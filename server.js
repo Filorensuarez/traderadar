@@ -20,25 +20,24 @@ const cfg = {
   strong: 84,
   late: 5,
   max: 120,
-
-  // 15 dakika veri sakla
   keepMs: 15 * 60 * 1000,
-
-  // Coin en az 8 dakika izlenmeden erken uyarı üretme
   warmupMs: 8 * 60 * 1000,
+  minBaselineWindows: 3,
 
-  // En az 3 dolu geçmiş pencere gerekli
-  minBaselineWindows: 3
+  // 84+ puan en az 8 saniye korunmalı
+  strongHoldMs: 8000,
+
+  // Son 5 dakika zirve puanı
+  peakMemoryMs: 5 * 60 * 1000
 };
 
 const median = arr => {
-  const clean = arr.filter(
-    x => Number.isFinite(x) && x > 0
-  );
+  const a = arr
+    .filter(x => Number.isFinite(x) && x > 0)
+    .sort((x, y) => x - y);
 
-  if (!clean.length) return 0;
+  if (!a.length) return 0;
 
-  const a = [...clean].sort((x, y) => x - y);
   const m = Math.floor(a.length / 2);
 
   return a.length % 2
@@ -65,10 +64,19 @@ function getState(symbol) {
       trades: [],
       candles: [],
       price: 0,
+
       score: 0,
+      rawStatus: "VERİ TOPLANIYOR",
       status: "VERİ TOPLANIYOR",
+
       metrics: {},
-      firstTradeAt: 0
+      firstTradeAt: 0,
+
+      scoreHistory: [],
+      peak5m: 0,
+
+      strongSince: 0,
+      lastSignalAt: 0
     });
   }
 
@@ -76,11 +84,11 @@ function getState(symbol) {
 }
 
 function windowStats(s, seconds) {
-  const since = Date.now() - seconds * 1000;
+  const since =
+    Date.now() - seconds * 1000;
 
-  const rows = s.trades.filter(
-    x => x.t >= since
-  );
+  const rows =
+    s.trades.filter(x => x.t >= since);
 
   if (!rows.length) {
     return {
@@ -91,15 +99,18 @@ function windowStats(s, seconds) {
     };
   }
 
-  const volume = rows.reduce(
-    (a, x) => a + x.q,
-    0
-  );
+  const volume =
+    rows.reduce(
+      (a, x) => a + x.q,
+      0
+    );
 
-  const buyVolume = rows.reduce(
-    (a, x) => a + (x.buy ? x.q : 0),
-    0
-  );
+  const buyVolume =
+    rows.reduce(
+      (a, x) =>
+        a + (x.buy ? x.q : 0),
+      0
+    );
 
   return {
     ret: pct(
@@ -118,6 +129,34 @@ function windowStats(s, seconds) {
   };
 }
 
+function updatePeak(s, score) {
+  const now = Date.now();
+
+  s.scoreHistory.push({
+    t: now,
+    score
+  });
+
+  const cutoff =
+    now - cfg.peakMemoryMs;
+
+  while (
+    s.scoreHistory.length &&
+    s.scoreHistory[0].t < cutoff
+  ) {
+    s.scoreHistory.shift();
+  }
+
+  s.peak5m =
+    s.scoreHistory.length
+      ? Math.max(
+          ...s.scoreHistory.map(
+            x => x.score
+          )
+        )
+      : score;
+}
+
 function calculate(s) {
   const now = Date.now();
 
@@ -129,29 +168,34 @@ function calculate(s) {
 
   const baselines = [];
 
-  // Önceki 2 dakikalık pencereler
   for (let k = 2; k <= 7; k++) {
-    const lo = now - k * 120000;
-    const hi = now - (k - 1) * 120000;
+    const lo =
+      now - k * 120000;
 
-    const rows = s.trades.filter(
-      x => x.t >= lo && x.t < hi
-    );
+    const hi =
+      now - (k - 1) * 120000;
+
+    const rows =
+      s.trades.filter(
+        x => x.t >= lo && x.t < hi
+      );
 
     if (rows.length < 3) continue;
 
-    const volume = rows.reduce(
-      (a, x) => a + x.q,
-      0
-    );
+    const volume =
+      rows.reduce(
+        (a, x) => a + x.q,
+        0
+      );
 
     if (volume <= 0) continue;
 
-    const buyVolume = rows.reduce(
-      (a, x) =>
-        a + (x.buy ? x.q : 0),
-      0
-    );
+    const buyVolume =
+      rows.reduce(
+        (a, x) =>
+          a + (x.buy ? x.q : 0),
+        0
+      );
 
     baselines.push({
       v: volume,
@@ -168,24 +212,28 @@ function calculate(s) {
 
   const ready =
     age >= cfg.warmupMs &&
-    baselines.length >= cfg.minBaselineWindows;
+    baselines.length >=
+      cfg.minBaselineWindows;
 
   let volumeX = 0;
   let tradeX = 0;
   let buyShift = 0;
 
   if (ready) {
-    const baseVol = median(
-      baselines.map(x => x.v)
-    );
+    const baseVol =
+      median(
+        baselines.map(x => x.v)
+      );
 
-    const baseTrades = median(
-      baselines.map(x => x.n)
-    );
+    const baseTrades =
+      median(
+        baselines.map(x => x.n)
+      );
 
-    const baseBuy = median(
-      baselines.map(x => x.br)
-    );
+    const baseBuy =
+      median(
+        baselines.map(x => x.br)
+      );
 
     volumeX =
       baseVol > 0
@@ -200,17 +248,22 @@ function calculate(s) {
     buyShift =
       w30.buyRatio - baseBuy;
 
-    // Anormal oranların puanı bozmasını önle
-    volumeX = Math.min(volumeX, 20);
-    tradeX = Math.min(tradeX, 20);
+    // Aşırı uç değerlerin puanı ele
+    // geçirmesini engelle.
+    volumeX =
+      Math.min(volumeX, 20);
+
+    tradeX =
+      Math.min(tradeX, 20);
   }
 
-  const momentum = Math.max(
-    0,
-    w10.ret * 2 +
-    w30.ret +
-    w60.ret * 0.5
-  );
+  const momentum =
+    Math.max(
+      0,
+      w10.ret * 2 +
+      w30.ret +
+      w60.ret * 0.5
+    );
 
   const candles =
     s.candles.slice(-8);
@@ -263,10 +316,12 @@ function calculate(s) {
         : 99;
   }
 
-  // Veri henüz yeterli değilse sinyal üretme
   if (!ready) {
     s.score = 0;
+    s.peak5m = 0;
+    s.rawStatus = "VERİ TOPLANIYOR";
     s.status = "VERİ TOPLANIYOR";
+    s.strongSince = 0;
 
     s.metrics = {
       w5,
@@ -274,17 +329,25 @@ function calculate(s) {
       w30,
       w60,
       w120,
+
       volX: 0,
       tradeX: 0,
+
       compression,
       resistanceDistance,
+
       ready: false,
-      baselineWindows: baselines.length,
+
+      baselineWindows:
+        baselines.length,
+
       warmupRemaining:
         Math.max(
           0,
           cfg.warmupMs - age
-        )
+        ),
+
+      peak5m: 0
     };
 
     return;
@@ -308,7 +371,10 @@ function calculate(s) {
     buy:
       sigmoid(
         w30.buyRatio +
-        Math.max(0, buyShift) * 0.7,
+        Math.max(
+          0,
+          buyShift
+        ) * 0.7,
         60,
         6
       ),
@@ -351,23 +417,137 @@ function calculate(s) {
       Math.min(score, 58);
   }
 
-  s.score =
+  score =
     Math.round(score);
 
-  s.status =
-    late
-      ? "GEÇ KALINDI"
+  s.score = score;
 
-      : score >= cfg.strong
-      ? "GÜÇLÜ ERKEN UYARI"
+  updatePeak(
+    s,
+    score
+  );
 
-      : score >= cfg.alert
-      ? "ERKEN UYARI"
+  if (late) {
+    s.rawStatus =
+      "GEÇ KALINDI";
 
-      : score >= 58
-      ? "ADAY"
+  } else if (
+    score >= cfg.strong
+  ) {
+    s.rawStatus =
+      "GÜÇLÜ ERKEN UYARI";
 
-      : "İZLENİYOR";
+  } else if (
+    score >= cfg.alert
+  ) {
+    s.rawStatus =
+      "ERKEN UYARI";
+
+  } else if (
+    score >= 58
+  ) {
+    s.rawStatus =
+      "ADAY";
+
+  } else {
+    s.rawStatus =
+      "İZLENİYOR";
+  }
+
+  // 84 üzeri tek anlık sıçrama güçlü
+  // uyarı sayılmayacak.
+  if (
+    !late &&
+    score >= cfg.strong
+  ) {
+    if (!s.strongSince) {
+      s.strongSince = now;
+    }
+
+  } else {
+    s.strongSince = 0;
+  }
+
+  const strongConfirmed =
+    s.strongSince &&
+    now - s.strongSince >=
+      cfg.strongHoldMs;
+
+  const previouslyStrong =
+    s.peak5m >= cfg.strong;
+
+  const buyHealthy =
+    w30.buyRatio >= 55;
+
+  const flowHealthy =
+    volumeX >= 1.2 ||
+    tradeX >= 1.2;
+
+  const momentumHealthy =
+    w10.ret > -0.15 &&
+    w30.ret > -0.30;
+
+  if (late) {
+    s.status =
+      "GEÇ KALINDI";
+
+  } else if (
+    strongConfirmed
+  ) {
+    s.status =
+      "GÜÇLÜ ERKEN UYARI";
+
+    s.lastSignalAt = now;
+
+  } else if (
+    score >= cfg.strong
+  ) {
+    s.status =
+      "TEYİT BEKLENİYOR";
+
+  } else if (
+    score >= cfg.alert
+  ) {
+    s.status =
+      "ERKEN UYARI";
+
+    s.lastSignalAt = now;
+
+  } else if (
+    previouslyStrong &&
+    score >= 70 &&
+    buyHealthy &&
+    flowHealthy &&
+    momentumHealthy
+  ) {
+    s.status =
+      "SİNYAL KORUNUYOR";
+
+  } else if (
+    previouslyStrong &&
+    (
+      score < 70 ||
+      w30.buyRatio < 50 ||
+      (
+        volumeX < 1 &&
+        tradeX < 1
+      ) ||
+      w30.ret < -0.4
+    )
+  ) {
+    s.status =
+      "SİNYAL BOZULDU";
+
+  } else if (
+    score >= 58
+  ) {
+    s.status =
+      "ADAY";
+
+  } else {
+    s.status =
+      "İZLENİYOR";
+  }
 
   s.metrics = {
     w5,
@@ -376,15 +556,35 @@ function calculate(s) {
     w60,
     w120,
 
-    volX: volumeX,
-    tradeX: tradeX,
+    volX,
+    tradeX,
 
     compression,
     resistanceDistance,
 
     ready: true,
+
     baselineWindows:
-      baselines.length
+      baselines.length,
+
+    peak5m:
+      s.peak5m,
+
+    strongConfirmed:
+      Boolean(strongConfirmed),
+
+    strongHoldSeconds:
+      s.strongSince
+        ? Math.floor(
+            (
+              now -
+              s.strongSince
+            ) / 1000
+          )
+        : 0,
+
+    rawStatus:
+      s.rawStatus
   };
 }
 
@@ -481,10 +681,12 @@ function connectOKX(symbols) {
 
   ws.on("open", () => {
     const args =
-      symbols.map(symbol => ({
-        channel: "trades",
-        instId: symbol
-      }));
+      symbols.map(
+        symbol => ({
+          channel: "trades",
+          instId: symbol
+        })
+      );
 
     for (
       let i = 0;
@@ -495,7 +697,10 @@ function connectOKX(symbols) {
         JSON.stringify({
           op: "subscribe",
           args:
-            args.slice(i, i + 50)
+            args.slice(
+              i,
+              i + 50
+            )
         })
       );
     }
@@ -525,11 +730,10 @@ function connectOKX(symbols) {
     }
 
     for (const trade of msg.data) {
-      const symbol =
-        trade.instId;
-
       const s =
-        getState(symbol);
+        getState(
+          trade.instId
+        );
 
       const price =
         Number(trade.px);
@@ -559,8 +763,6 @@ function connectOKX(symbols) {
       s.trades.push({
         t: timestamp,
         p: price,
-
-        // USDT işlem değeri
         q: price * size,
 
         buy:
@@ -573,7 +775,8 @@ function connectOKX(symbols) {
 
       while (
         s.trades.length &&
-        s.trades[0].t < cutoff
+        s.trades[0].t <
+          cutoff
       ) {
         s.trades.shift();
       }
@@ -582,24 +785,32 @@ function connectOKX(symbols) {
     }
   });
 
-  ws.on("error", err => {
-    console.error(
-      "OKX WebSocket:",
-      err.message
-    );
-  });
+  ws.on(
+    "error",
+    err => {
+      console.error(
+        "OKX WebSocket:",
+        err.message
+      );
+    }
+  );
 
-  ws.on("close", () => {
-    console.log(
-      "OKX bağlantısı kapandı. Yeniden bağlanılıyor."
-    );
+  ws.on(
+    "close",
+    () => {
+      console.log(
+        "OKX bağlantısı kapandı. Yeniden bağlanılıyor."
+      );
 
-    setTimeout(
-      () =>
-        connectOKX(symbols),
-      2000
-    );
-  });
+      setTimeout(
+        () =>
+          connectOKX(
+            symbols
+          ),
+        2000
+      );
+    }
+  );
 }
 
 function radarRows() {
@@ -610,120 +821,51 @@ function radarRows() {
     )
 
     .sort(
-      (a, b) =>
-        b.score - a.score
+      (a, b) => {
+        // Önce aktif sinyaller,
+        // sonra puan sırası.
+        const priority = status => {
+          if (
+            status ===
+            "GÜÇLÜ ERKEN UYARI"
+          ) return 7;
+
+          if (
+            status ===
+            "ERKEN UYARI"
+          ) return 6;
+
+          if (
+            status ===
+            "SİNYAL KORUNUYOR"
+          ) return 5;
+
+          if (
+            status ===
+            "TEYİT BEKLENİYOR"
+          ) return 4;
+
+          if (
+            status ===
+            "ADAY"
+          ) return 3;
+
+          if (
+            status ===
+            "SİNYAL BOZULDU"
+          ) return 2;
+
+          return 1;
+        };
+
+        return (
+          priority(b.status) -
+            priority(a.status) ||
+          b.score - a.score
+        );
+      }
     )
 
     .slice(0, 30)
 
-    .map(x => ({
-      symbol: x.symbol,
-      price: x.price,
-      score: x.score,
-      status: x.status,
-      metrics: x.metrics,
-      source: "OKX"
-    }));
-}
-
-// Mobil için WebSocket yedek veri yolu
-app.get(
-  "/api/radar",
-  (req, res) => {
-    res.set(
-      "Cache-Control",
-      "no-store"
-    );
-
-    res.json({
-      type: "radar",
-      source: "OKX",
-      rows: radarRows(),
-      ts: Date.now()
-    });
-  }
-);
-
-const server =
-  app.listen(
-    PORT,
-    async () => {
-      console.log(
-        `TradeRadar port ${PORT}`
-      );
-
-      try {
-        const symbols =
-          await getSymbols();
-
-        console.log(
-          `${symbols.length} OKX USDT paritesi bulundu`
-        );
-
-        if (!symbols.length) {
-          console.error(
-            "OKX paritesi bulunamadı."
-          );
-
-          return;
-        }
-
-        await loadCandles(
-          symbols
-        );
-
-        connectOKX(
-          symbols
-        );
-
-      } catch (e) {
-        console.error(
-          "OKX başlatma hatası:",
-          e.message
-        );
-      }
-    }
-  );
-
-const ui =
-  new WebSocketServer({
-    server,
-    path: "/live"
-  });
-
-ui.on(
-  "connection",
-  ws => {
-    clients.add(ws);
-
-    ws.on(
-      "close",
-      () => {
-        clients.delete(ws);
-      }
-    );
-  }
-);
-
-setInterval(
-  () => {
-    const message =
-      JSON.stringify({
-        type: "radar",
-        source: "OKX",
-        rows: radarRows()
-      });
-
-    for (
-      const ws of clients
-    ) {
-      if (
-        ws.readyState ===
-        WebSocket.OPEN
-      ) {
-        ws.send(message);
-      }
-    }
-  },
-  1000
-);
+    .map(x =>
