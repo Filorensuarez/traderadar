@@ -1168,9 +1168,175 @@ function connectOKX(
   );
 
 
-  ws.on(
-    "close",
-    () => {
+  ws.on("close", () => {
+  console.log("OKX bağlantısı kapandı. Yeniden bağlanılıyor.");
+
+  setTimeout(
+    () => connectOKX(symbols),
+    2000
+  );
+});
+
+}
+
+function priority(status) {
+  if (status === "GÜÇLÜ ERKEN UYARI") return 7;
+  if (status === "ERKEN UYARI") return 6;
+  if (status === "SİNYAL KORUNUYOR") return 5;
+  if (status === "TEYİT BEKLENİYOR") return 4;
+  if (status === "ADAY") return 3;
+  if (status === "SİNYAL BOZULDU") return 2;
+  return 1;
+}
+
+function radarRows() {
+
+  return [...states.values()]
+
+    .filter(x => x.price)
+
+    .sort(
+      (a, b) =>
+        priority(b.status) -
+          priority(a.status) ||
+        b.score - a.score
+    )
+
+    .slice(0, 30)
+
+    .map(x => ({
+      symbol: x.symbol,
+      price: x.price,
+
+      score: x.score,
+      peak5m: x.peak5m,
+
+      status: x.status,
+      rawStatus: x.rawStatus,
+
+      metrics: x.metrics,
+
+      source: "OKX"
+    }));
+}
+
+
+// HTTP YEDEK
+
+app.get("/api/radar", (req, res) => {
+
+  res.set(
+    "Cache-Control",
+    "no-store"
+  );
+
+  res.json({
+    type: "radar",
+    source: "OKX",
+    rows: radarRows(),
+    ts: Date.now()
+  });
+
+});
+
+
+// SUNUCU
+
+const server = app.listen(
+  PORT,
+  async () => {
+
+    console.log(
+      `TradeRadar port ${PORT}`
+    );
+
+    try {
+
+      const symbols =
+        await getSymbols();
 
       console.log(
-        "OKX bağlantısı kapandı. Yen
+        `${symbols.length} OKX USDT paritesi bulundu`
+      );
+
+      if (!symbols.length) {
+
+        console.error(
+          "OKX paritesi bulunamadı."
+        );
+
+        return;
+      }
+
+      await loadCandles(symbols);
+
+      connectOKX(symbols);
+
+    } catch (e) {
+
+      console.error(
+        "OKX başlatma hatası:",
+        e.message
+      );
+    }
+  }
+);
+
+
+// TELEFON WEBSOCKET
+
+const ui =
+  new WebSocketServer({
+    server,
+    path: "/live"
+  });
+
+
+ui.on("connection", ws => {
+
+  clients.add(ws);
+
+  try {
+
+    ws.send(
+      JSON.stringify({
+        type: "radar",
+        source: "OKX",
+        rows: radarRows()
+      })
+    );
+
+  } catch (e) {}
+
+
+  ws.on("close", () => {
+    clients.delete(ws);
+  });
+
+});
+
+
+// HER SANİYE GÜNCELLE
+
+setInterval(() => {
+
+  const message =
+    JSON.stringify({
+      type: "radar",
+      source: "OKX",
+      rows: radarRows()
+    });
+
+
+  for (const ws of clients) {
+
+    if (
+      ws.readyState ===
+      WebSocket.OPEN
+    ) {
+
+      ws.send(message);
+    }
+  }
+
+}, 1000);
