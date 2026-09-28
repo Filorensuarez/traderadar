@@ -3,7 +3,7 @@ import WebSocket from "ws";
 import path from "path";
 import {fileURLToPath} from "url";
 const app=express(), __dirname=path.dirname(fileURLToPath(import.meta.url)), PORT=process.env.PORT||3000;
-app.use(express.static(path.join(__dirname,"public")));
+app.use(express.static(path.join(__dirname,". ")));
 const SURL="https://www.binance.tr/open/v1/common/symbols", WSS="wss://stream-cloud.binance.tr/ws";
 const st=new Map(), clients=new Set();
 const cfg={alert:72,strong:84,late:5,max:120,keepMs:15*60*1000};
