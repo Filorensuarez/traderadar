@@ -1,106 +1,168 @@
-const C=document.querySelector("#cards");
-const K=document.querySelector("#conn");
-const T=document.querySelector("#time");
+const C = document.querySelector("#cards");
+const K = document.querySelector("#conn");
+const T = document.querySelector("#time");
 
-const f=(n,d=2)=>Number.isFinite(Number(n))?Number(n).toFixed(d):"-";
+const f = (n, d = 2) =>
+  Number.isFinite(Number(n)) ? Number(n).toFixed(d) : "-";
 
-const alarms=new Map();
-const COOLDOWN=10*60*1000;
+const coinAlarmHistory = new Map();
 
-async function enableNotifications(){
-  if(!("Notification" in window)){
+const COIN_COOLDOWN = 10 * 60 * 1000;
+const SOUND_COOLDOWN = 30 * 1000;
+
+let lastSoundAt = 0;
+let wsConnected = false;
+
+async function enableNotifications() {
+  if (!("Notification" in window)) {
     alert("Tarayıcınız bildirimleri desteklemiyor.");
     return;
   }
 
-  const p=await Notification.requestPermission();
+  const permission = await Notification.requestPermission();
 
-  if(p==="granted"){
-    notifyBtn.textContent="Bildirimler Açık";
+  if (permission === "granted") {
+    notifyBtn.textContent = "Bildirimler Açık";
     alert("TradeRadar bildirimleri açıldı.");
   }
 }
 
-function beep(strong=false){
-  try{
-    const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    const osc=ctx.createOscillator();
-    const gain=ctx.createGain();
+function beep(strong = false) {
+  const now = Date.now();
+
+  // En fazla 30 saniyede bir ses
+  if (now - lastSoundAt < SOUND_COOLDOWN) return;
+
+  lastSoundAt = now;
+
+  try {
+    const ctx =
+      new (window.AudioContext || window.webkitAudioContext)();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
 
     osc.connect(gain);
     gain.connect(ctx.destination);
 
-    osc.frequency.value=strong?880:620;
-    gain.gain.value=0.15;
+    osc.frequency.value = strong ? 880 : 620;
+    gain.gain.value = 0.12;
 
     osc.start();
 
-    setTimeout(()=>{
+    setTimeout(() => {
       osc.stop();
       ctx.close();
-    },strong?700:350);
-  }catch(e){}
+    }, strong ? 600 : 300);
+
+  } catch (e) {}
 }
 
-function alarm(x){
-  if(
-    x.status!=="ERKEN UYARI" &&
-    x.status!=="GÜÇLÜ ERKEN UYARI"
-  ) return;
+function processAlerts(rows) {
+  const alerts = rows
+    .filter(x =>
+      x.status === "ERKEN UYARI" ||
+      x.status === "GÜÇLÜ ERKEN UYARI"
+    )
+    .filter(x => x.metrics?.ready !== false)
+    .sort((a, b) => b.score - a.score);
 
-  const strong=x.status==="GÜÇLÜ ERKEN UYARI";
-  const key=x.symbol+":"+(strong?"strong":"alert");
-  const last=alarms.get(key)||0;
+  if (!alerts.length) return;
 
-  if(Date.now()-last<COOLDOWN) return;
+  const now = Date.now();
 
-  alarms.set(key,Date.now());
+  const fresh = alerts.filter(x => {
+    const last =
+      coinAlarmHistory.get(x.symbol) || 0;
 
-  const m=x.metrics||{};
-  const w30=m.w30||{};
+    return now - last >= COIN_COOLDOWN;
+  });
 
-  const title=
-    (strong?"GÜÇLÜ ERKEN UYARI — ":"ERKEN UYARI — ")+x.symbol;
+  if (!fresh.length) return;
 
-  const body=
-    "Puan: "+x.score+"/100\n"+
-    "Alış baskısı: %"+f(w30.buyRatio,1)+"\n"+
-    "Hacim: "+f(m.volX)+"x | İşlem: "+f(m.tradeX)+"x";
+  fresh.forEach(x => {
+    coinAlarmHistory.set(x.symbol, now);
+  });
 
+  const strongest = fresh[0];
+
+  const strong =
+    strongest.status === "GÜÇLÜ ERKEN UYARI";
+
+  // Kaç coin gelirse gelsin tek ses
   beep(strong);
 
-  if("vibrate" in navigator){
+  if ("vibrate" in navigator) {
     navigator.vibrate(
       strong
-        ? [300,150,300,150,500]
-        : [250,120,250]
+        ? [300, 150, 400]
+        : [250, 120, 250]
     );
   }
 
-  if(
+  if (
     "Notification" in window &&
-    Notification.permission==="granted"
-  ){
-    new Notification(title,{
-      body:body,
-      tag:key
-    });
+    Notification.permission === "granted"
+  ) {
+    const m = strongest.metrics || {};
+    const w30 = m.w30 || {};
+
+    let body =
+      "Puan: " + strongest.score + "/100\n" +
+      "Alış baskısı: %" + f(w30.buyRatio, 1) + "\n" +
+      "Hacim: " + f(m.volX) + "x\n" +
+      "İşlem hızı: " + f(m.tradeX) + "x";
+
+    if (fresh.length > 1) {
+      body +=
+        "\nAyrıca " +
+        (fresh.length - 1) +
+        " coin daha uyarı verdi.";
+    }
+
+    new Notification(
+      strong
+        ? "GÜÇLÜ ERKEN UYARI — " + strongest.symbol
+        : "ERKEN UYARI — " + strongest.symbol,
+      {
+        body,
+        tag: "traderadar-main"
+      }
+    );
   }
 }
 
-function render(rows){
-  T.textContent=new Date().toLocaleTimeString("tr-TR");
+function render(rows) {
+  T.textContent =
+    new Date().toLocaleTimeString("tr-TR");
 
-  rows.forEach(alarm);
+  processAlerts(rows);
 
-  C.innerHTML=rows.map(x=>{
-    const m=x.metrics||{};
-    const w10=m.w10||{};
-    const w30=m.w30||{};
-    const w60=m.w60||{};
-    const w120=m.w120||{};
+  C.innerHTML = rows.map(x => {
+    const m = x.metrics || {};
 
-    const symbol=x.symbol.replace("-USDT","/USDT");
+    const w10 = m.w10 || {};
+    const w30 = m.w30 || {};
+    const w60 = m.w60 || {};
+    const w120 = m.w120 || {};
+
+    const symbol =
+      x.symbol.replace("-USDT", "/USDT");
+
+    let warmup = "";
+
+    if (x.status === "VERİ TOPLANIYOR") {
+      const remaining =
+        Math.ceil(
+          (m.warmupRemaining || 0) / 60000
+        );
+
+      warmup =
+        `<div class="m">
+          <span>Hazırlık</span>
+          <b>${remaining} dk</b>
+        </div>`;
+    }
 
     return `
       <article class="card">
@@ -135,7 +197,7 @@ function render(rows){
 
           <div class="m">
             <span>30 sn alış baskısı</span>
-            <b>%${f(w30.buyRatio,1)}</b>
+            <b>%${f(w30.buyRatio, 1)}</b>
           </div>
 
           <div class="m">
@@ -155,7 +217,7 @@ function render(rows){
 
           <div class="m">
             <span>8 mum sıkışma</span>
-            <b>${f(m.compression,0)}/100</b>
+            <b>${f(m.compression, 0)}/100</b>
           </div>
 
           <div class="m">
@@ -163,61 +225,149 @@ function render(rows){
             <b>%${f(m.resistanceDistance)}</b>
           </div>
 
+          ${warmup}
+
         </div>
       </article>
     `;
   }).join("");
 }
 
-const notifyBtn=document.createElement("button");
+const notifyBtn =
+  document.createElement("button");
 
-notifyBtn.textContent=
-  ("Notification" in window &&
-   Notification.permission==="granted")
-  ? "Bildirimler Açık"
-  : "Bildirimleri Aç";
+notifyBtn.textContent =
+  (
+    "Notification" in window &&
+    Notification.permission === "granted"
+  )
+    ? "Bildirimler Açık"
+    : "Bildirimleri Aç";
 
-notifyBtn.style.cssText=
-  "position:fixed;right:15px;bottom:18px;z-index:999;"+
-  "padding:13px 18px;border:0;border-radius:24px;"+
-  "font-weight:700;cursor:pointer";
+notifyBtn.style.cssText =
+  "position:fixed;" +
+  "right:15px;" +
+  "bottom:18px;" +
+  "z-index:999;" +
+  "padding:13px 18px;" +
+  "border:0;" +
+  "border-radius:24px;" +
+  "font-weight:700;" +
+  "cursor:pointer;";
 
-notifyBtn.onclick=enableNotifications;
+notifyBtn.onclick =
+  enableNotifications;
 
 document.body.appendChild(notifyBtn);
 
-let ws=null;
 
-function connect(){
-  const protocol=
-    location.protocol==="https:" ? "wss" : "ws";
+// HTTP YEDEK BAĞLANTI
 
-  ws=new WebSocket(
-    protocol+"://"+location.host+"/live"
-  );
+async function pollRadar() {
+  try {
+    const response =
+      await fetch(
+        "/api/radar?t=" + Date.now(),
+        {
+          cache: "no-store"
+        }
+      );
 
-  ws.onopen=()=>{
-    K.textContent="OKX Canlı";
-  };
+    if (!response.ok) {
+      throw new Error(
+        "HTTP " + response.status
+      );
+    }
 
-  ws.onmessage=e=>{
-    try{
-      const d=JSON.parse(e.data);
+    const data =
+      await response.json();
 
-      if(d.type==="radar"){
-        render(d.rows||[]);
+    if (
+      data.type === "radar" &&
+      Array.isArray(data.rows)
+    ) {
+      render(data.rows);
+
+      if (!wsConnected) {
+        K.textContent =
+          "OKX HTTP Yedek";
       }
-    }catch(err){}
+    }
+
+  } catch (e) {
+    if (!wsConnected) {
+      K.textContent =
+        "Bağlantı bekleniyor...";
+    }
+  }
+}
+
+
+// WEBSOCKET ANA BAĞLANTI
+
+function connectWS() {
+  const protocol =
+    location.protocol === "https:"
+      ? "wss"
+      : "ws";
+
+  const ws =
+    new WebSocket(
+      protocol +
+      "://" +
+      location.host +
+      "/live"
+    );
+
+  ws.onopen = () => {
+    wsConnected = true;
+
+    K.textContent =
+      "OKX Canlı";
   };
 
-  ws.onerror=()=>{
-    K.textContent="Bağlantı hatası";
+  ws.onmessage = event => {
+    try {
+      const data =
+        JSON.parse(event.data);
+
+      if (
+        data.type === "radar" &&
+        Array.isArray(data.rows)
+      ) {
+        render(data.rows);
+      }
+
+    } catch (e) {}
   };
 
-  ws.onclose=()=>{
-    K.textContent="Yeniden bağlanıyor...";
-    setTimeout(connect,2000);
+  ws.onerror = () => {
+    wsConnected = false;
+  };
+
+  ws.onclose = () => {
+    wsConnected = false;
+
+    K.textContent =
+      "OKX HTTP Yedek";
+
+    setTimeout(
+      connectWS,
+      3000
+    );
   };
 }
 
-connect();
+
+// BAŞLAT
+
+connectWS();
+
+// Sayfa açılır açılmaz HTTP'den de veri al
+pollRadar();
+
+// WebSocket çalışsa bile HTTP yedek kontrolü
+setInterval(
+  pollRadar,
+  2000
+);
