@@ -1,5 +1,5 @@
 import express from "express";
-import WebSocket from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 import path from "path";
 import {fileURLToPath} from "url";
 const app=express(), __dirname=path.dirname(fileURLToPath(import.meta.url)), PORT=process.env.PORT||3000;
@@ -24,5 +24,5 @@ function connect(list){let w=new WebSocket(WSS);w.on("open",()=>{let p=[];for(le
  w.on("message",r=>{let d;try{d=JSON.parse(r.toString());}catch{return}d=d.data||d;if(d.e==="aggTrade"){let s=S(d.s),p=+d.p,q=+d.q;s.tr.push({t:+(d.T||d.E||Date.now()),p,q:p*q,buy:!d.m});s.price=p;let cut=Date.now()-cfg.keepMs;while(s.tr.length&&s.tr[0].t<cut)s.tr.shift();calc(s)}else if(d.e==="kline"&&d.k){let s=S(d.s),k=d.k,x={t:+k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+(k.q||k.v),n:+k.n},i=s.k.findIndex(y=>y.t===x.t);if(i>=0)s.k[i]=x;else s.k.push(x);s.k=s.k.slice(-12)}});
  w.on("close",()=>setTimeout(()=>connect(list),1500));w.on("error",()=>w.close())}
 const server=app.listen(PORT,async()=>{console.log("TradeRadar http://localhost:"+PORT);let a=await symbols();console.log(a.length+" TRY paritesi");for(let i=0;i<a.length;i+=30)connect(a.slice(i,i+30))});
-const ui=new WebSocket.Server({server,path:"/live"});ui.on("connection",w=>{clients.add(w);w.on("close",()=>clients.delete(w))});
+const ui=new WebSocketServer({server,path:"/live"});ui.on("connection",w=>{clients.add(w);w.on("close",()=>clients.delete(w))});
 setInterval(()=>{let rows=[...st.values()].filter(x=>x.price).sort((a,b)=>b.score-a.score).slice(0,30).map(x=>({symbol:x.symbol,price:x.price,score:x.score,status:x.status,metrics:x.m})),msg=JSON.stringify({type:"radar",at:Date.now(),rows});for(let w of clients)if(w.readyState===1)w.send(msg)},1000);
