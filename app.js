@@ -1513,12 +1513,6 @@ async function pollRadar() {
         K.textContent =
           "Ekran hatası";
       }
-    } catch (e) {
-      console.error(
-        "Ekran çizme:",
-        e
-      );
-    }
 
   } catch (e) {
     console.error(
