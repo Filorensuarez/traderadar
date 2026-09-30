@@ -1708,7 +1708,147 @@ app.get(
   }
 );
 
+// =====================================
+// TEK COİN SORGULAMA
+// =====================================
 
+app.get(
+  "/api/coin/:symbol",
+  (req, res) => {
+    res.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+    let symbol =
+      String(
+        req.params.symbol || ""
+      )
+        .trim()
+        .toUpperCase();
+
+
+    symbol =
+      symbol
+        .replace("/USDT", "")
+        .replace("-USDT", "")
+        .replace("USDT", "")
+        .trim();
+
+
+    const fullSymbol =
+      `${symbol}-USDT`;
+
+
+    const s =
+      states.get(
+        fullSymbol
+      );
+
+
+    if (!s) {
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Coin bulunamadı.",
+          symbol:
+            fullSymbol
+        });
+    }
+
+
+    const lastHistory =
+      signalHistory.find(
+        h =>
+          h.symbol ===
+          fullSymbol
+      );
+
+
+    const m =
+      s.metrics || {};
+
+
+    res.json({
+      ok: true,
+
+      source:
+        "OKX",
+
+      symbol:
+        s.symbol,
+
+      price:
+        s.price,
+
+      score:
+        s.score,
+
+      peak5m:
+        s.peak5m,
+
+      status:
+        s.status,
+
+      metrics:
+        m,
+
+      history:
+        lastHistory || null,
+
+      analysis: {
+        volumeStrong:
+          Number(
+            m.volX || 0
+          ) >= 2,
+
+        volumeAccelerationStrong:
+          Number(
+            m.volumeAcceleration ||
+            0
+          ) >= 1.4,
+
+        tradeStrong:
+          Number(
+            m.tradeX || 0
+          ) >= 1.2,
+
+        tradeAccelerationStrong:
+          Number(
+            m.tradeAcceleration ||
+            0
+          ) >= 1.3,
+
+        buyerStrong:
+          Number(
+            m.w30?.buyRatio ||
+            0
+          ) >= 65,
+
+        resistanceNear:
+          Number(
+            m.resistanceDistance ||
+            99
+          ) >= -0.5 &&
+          Number(
+            m.resistanceDistance ||
+            99
+          ) <= 2.5,
+
+        priceNotExtended:
+          Number(
+            m.w120?.ret ||
+            0
+          ) < 2.5
+      },
+
+      ts:
+        Date.now()
+    });
+  }
+);
 app.get(
   "/api/history",
   (req, res) => {
