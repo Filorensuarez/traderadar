@@ -530,46 +530,682 @@ function calculate(s) {
   ) {
     s.status =
       "TEYİT BEKLENİYOR";
+function calculate(s) {
+  const now = Date.now();
 
-  } else if (
-    s.score >= CFG.alert
-  ) {
-    s.status =
-      "ERKEN UYARI";
+  const w5 = windowStats(s, 5);
+  const w10 = windowStats(s, 10);
+  const w30 = windowStats(s, 30);
+  const w60 = windowStats(s, 60);
+  const w120 = windowStats(s, 120);
 
-  } else if (
-    previouslyStrong &&
-    s.score >= 70 &&
-    healthy
-  ) {
-    s.status =
-      "SİNYAL KORUNUYOR";
+  // ===================================
+  // GEÇMİŞ REFERANS PENCERELERİ
+  // ===================================
 
-  } else if (
-    previouslyStrong &&
-    (
-      s.score < 70 ||
-      w30.buyRatio < 50 ||
+  const baseline = [];
+
+  for (let k = 2; k <= 7; k++) {
+    const lo = now - k * 120000;
+    const hi = now - (k - 1) * 120000;
+
+    const r = s.trades.filter(
+      x => x.t >= lo && x.t < hi
+    );
+
+    if (r.length < 3) continue;
+
+    const volume =
+      r.reduce(
+        (a, x) => a + x.q,
+        0
+      );
+
+    if (!volume) continue;
+
+    const buyVolume =
+      r.reduce(
+        (a, x) =>
+          a + (x.buy ? x.q : 0),
+        0
+      );
+
+    baseline.push({
+      volume,
+      trades: r.length,
+      buy:
+        (buyVolume / volume) * 100
+    });
+  }
+
+  const age =
+    s.firstTradeAt
+      ? now - s.firstTradeAt
+      : 0;
+
+  const ready =
+    age >= CFG.warmupMs &&
+    baseline.length >= CFG.minBaseline;
+
+
+  // ===================================
+  // HACİM / İŞLEM İVMESİ
+  // ===================================
+
+  const baseVol =
+    median(
+      baseline.map(x => x.volume)
+    );
+
+  const baseTrades =
+    median(
+      baseline.map(x => x.trades)
+    );
+
+  const baseBuy =
+    median(
+      baseline.map(x => x.buy)
+    );
+
+
+  const vol120 =
+    ready && baseVol
+      ? w120.vol / baseVol
+      : 0;
+
+
+  const trade120 =
+    ready && baseTrades
+      ? w120.n / baseTrades
+      : 0;
+
+
+  // Son 30 saniyenin hızını
+  // 120 saniyelik ortalamaya kıyasla.
+  const vol30Expected =
+    w120.vol / 4;
+
+
+  const trade30Expected =
+    w120.n / 4;
+
+
+  const volumeAcceleration =
+    vol30Expected > 0
+      ? w30.vol / vol30Expected
+      : 0;
+
+
+  const tradeAcceleration =
+    trade30Expected > 0
+      ? w30.n / trade30Expected
+      : 0;
+
+
+  // Son 10 saniyede daha da
+  // hızlanma var mı?
+  const vol10Expected =
+    w30.vol / 3;
+
+
+  const microVolumeAcceleration =
+    vol10Expected > 0
+      ? w10.vol / vol10Expected
+      : 0;
+
+
+  const trade10Expected =
+    w30.n / 3;
+
+
+  const microTradeAcceleration =
+    trade10Expected > 0
+      ? w10.n / trade10Expected
+      : 0;
+
+
+  // ===================================
+  // ALIŞ BASKISI
+  // ===================================
+
+  const buyShift =
+    ready
+      ? w30.buyRatio - baseBuy
+      : 0;
+
+
+  const buyStrength =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        (
+          w10.buyRatio * 0.35 +
+          w30.buyRatio * 0.45 +
+          w60.buyRatio * 0.20
+        )
+      )
+    );
+
+
+  // ===================================
+  // 15 DK MUM YAPISI
+  // ===================================
+
+  const candles =
+    s.candles.slice(-8);
+
+  let compression = 50;
+  let resistanceDistance = 99;
+
+  let trendScore = 0;
+  let breakoutScore = 0;
+
+  let recentResistance = 0;
+
+  if (candles.length >= 4) {
+    const highs =
+      candles.map(x => x.h);
+
+    const lows =
+      candles.map(x => x.l);
+
+    const closes =
+      candles.map(x => x.c);
+
+
+    const middle =
+      median(closes) || 1;
+
+
+    const rangePct =
       (
-        volumeX < 1 &&
-        tradeX < 1
-      ) ||
-      w30.ret < -0.4
-    )
-  ) {
+        Math.max(...highs) -
+        Math.min(...lows)
+      ) /
+      middle *
+      100;
+
+
+    compression =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          100 - rangePct * 14
+        )
+      );
+
+
+    recentResistance =
+      Math.max(
+        ...highs.slice(0, -1)
+      );
+
+
+    resistanceDistance =
+      recentResistance
+        ? (
+            (
+              recentResistance -
+              s.price
+            ) /
+            recentResistance
+          ) * 100
+        : 99;
+
+
+    // Son kapanışlar sürekli
+    // yükseliyor mu?
+    let rising = 0;
+
+    for (
+      let i = 1;
+      i < closes.length;
+      i++
+    ) {
+      if (
+        closes[i] >
+        closes[i - 1]
+      ) {
+        rising++;
+      }
+    }
+
+
+    trendScore =
+      (
+        rising /
+        Math.max(
+          1,
+          closes.length - 1
+        )
+      ) * 100;
+
+
+    // Direnç kırıldı mı?
+    if (
+      recentResistance &&
+      s.price >
+        recentResistance
+    ) {
+      const breakoutPct =
+        (
+          (
+            s.price -
+            recentResistance
+          ) /
+          recentResistance
+        ) * 100;
+
+
+      breakoutScore =
+        Math.min(
+          100,
+          55 +
+          breakoutPct * 100
+        );
+    }
+  }
+
+
+  // ===================================
+  // HAZIRLIK TAMAMLANMADAN
+  // ===================================
+
+  if (!ready) {
+    s.score = 0;
+    s.peak5m = 0;
+
     s.status =
-      "SİNYAL BOZULDU";
+      "VERİ TOPLANIYOR";
+
+    s.rawStatus =
+      "VERİ TOPLANIYOR";
+
+    s.strongSince = 0;
+
+    s.metrics = {
+      w5,
+      w10,
+      w30,
+      w60,
+      w120,
+
+      volX: 0,
+      tradeX: 0,
+
+      volumeAcceleration,
+      tradeAcceleration,
+
+      microVolumeAcceleration,
+      microTradeAcceleration,
+
+      buyStrength,
+      buyShift,
+
+      compression,
+      trendScore,
+
+      resistanceDistance,
+      breakoutScore,
+
+      ready: false,
+
+      warmupRemaining:
+        Math.max(
+          0,
+          CFG.warmupMs - age
+        ),
+
+      peak5m: 0
+    };
+
+    return;
+  }
+
+
+  // ===================================
+  // FİYAT ÇOK İLERLEDİ Mİ?
+  // ===================================
+
+  const alreadyMoved =
+    Math.max(
+      w60.ret,
+      w120.ret
+    );
+
+
+  const tooLate =
+    w120.ret >= 5 ||
+    w60.ret >= 4;
+
+
+  // Erken sinyal için ideal:
+  // fiyat henüz çok yükselmemiş olmalı.
+  const earlyPriceScore =
+    alreadyMoved <= 0
+      ? 35
+
+      : alreadyMoved <= 0.5
+        ? 100
+
+        : alreadyMoved <= 1
+          ? 95
+
+          : alreadyMoved <= 2
+            ? 80
+
+            : alreadyMoved <= 3
+              ? 55
+
+              : 20;
+
+
+  // ===================================
+  // HACİM İVMESİ PUANI
+  // ===================================
+
+  const volumeScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+
+        vol120 * 18 +
+
+        Math.max(
+          0,
+          volumeAcceleration - 1
+        ) * 35 +
+
+        Math.max(
+          0,
+          microVolumeAcceleration - 1
+        ) * 20
+      )
+    );
+
+
+  // ===================================
+  // İŞLEM HIZI PUANI
+  // ===================================
+
+  const tradeScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+
+        trade120 * 18 +
+
+        Math.max(
+          0,
+          tradeAcceleration - 1
+        ) * 35 +
+
+        Math.max(
+          0,
+          microTradeAcceleration - 1
+        ) * 20
+      )
+    );
+
+
+  // ===================================
+  // ALIŞ AKIŞI PUANI
+  // ===================================
+
+  const orderFlowScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+
+        buyStrength +
+
+        Math.max(
+          0,
+          buyShift
+        ) * 1.2
+      )
+    );
+
+
+  // ===================================
+  // MİKRO MOMENTUM
+  // ===================================
+
+  const momentumScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+
+        50 +
+
+        w5.ret * 90 +
+
+        w10.ret * 65 +
+
+        w30.ret * 30
+      )
+    );
+
+
+  // ===================================
+  // DİRENÇ YAKINLIĞI
+  // ===================================
+
+  let resistanceScore = 0;
+
+  if (
+    resistanceDistance >= 0 &&
+    resistanceDistance <= 2
+  ) {
+    resistanceScore =
+      100 -
+      resistanceDistance * 30;
 
   } else if (
-    s.score >= 58
+    resistanceDistance < 0 &&
+    resistanceDistance > -1
+  ) {
+    resistanceScore = 100;
+
+  } else if (
+    resistanceDistance > 2 &&
+    resistanceDistance <= 4
+  ) {
+    resistanceScore = 35;
+  }
+
+
+  // ===================================
+  // PATLAMA HAZIRLIK PUANI
+  // ===================================
+
+  let preparationScore =
+    volumeScore * 0.22 +
+    tradeScore * 0.17 +
+    orderFlowScore * 0.18 +
+    momentumScore * 0.10 +
+    compression * 0.10 +
+    trendScore * 0.08 +
+    resistanceScore * 0.08 +
+    earlyPriceScore * 0.07;
+
+
+  // Hacim gerçekten hızlanmıyorsa
+  // yüksek puanı engelle.
+  if (
+    volumeAcceleration < 1.05 &&
+    vol120 < 1.3
+  ) {
+    preparationScore =
+      Math.min(
+        preparationScore,
+        68
+      );
+  }
+
+
+  // Alıcı baskısı yoksa
+  // erken patlama sinyali verme.
+  if (
+    w30.buyRatio < 55
+  ) {
+    preparationScore =
+      Math.min(
+        preparationScore,
+        67
+      );
+  }
+
+
+  // Fiyat zaten çok gittiyse
+  // hazırlık sinyali sayma.
+  if (tooLate) {
+    preparationScore =
+      Math.min(
+        preparationScore,
+        55
+      );
+  }
+
+
+  // ===================================
+  // KIRILIM PUANI
+  // ===================================
+
+  const breakoutConfirmed =
+    breakoutScore >= 55 &&
+    w30.buyRatio >= 58 &&
+    (
+      vol120 >= 1.5 ||
+      volumeAcceleration >= 1.25
+    ) &&
+    w10.ret > -0.10;
+
+
+  let finalScore =
+    preparationScore;
+
+
+  if (breakoutConfirmed) {
+    finalScore =
+      Math.max(
+        finalScore,
+        Math.min(
+          100,
+
+          70 +
+          breakoutScore * 0.15 +
+          Math.min(
+            15,
+            vol120 * 3
+          )
+        )
+      );
+  }
+
+
+  s.score =
+    Math.round(
+      Math.max(
+        0,
+        Math.min(
+          100,
+          finalScore
+        )
+      )
+    );
+
+
+  updatePeak(s);
+
+
+  // ===================================
+  // SİNYAL SINIFLANDIRMASI
+  // ===================================
+
+  const accumulation =
+    !tooLate &&
+    s.score >= 60 &&
+    compression >= 55 &&
+    (
+      volumeAcceleration >= 1.05 ||
+      tradeAcceleration >= 1.10
+    ) &&
+    w30.buyRatio >= 53;
+
+
+  const preparing =
+    !tooLate &&
+    s.score >= 72 &&
+    (
+      vol120 >= 1.3 ||
+      volumeAcceleration >= 1.20
+    ) &&
+    (
+      trade120 >= 1.2 ||
+      tradeAcceleration >= 1.20
+    ) &&
+    w30.buyRatio >= 58 &&
+    resistanceDistance <= 2.5;
+
+
+  const strongPreparing =
+    preparing &&
+    s.score >= 82 &&
+    buyStrength >= 62 &&
+    (
+      microVolumeAcceleration >= 1.10 ||
+      microTradeAcceleration >= 1.10
+    );
+
+
+  if (tooLate) {
+    s.status =
+      "GEÇ KALINDI";
+
+  } else if (
+    breakoutConfirmed
   ) {
     s.status =
-      "ADAY";
+      "KIRILIM TEYİDİ";
+
+  } else if (
+    strongPreparing
+  ) {
+    s.status =
+      "GÜÇLÜ PATLAMA HAZIRLIĞI";
+
+  } else if (
+    preparing
+  ) {
+    s.status =
+      "PATLAMA HAZIRLIĞI";
+
+  } else if (
+    accumulation
+  ) {
+    s.status =
+      "BİRİKİM TESPİT EDİLDİ";
 
   } else {
     s.status =
       "İZLENİYOR";
   }
+
+
+  s.rawStatus =
+    s.status;
+
+
+  // ===================================
+  // ARAYÜZE GÖNDERİLECEK VERİLER
+  // ===================================
 
   s.metrics = {
     w5,
@@ -578,11 +1214,73 @@ function calculate(s) {
     w60,
     w120,
 
-    volX: volumeX,
-    tradeX,
+    volX:
+      Number(
+        Math.min(
+          vol120,
+          99
+        ).toFixed(2)
+      ),
 
-    compression,
-    resistanceDistance,
+    tradeX:
+      Number(
+        Math.min(
+          trade120,
+          99
+        ).toFixed(2)
+      ),
+
+    volumeAcceleration:
+      Number(
+        volumeAcceleration.toFixed(2)
+      ),
+
+    tradeAcceleration:
+      Number(
+        tradeAcceleration.toFixed(2)
+      ),
+
+    microVolumeAcceleration:
+      Number(
+        microVolumeAcceleration.toFixed(2)
+      ),
+
+    microTradeAcceleration:
+      Number(
+        microTradeAcceleration.toFixed(2)
+      ),
+
+    buyStrength:
+      Number(
+        buyStrength.toFixed(1)
+      ),
+
+    buyShift:
+      Number(
+        buyShift.toFixed(1)
+      ),
+
+    compression:
+      Math.round(compression),
+
+    trendScore:
+      Math.round(trendScore),
+
+    resistanceDistance:
+      Number(
+        resistanceDistance.toFixed(2)
+      ),
+
+    breakoutScore:
+      Math.round(breakoutScore),
+
+    breakoutConfirmed,
+
+    earlyPriceScore:
+      Math.round(earlyPriceScore),
+
+    preparationScore:
+      Math.round(preparationScore),
 
     ready: true,
 
@@ -590,22 +1288,7 @@ function calculate(s) {
       baseline.length,
 
     peak5m:
-      s.peak5m,
-
-    strongConfirmed,
-
-    strongHoldSeconds:
-      s.strongSince
-        ? Math.floor(
-            (
-              now -
-              s.strongSince
-            ) / 1000
-          )
-        : 0,
-
-    rawStatus:
-      s.rawStatus
+      s.peak5m
   };
 }
 
