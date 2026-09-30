@@ -1513,7 +1513,7 @@ async function pollRadar() {
         K.textContent =
           "Ekran hatası";
       }
-
+    } 
   } catch (e) {
     console.error(
       "Radar HTTP:",
