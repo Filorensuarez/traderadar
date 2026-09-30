@@ -7,46 +7,42 @@ const f = (n, d = 2) =>
     ? Number(n).toFixed(d)
     : "-";
 
-const COIN_COOLDOWN = 10 * 60 * 1000;
-const SOUND_COOLDOWN = 30 * 1000;
-
-const coinAlarmHistory = new Map();
+const COOLDOWN = 10 * 60 * 1000;
+const SOUND_WAIT = 30 * 1000;
 
 let audioCtx = null;
-let lastSoundAt = 0;
+let lastSound = 0;
 let wsConnected = false;
 let activeView = "live";
-let currentRows = [];
+let rows = [];
+
 let movers = {
   gainers: [],
   losers: [],
   updatedAt: 0
 };
 
+const alarms = new Map();
+
 
 // =====================================
-// SES
+// SES MOTORU
 // =====================================
 
 async function unlockAudio() {
   try {
     if (!audioCtx) {
-      audioCtx =
-        new (
-          window.AudioContext ||
-          window.webkitAudioContext
-        )();
+      audioCtx = new (
+        window.AudioContext ||
+        window.webkitAudioContext
+      )();
     }
 
-    if (
-      audioCtx.state === "suspended"
-    ) {
+    if (audioCtx.state === "suspended") {
       await audioCtx.resume();
     }
 
-    return (
-      audioCtx.state === "running"
-    );
+    return audioCtx.state === "running";
 
   } catch {
     return false;
@@ -54,7 +50,7 @@ async function unlockAudio() {
 }
 
 
-async function playAlarm(
+async function alarmSound(
   strong = false,
   force = false
 ) {
@@ -62,18 +58,12 @@ async function playAlarm(
 
   if (
     !force &&
-    now - lastSoundAt <
-      SOUND_COOLDOWN
-  ) {
-    return;
-  }
+    now - lastSound < SOUND_WAIT
+  ) return;
 
-  const ok =
-    await unlockAudio();
+  if (!(await unlockAudio())) return;
 
-  if (!ok) return;
-
-  lastSoundAt = now;
+  lastSound = now;
 
   try {
     const osc =
@@ -83,93 +73,63 @@ async function playAlarm(
       audioCtx.createGain();
 
     osc.connect(gain);
-    gain.connect(
-      audioCtx.destination
-    );
+    gain.connect(audioCtx.destination);
 
     osc.type =
-      strong
-        ? "square"
-        : "sine";
+      strong ? "square" : "sine";
 
     osc.frequency.value =
-      strong
-        ? 920
-        : 680;
+      strong ? 950 : 700;
 
-    gain.gain.value =
-      0.25;
+    gain.gain.value = 0.30;
 
     osc.start();
 
-    setTimeout(
-      () => {
-        try {
-          osc.stop();
-        } catch {}
-      },
-      strong
-        ? 900
-        : 500
-    );
+    setTimeout(() => {
+      try {
+        osc.stop();
+      } catch {}
+    }, strong ? 900 : 550);
 
   } catch {}
 }
 
 
 // =====================================
-// BİLDİRİM
+// BİLDİRİMLERİ AÇ
 // =====================================
 
 async function enableNotifications() {
   await unlockAudio();
 
-  if (
-    !("Notification" in window)
-  ) {
-    notifyBtn.textContent =
-      "Ses Açık";
+  let granted = false;
 
-    await playAlarm(
-      false,
-      true
-    );
+  if ("Notification" in window) {
+    try {
+      const p =
+        await Notification.requestPermission();
 
-    alert(
-      "Ses alarmı etkinleştirildi."
-    );
-
-    return;
+      granted =
+        p === "granted";
+    } catch {}
   }
 
-  const permission =
-    await Notification
-      .requestPermission();
+  notifyBtn.textContent =
+    granted
+      ? "Bildirimler Açık"
+      : "Ses Açık";
 
-  if (
-    permission === "granted"
-  ) {
-    notifyBtn.textContent =
-      "Bildirimler Açık";
+  await alarmSound(false, true);
 
-    await playAlarm(
-      false,
-      true
-    );
-
-    alert(
-      "Bildirim ve alarm sesi etkinleştirildi."
-    );
-
-  } else {
-    notifyBtn.textContent =
-      "Ses Açık";
-
-    await playAlarm(
-      false,
-      true
-    );
+  if ("vibrate" in navigator) {
+    navigator.vibrate(200);
   }
+
+  alert(
+    granted
+      ? "Bildirim, titreşim ve alarm sesi etkinleştirildi."
+      : "Alarm sesi etkinleştirildi."
+  );
 }
 
 
@@ -180,14 +140,9 @@ async function enableNotifications() {
 async function testAlarm() {
   await unlockAudio();
 
-  await playAlarm(
-    true,
-    true
-  );
+  await alarmSound(true, true);
 
-  if (
-    "vibrate" in navigator
-  ) {
+  if ("vibrate" in navigator) {
     navigator.vibrate(
       [400, 150, 500]
     );
@@ -195,8 +150,7 @@ async function testAlarm() {
 
   if (
     "Notification" in window &&
-    Notification.permission ===
-      "granted"
+    Notification.permission === "granted"
   ) {
     try {
       new Notification(
@@ -217,7 +171,7 @@ async function testAlarm() {
 // SİNYAL GEÇMİŞİ
 // =====================================
 
-function loadHistory() {
+function getHistory() {
   try {
     return JSON.parse(
       localStorage.getItem(
@@ -243,44 +197,30 @@ function saveHistory(list) {
 
 
 function addHistory(x) {
-  const list =
-    loadHistory();
-
-  const now =
-    Date.now();
+  const list = getHistory();
+  const now = Date.now();
 
   const exists =
     list.some(
       h =>
-        h.symbol ===
-          x.symbol &&
-        now -
-          h.timestamp <
-          COIN_COOLDOWN
+        h.symbol === x.symbol &&
+        now - h.timestamp < COOLDOWN
     );
 
   if (exists) return;
 
-  const m =
-    x.metrics || {};
+  const m = x.metrics || {};
 
   list.unshift({
-    timestamp:
-      now,
+    timestamp: now,
 
-    symbol:
-      x.symbol,
+    symbol: x.symbol,
+    status: x.status,
 
-    status:
-      x.status,
+    price: Number(x.price),
+    score: Number(x.score),
 
-    price:
-      Number(x.price),
-
-    score:
-      Number(x.score),
-
-    peak5m:
+    peak:
       Number(
         m.peak5m ??
         x.peak5m ??
@@ -288,19 +228,14 @@ function addHistory(x) {
       ),
 
     volX:
-      Number(
-        m.volX || 0
-      ),
+      Number(m.volX || 0),
 
     tradeX:
-      Number(
-        m.tradeX || 0
-      ),
+      Number(m.tradeX || 0),
 
-    buyRatio:
+    buy:
       Number(
-        m.w30?.buyRatio ||
-        0
+        m.w30?.buyRatio || 0
       ),
 
     ret10:
@@ -323,11 +258,10 @@ function addHistory(x) {
         m.w120?.ret || 0
       ),
 
-    highestPrice:
+    high:
       Number(x.price),
 
-    maxGain:
-      0,
+    maxGain: 0,
 
     lastStatus:
       x.status
@@ -337,20 +271,15 @@ function addHistory(x) {
 }
 
 
-function updateHistory(rows) {
-  const list =
-    loadHistory();
+function updateHistory() {
+  const list = getHistory();
 
   let changed = false;
 
-  for (
-    const h of list
-  ) {
+  for (const h of list) {
     const x =
       rows.find(
-        r =>
-          r.symbol ===
-          h.symbol
+        r => r.symbol === h.symbol
       );
 
     if (!x) continue;
@@ -360,30 +289,23 @@ function updateHistory(rows) {
 
     if (
       price >
-      Number(
-        h.highestPrice || 0
-      )
+      Number(h.high || 0)
     ) {
-      h.highestPrice =
-        price;
+      h.high = price;
 
-      if (h.price > 0) {
-        h.maxGain =
-          (
-            (
-              price -
+      h.maxGain =
+        h.price
+          ? (
+              (price - h.price) /
               h.price
-            ) /
-            h.price
-          ) * 100;
-      }
+            ) * 100
+          : 0;
 
       changed = true;
     }
 
     if (
-      h.lastStatus !==
-      x.status
+      h.lastStatus !== x.status
     ) {
       h.lastStatus =
         x.status;
@@ -400,13 +322,9 @@ function updateHistory(rows) {
 
     if (
       peak >
-      Number(
-        h.peak5m || 0
-      )
+      Number(h.peak || 0)
     ) {
-      h.peak5m =
-        peak;
-
+      h.peak = peak;
       changed = true;
     }
   }
@@ -421,49 +339,41 @@ function updateHistory(rows) {
 // GERÇEK SİNYAL ALARMI
 // =====================================
 
-function processAlerts(rows) {
-  const alerts =
+function processAlerts() {
+  const candidates =
     rows
       .filter(
         x =>
-          x.status ===
-            "ERKEN UYARI" ||
-          x.status ===
-            "GÜÇLÜ ERKEN UYARI"
+          x.status === "ERKEN UYARI" ||
+          x.status === "GÜÇLÜ ERKEN UYARI"
       )
       .filter(
         x =>
-          x.metrics?.ready !==
-          false
+          x.metrics?.ready !== false
       )
       .sort(
         (a, b) =>
-          b.score -
-          a.score
+          b.score - a.score
       );
 
-  if (!alerts.length) return;
+  if (!candidates.length) return;
 
-  const now =
-    Date.now();
+  const now = Date.now();
 
   const fresh =
-    alerts.filter(x => {
+    candidates.filter(x => {
       const last =
-        coinAlarmHistory.get(
-          x.symbol
-        ) || 0;
+        alarms.get(x.symbol) || 0;
 
       return (
-        now - last >=
-        COIN_COOLDOWN
+        now - last >= COOLDOWN
       );
     });
 
   if (!fresh.length) return;
 
   fresh.forEach(x => {
-    coinAlarmHistory.set(
+    alarms.set(
       x.symbol,
       now
     );
@@ -471,57 +381,46 @@ function processAlerts(rows) {
     addHistory(x);
   });
 
-  const x =
-    fresh[0];
+  const x = fresh[0];
 
   const strong =
     x.status ===
     "GÜÇLÜ ERKEN UYARI";
 
-  playAlarm(strong);
+  alarmSound(strong);
 
-  if (
-    "vibrate" in navigator
-  ) {
+  if ("vibrate" in navigator) {
     navigator.vibrate(
       strong
-        ? [400,150,500]
-        : [250,120,300]
+        ? [400, 150, 500]
+        : [250, 120, 300]
     );
   }
 
   if (
     "Notification" in window &&
-    Notification.permission ===
-      "granted"
+    Notification.permission === "granted"
   ) {
-    const m =
-      x.metrics || {};
+    const m = x.metrics || {};
 
     try {
       new Notification(
         strong
-          ? "GÜÇLÜ ERKEN UYARI — " +
-            x.symbol
-          : "ERKEN UYARI — " +
-            x.symbol,
+          ? `GÜÇLÜ ERKEN UYARI — ${x.symbol}`
+          : `ERKEN UYARI — ${x.symbol}`,
         {
           body:
-            "Puan: " +
-            x.score +
-            "/100\n" +
-            "Fiyat: " +
-            x.price +
-            "\nHacim: " +
-            f(m.volX) +
-            "x\nAlış: %" +
-            f(
+            `Puan: ${x.score}/100\n` +
+            `Fiyat: ${x.price}\n` +
+            `Hacim: ${f(m.volX)}x\n` +
+            `İşlem hızı: ${f(m.tradeX)}x\n` +
+            `Alış baskısı: %${f(
               m.w30?.buyRatio,
               1
-            ),
+            )}`,
 
           tag:
-            "traderadar-main"
+            "traderadar-signal"
         }
       );
     } catch {}
@@ -530,282 +429,377 @@ function processAlerts(rows) {
 
 
 // =====================================
+// SEKME DÜĞMELERİ
+// =====================================
+
+const nav =
+  document.createElement("div");
+
+nav.style.cssText =
+  "display:flex;" +
+  "gap:7px;" +
+  "padding:10px 16px;" +
+  "overflow-x:auto;" +
+  "position:sticky;" +
+  "top:0;" +
+  "z-index:100;" +
+  "background:#0b1220;";
+
+
+function makeTab(
+  text,
+  view
+) {
+  const b =
+    document.createElement("button");
+
+  b.textContent = text;
+
+  b.style.cssText =
+    "white-space:nowrap;" +
+    "padding:10px 13px;" +
+    "border:0;" +
+    "border-radius:10px;" +
+    "font-weight:700;" +
+    "cursor:pointer;";
+
+  b.onclick = () => {
+    activeView = view;
+    draw();
+  };
+
+  nav.appendChild(b);
+
+  return b;
+}
+
+
+const liveTab =
+  makeTab(
+    "Canlı Radar",
+    "live"
+  );
+
+const moversTab =
+  makeTab(
+    "Hareket Edenler",
+    "movers"
+  );
+
+const historyTab =
+  makeTab(
+    "Sinyal Geçmişi",
+    "history"
+  );
+
+
+if (C?.parentNode) {
+  C.parentNode.insertBefore(
+    nav,
+    C
+  );
+}
+
+
+// =====================================
+// SABİT DÜĞMELER
+// =====================================
+
+const notifyBtn =
+  document.createElement("button");
+
+notifyBtn.textContent =
+  (
+    "Notification" in window &&
+    Notification.permission === "granted"
+  )
+    ? "Bildirimler Açık"
+    : "Bildirimleri Aç";
+
+notifyBtn.onclick =
+  enableNotifications;
+
+
+const testBtn =
+  document.createElement("button");
+
+testBtn.textContent =
+  "Alarmı Test Et";
+
+testBtn.onclick =
+  testAlarm;
+
+
+const controls =
+  document.createElement("div");
+
+controls.style.cssText =
+  "position:fixed;" +
+  "right:12px;" +
+  "bottom:15px;" +
+  "z-index:999;" +
+  "display:flex;" +
+  "flex-direction:column;" +
+  "gap:8px;";
+
+
+for (
+  const b of [
+    testBtn,
+    notifyBtn
+  ]
+) {
+  b.style.cssText =
+    "padding:11px 15px;" +
+    "border:0;" +
+    "border-radius:20px;" +
+    "font-weight:700;" +
+    "cursor:pointer;";
+}
+
+
+controls.appendChild(testBtn);
+controls.appendChild(notifyBtn);
+
+document.body.appendChild(
+  controls
+);
+// =====================================
 // CANLI RADAR EKRANI
 // =====================================
 
 function renderLive() {
+  if (!rows.length) {
+    C.innerHTML = `
+      <article class="card">
+        <div class="sym">Radar verisi bekleniyor</div>
+      </article>
+    `;
+    return;
+  }
+
   C.innerHTML =
-    currentRows
-      .map(x => {
-        const m =
-          x.metrics || {};
+    rows.map(x => {
+      const m = x.metrics || {};
 
-        const symbol =
-          x.symbol.replace(
-            "-USDT",
-            "/USDT"
+      const symbol =
+        x.symbol.replace(
+          "-USDT",
+          "/USDT"
+        );
+
+      const peak =
+        Number(
+          m.peak5m ??
+          x.peak5m ??
+          x.score
+        );
+
+      let warmup = "";
+
+      if (
+        x.status ===
+        "VERİ TOPLANIYOR"
+      ) {
+        const remaining =
+          Math.ceil(
+            Number(
+              m.warmupRemaining || 0
+            ) / 60000
           );
 
-        const peak =
-          Number(
-            m.peak5m ??
-            x.peak5m ??
-            x.score
-          );
+        warmup = `
+          <div class="m">
+            <span>Hazırlık</span>
+            <b>${remaining} dk</b>
+          </div>
+        `;
+      }
 
-        let warmup = "";
+      return `
+        <article class="card">
 
-        if (
-          x.status ===
-          "VERİ TOPLANIYOR"
-        ) {
-          warmup = `
+          <div class="top">
+            <div>
+              <div class="sym">
+                ${symbol}
+              </div>
+
+              <span class="status">
+                ${x.status}
+              </span>
+            </div>
+
+            <div>
+              <div class="score">
+                ${x.score}/100
+              </div>
+
+              <small>
+                ${x.price}
+              </small>
+            </div>
+          </div>
+
+          <div class="bar">
+            <i style="width:${Math.min(
+              100,
+              Number(x.score) || 0
+            )}%"></i>
+          </div>
+
+          <div class="metrics">
+
             <div class="m">
-              <span>Hazırlık</span>
+              <span>5 dk zirve</span>
+              <b>${f(peak, 0)}/100</b>
+            </div>
+
+            <div class="m">
+              <span>120 sn hacim</span>
+              <b>${f(m.volX)}x</b>
+            </div>
+
+            <div class="m">
+              <span>İşlem hızı</span>
+              <b>${f(m.tradeX)}x</b>
+            </div>
+
+            <div class="m">
+              <span>30 sn alış</span>
               <b>
-                ${Math.ceil(
-                  (
-                    m.warmupRemaining ||
-                    0
-                  ) /
-                  60000
-                )} dk
+                %${f(
+                  m.w30?.buyRatio,
+                  1
+                )}
               </b>
             </div>
-          `;
-        }
 
-        return `
-          <article class="card">
-
-            <div class="top">
-              <div>
-                <div class="sym">
-                  ${symbol}
-                </div>
-
-                <span class="status">
-                  ${x.status}
-                </span>
-              </div>
-
-              <div>
-                <div class="score">
-                  ${x.score}/100
-                </div>
-
-                <small>
-                  ${x.price}
-                </small>
-              </div>
+            <div class="m">
+              <span>10 sn fiyat</span>
+              <b>
+                %${f(
+                  m.w10?.ret
+                )}
+              </b>
             </div>
 
-            <div class="bar">
-              <i style="width:${Math.min(
-                100,
-                x.score
-              )}%"></i>
+            <div class="m">
+              <span>30 sn fiyat</span>
+              <b>
+                %${f(
+                  m.w30?.ret
+                )}
+              </b>
             </div>
 
-            <div class="metrics">
-
-              <div class="m">
-                <span>
-                  5 dk zirve
-                </span>
-                <b>
-                  ${f(peak,0)}/100
-                </b>
-              </div>
-
-              <div class="m">
-                <span>
-                  120 sn hacim
-                </span>
-                <b>
-                  ${f(m.volX)}x
-                </b>
-              </div>
-
-              <div class="m">
-                <span>
-                  İşlem hızı
-                </span>
-                <b>
-                  ${f(m.tradeX)}x
-                </b>
-              </div>
-
-              <div class="m">
-                <span>
-                  30 sn alış
-                </span>
-                <b>
-                  %${f(
-                    m.w30?.buyRatio,
-                    1
-                  )}
-                </b>
-              </div>
-
-              <div class="m">
-                <span>
-                  10 sn fiyat
-                </span>
-                <b>
-                  %${f(
-                    m.w10?.ret
-                  )}
-                </b>
-              </div>
-
-              <div class="m">
-                <span>
-                  60 sn fiyat
-                </span>
-                <b>
-                  %${f(
-                    m.w60?.ret
-                  )}
-                </b>
-              </div>
-
-              <div class="m">
-                <span>
-                  120 sn fiyat
-                </span>
-                <b>
-                  %${f(
-                    m.w120?.ret
-                  )}
-                </b>
-              </div>
-
-              <div class="m">
-                <span>
-                  Sıkışma
-                </span>
-                <b>
-                  ${f(
-                    m.compression,
-                    0
-                  )}/100
-                </b>
-              </div>
-
-              <div class="m">
-                <span>
-                  Dirence uzaklık
-                </span>
-                <b>
-                  %${f(
-                    m.resistanceDistance
-                  )}
-                </b>
-              </div>
-
-              ${warmup}
-
+            <div class="m">
+              <span>60 sn fiyat</span>
+              <b>
+                %${f(
+                  m.w60?.ret
+                )}
+              </b>
             </div>
-          </article>
-        `;
-      })
-      .join("");
-}
 
+            <div class="m">
+              <span>120 sn fiyat</span>
+              <b>
+                %${f(
+                  m.w120?.ret
+                )}
+              </b>
+            </div>
 
-// =====================================
-// HAREKET EDENLER
-// =====================================
+            <div class="m">
+              <span>Sıkışma</span>
+              <b>
+                ${f(
+                  m.compression,
+                  0
+                )}/100
+              </b>
+            </div>
 
-async function loadMovers() {
-  try {
-    const r =
-      await fetch(
-        "/api/movers?t=" +
-        Date.now(),
-        {
-          cache:
-            "no-store"
-        }
-      );
+            <div class="m">
+              <span>Dirence uzaklık</span>
+              <b>
+                %${f(
+                  m.resistanceDistance
+                )}
+              </b>
+            </div>
 
-    if (!r.ok) {
-      throw new Error();
-    }
+            ${warmup}
 
-    movers =
-      await r.json();
+          </div>
 
-    if (
-      activeView ===
-      "movers"
-    ) {
-      renderMovers();
-    }
-
-  } catch {
-    if (
-      activeView ===
-      "movers"
-    ) {
-      C.innerHTML = `
-        <article class="card">
-          Hareket analizi sunucuda
-          henüz etkin değil.
         </article>
       `;
-    }
-  }
+    }).join("");
 }
 
 
-function moverCard(
-  x,
-  type
-) {
+// =====================================
+// HAREKET EDENLER KARTI
+// =====================================
+
+function moverCard(x, type) {
+  const up =
+    type === "up";
+
   const symbol =
     x.symbol.replace(
       "-USDT",
       "/USDT"
     );
 
-  const isUp =
-    type === "up";
+  const score =
+    up
+      ? x.continuationScore
+      : x.reversalScore;
+
+  const status =
+    up
+      ? x.continuationText
+      : x.reversalText;
 
   return `
     <article class="card">
 
       <div class="top">
+
         <div>
           <div class="sym">
             ${symbol}
           </div>
 
           <span class="status">
-            ${
-              isUp
-                ? x.continuationText
-                : x.reversalText
-            }
+            ${status}
           </span>
         </div>
 
         <div>
           <div class="score">
             ${
-              x.change24 >= 0
+              Number(x.change24) >= 0
                 ? "+"
                 : ""
-            }${f(
-              x.change24
-            )}%
+            }${f(x.change24)}%
           </div>
 
           <small>
             ${x.price}
           </small>
         </div>
+
+      </div>
+
+      <div class="bar">
+        <i style="width:${Math.min(
+          100,
+          Number(score) || 0
+        )}%"></i>
       </div>
 
       <div class="metrics">
@@ -813,85 +807,41 @@ function moverCard(
         <div class="m">
           <span>
             ${
-              isUp
+              up
                 ? "Devam gücü"
                 : "Dönüş gücü"
             }
           </span>
 
           <b>
-            ${
-              isUp
-                ? f(
-                    x.continuationScore,
-                    0
-                  )
-                : f(
-                    x.reversalScore,
-                    0
-                  )
-            }/100
+            ${f(score, 0)}/100
           </b>
         </div>
 
         <div class="m">
-          <span>
-            15 dk momentum
-          </span>
-
+          <span>15 dk momentum</span>
           <b>
-            %${f(
-              x.momentum15
-            )}
+            %${f(x.momentum15)}
           </b>
         </div>
 
         <div class="m">
-          <span>
-            1 saat momentum
-          </span>
-
+          <span>1 saat momentum</span>
           <b>
-            %${f(
-              x.momentum1h
-            )}
+            %${f(x.momentum1h)}
           </b>
         </div>
 
         <div class="m">
-          <span>
-            Hacim oranı
-          </span>
-
+          <span>Hacim oranı</span>
           <b>
-            ${f(
-              x.volumeRatio
-            )}x
+            ${f(x.volumeRatio)}x
           </b>
         </div>
 
         ${
-          !isUp
+          up
             ? `
-              <div class="m">
-                <span>
-                  Muhtemel tepki bölgesi
-                </span>
-
-                <b>
-                  ${f(
-                    x.supportLow,
-                    6
-                  )}
-                  –
-                  ${f(
-                    x.supportHigh,
-                    6
-                  )}
-                </b>
-              </div>
-            `
-            : `
               <div class="m">
                 <span>
                   24s zirveye uzaklık
@@ -900,6 +850,25 @@ function moverCard(
                 <b>
                   %${f(
                     x.distanceFromHigh
+                  )}
+                </b>
+              </div>
+            `
+            : `
+              <div class="m">
+                <span>
+                  Muhtemel tepki bölgesi
+                </span>
+
+                <b>
+                  ${f(
+                    x.supportLow,
+                    8
+                  )}
+                  –
+                  ${f(
+                    x.supportHigh,
+                    8
                   )}
                 </b>
               </div>
@@ -913,6 +882,10 @@ function moverCard(
 }
 
 
+// =====================================
+// HAREKET EDENLER EKRANI
+// =====================================
+
 function renderMovers() {
   const gainers =
     movers.gainers || [];
@@ -920,8 +893,27 @@ function renderMovers() {
   const losers =
     movers.losers || [];
 
+  const updated =
+    movers.updatedAt
+      ? new Date(
+          movers.updatedAt
+        ).toLocaleTimeString(
+          "tr-TR"
+        )
+      : "-";
+
   C.innerHTML = `
-    <div class="title">
+    <article class="card">
+      <div class="sym">
+        En Çok Hareket Edenler
+      </div>
+
+      <small>
+        Son analiz: ${updated}
+      </small>
+    </article>
+
+    <div style="padding:12px 2px">
       <h2>
         En Çok Yükselenler
       </h2>
@@ -940,15 +932,13 @@ function renderMovers() {
             .join("")
         : `
           <article class="card">
-            Yükselen coin verisi
-            bekleniyor.
+            Yükselen coin analizi
+            hazırlanıyor.
           </article>
         `
     }
 
-    <div class="title"
-         style="margin-top:25px">
-
+    <div style="padding:20px 2px 12px">
       <h2>
         En Çok Düşenler
       </h2>
@@ -967,8 +957,8 @@ function renderMovers() {
             .join("")
         : `
           <article class="card">
-            Düşen coin verisi
-            bekleniyor.
+            Düşen coin analizi
+            hazırlanıyor.
           </article>
         `
     }
@@ -977,28 +967,27 @@ function renderMovers() {
 
 
 // =====================================
-// SİNYAL GEÇMİŞİ
+// SİNYAL GEÇMİŞİ EKRANI
 // =====================================
 
 function renderHistory() {
   const list =
-    loadHistory();
+    getHistory();
 
   if (!list.length) {
     C.innerHTML = `
       <article class="card">
-
         <div class="sym">
-          Henüz sinyal yok
+          Henüz sinyal geçmişi yok
         </div>
 
         <p>
-          İlk erken uyarı
-          geldiğinde tarih,
-          saat ve fiyat burada
+          Radar ilk ERKEN UYARI veya
+          GÜÇLÜ ERKEN UYARI verdiğinde
+          coin, tarih, saat, fiyat ve
+          sinyal verileri burada
           kaydedilecek.
         </p>
-
       </article>
     `;
 
@@ -1007,9 +996,19 @@ function renderHistory() {
 
   C.innerHTML =
     list.map(h => {
-      const date =
+      const d =
         new Date(
           h.timestamp
+        );
+
+      const date =
+        d.toLocaleDateString(
+          "tr-TR"
+        );
+
+      const time =
+        d.toLocaleTimeString(
+          "tr-TR"
         );
 
       return `
@@ -1028,3 +1027,323 @@ function renderHistory() {
               <span class="status">
                 ${h.status}
               </span>
+            </div>
+
+            <div>
+              <div class="score">
+                ${h.score}/100
+              </div>
+
+              <small>
+                ${date}
+                ${time}
+              </small>
+            </div>
+
+          </div>
+
+          <div class="metrics">
+
+            <div class="m">
+              <span>İlk sinyal fiyatı</span>
+              <b>${h.price}</b>
+            </div>
+
+            <div class="m">
+              <span>Zirve puanı</span>
+              <b>
+                ${f(h.peak, 0)}/100
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Sinyal sonrası zirve</span>
+              <b>${h.high}</b>
+            </div>
+
+            <div class="m">
+              <span>Maksimum yükseliş</span>
+              <b>
+                +%${f(h.maxGain)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Hacim</span>
+              <b>
+                ${f(h.volX)}x
+              </b>
+            </div>
+
+            <div class="m">
+              <span>İşlem hızı</span>
+              <b>
+                ${f(h.tradeX)}x
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Alış baskısı</span>
+              <b>
+                %${f(h.buy, 1)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>10 sn</span>
+              <b>
+                %${f(h.ret10)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>30 sn</span>
+              <b>
+                %${f(h.ret30)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>60 sn</span>
+              <b>
+                %${f(h.ret60)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>120 sn</span>
+              <b>
+                %${f(h.ret120)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Son durum</span>
+              <b>
+                ${h.lastStatus}
+              </b>
+            </div>
+
+          </div>
+
+        </article>
+      `;
+    }).join("");
+}
+
+
+// =====================================
+// EKRAN SEÇİMİ
+// =====================================
+
+function draw() {
+  if (
+    activeView === "movers"
+  ) {
+    renderMovers();
+    return;
+  }
+
+  if (
+    activeView === "history"
+  ) {
+    renderHistory();
+    return;
+  }
+
+  renderLive();
+}
+
+
+// =====================================
+// HAREKET VERİSİ
+// =====================================
+
+async function pollMovers() {
+  try {
+    const r =
+      await fetch(
+        "/api/movers?t=" +
+        Date.now(),
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!r.ok) {
+      throw new Error(
+        `HTTP ${r.status}`
+      );
+    }
+
+    movers =
+      await r.json();
+
+    if (
+      activeView === "movers"
+    ) {
+      renderMovers();
+    }
+
+  } catch {}
+}
+
+
+// =====================================
+// RADAR HTTP YEDEK
+// =====================================
+
+async function pollRadar() {
+  try {
+    const r =
+      await fetch(
+        "/api/radar?t=" +
+        Date.now(),
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!r.ok) {
+      throw new Error(
+        `HTTP ${r.status}`
+      );
+    }
+
+    const data =
+      await r.json();
+
+    if (
+      data.type === "radar" &&
+      Array.isArray(data.rows)
+    ) {
+      rows = data.rows;
+
+      processAlerts();
+      updateHistory();
+
+      T.textContent =
+        new Date()
+          .toLocaleTimeString(
+            "tr-TR"
+          );
+
+      if (!wsConnected) {
+        K.textContent =
+          `OKX HTTP — ${data.tracked || "?"} coin`;
+      }
+
+      if (
+        activeView === "live"
+      ) {
+        renderLive();
+      }
+    }
+
+  } catch {
+    if (!wsConnected) {
+      K.textContent =
+        "Bağlantı bekleniyor...";
+    }
+  }
+}
+
+
+// =====================================
+// WEBSOCKET
+// =====================================
+
+function connectWS() {
+  const protocol =
+    location.protocol === "https:"
+      ? "wss"
+      : "ws";
+
+  const ws =
+    new WebSocket(
+      `${protocol}://${location.host}/live`
+    );
+
+  ws.onopen = () => {
+    wsConnected = true;
+
+    K.textContent =
+      "OKX Canlı";
+  };
+
+  ws.onmessage = event => {
+    try {
+      const data =
+        JSON.parse(
+          event.data
+        );
+
+      if (
+        data.type === "radar" &&
+        Array.isArray(
+          data.rows
+        )
+      ) {
+        rows =
+          data.rows;
+
+        processAlerts();
+        updateHistory();
+
+        T.textContent =
+          new Date()
+            .toLocaleTimeString(
+              "tr-TR"
+            );
+
+        K.textContent =
+          `OKX Canlı — ${data.tracked || "?"} coin`;
+
+        if (
+          activeView === "live"
+        ) {
+          renderLive();
+        }
+      }
+
+    } catch {}
+  };
+
+  ws.onerror = () => {
+    wsConnected = false;
+  };
+
+  ws.onclose = () => {
+    wsConnected = false;
+
+    K.textContent =
+      "OKX HTTP Yedek";
+
+    setTimeout(
+      connectWS,
+      3000
+    );
+  };
+}
+
+
+// =====================================
+// BAŞLAT
+// =====================================
+
+connectWS();
+
+pollRadar();
+pollMovers();
+
+setInterval(
+  pollRadar,
+  3000
+);
+
+setInterval(
+  pollMovers,
+  30000
+);
+
+draw();
