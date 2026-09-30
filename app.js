@@ -650,7 +650,10 @@ addTab(
   "Sinyal Geçmişi",
   "history"
 );
-
+addTab(
+  "Coin Sorgula",
+  "search"
+);
 
 if (
   C &&
