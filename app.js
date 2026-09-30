@@ -1841,7 +1841,12 @@ function draw() {
     renderHistory();
     return;
   }
-
+  if (
+    activeView === "search"
+  ) {
+    renderSearch();
+    return;
+  }
   renderLive();
 }
 
