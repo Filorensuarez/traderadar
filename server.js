@@ -2252,3 +2252,108 @@ const server =
         );
       }
    
+    }
+  );
+
+
+// =====================================
+// TELEFON CANLI WEBSOCKET
+// =====================================
+
+const ui =
+  new WebSocketServer({
+    server,
+    path: "/live"
+  });
+
+
+ui.on(
+  "connection",
+  ws => {
+    clients.add(ws);
+
+    try {
+      ws.send(
+        JSON.stringify({
+          type: "radar",
+          source: "OKX",
+          tracked: states.size,
+          rows: radarRows()
+        })
+      );
+    } catch {}
+
+
+    ws.on(
+      "close",
+      () => {
+        clients.delete(ws);
+      }
+    );
+  }
+);
+
+
+// =====================================
+// RADARI HER SANİYE TELEFONA GÖNDER
+// =====================================
+
+setInterval(
+  () => {
+    const message =
+      JSON.stringify({
+        type: "radar",
+        source: "OKX",
+        tracked: states.size,
+        rows: radarRows()
+      });
+
+
+    for (
+      const ws of clients
+    ) {
+      if (
+        ws.readyState ===
+        WebSocket.OPEN
+      ) {
+        try {
+          ws.send(message);
+        } catch {}
+      }
+    }
+  },
+  1000
+);
+
+
+// =====================================
+// HAREKET EDENLERİ GÜNCELLE
+// =====================================
+
+setInterval(
+  updateMovers,
+  60 * 1000
+);
+
+
+// =====================================
+// SAĞLIK KONTROLÜ
+// =====================================
+
+app.get(
+  "/health",
+  (req, res) => {
+    res.json({
+      ok: true,
+      source: "OKX",
+      tracked: states.size,
+      signals: signalHistory.length,
+      time: Date.now()
+    });
+  }
+);
+
+
+console.log(
+  "TradeRadar sistemi hazır."
+);
