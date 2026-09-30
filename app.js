@@ -1366,7 +1366,467 @@ function renderHistory() {
 // =====================================
 // EKRAN SEÇİMİ
 // =====================================
+// =====================================
+// COİN SORGULAMA
+// =====================================
 
+function renderSearch() {
+  if (!C) return;
+
+  C.innerHTML = `
+    <article class="card">
+      <div class="sym">
+        Coin Sorgula
+      </div>
+
+      <div style="
+        display:flex;
+        gap:8px;
+        margin-top:12px;
+      ">
+        <input
+          id="coinSearchInput"
+          type="text"
+          placeholder="Örnek: MEME"
+          autocomplete="off"
+          style="
+            flex:1;
+            min-width:0;
+            padding:12px;
+            border-radius:10px;
+            border:1px solid #334155;
+            font-size:16px;
+          "
+        >
+
+        <button
+          id="coinSearchBtn"
+          style="
+            padding:12px 16px;
+            border:0;
+            border-radius:10px;
+            font-weight:700;
+          "
+        >
+          Sorgula
+        </button>
+      </div>
+
+      <div
+        id="coinSearchResult"
+        style="margin-top:14px"
+      >
+        Coin adını yazıp Sorgula'ya basın.
+      </div>
+    </article>
+  `;
+
+
+  const input =
+    document.querySelector(
+      "#coinSearchInput"
+    );
+
+  const button =
+    document.querySelector(
+      "#coinSearchBtn"
+    );
+
+
+  button.onclick = () => {
+    searchCoin(
+      input.value
+    );
+  };
+
+
+  input.addEventListener(
+    "keydown",
+    event => {
+      if (
+        event.key === "Enter"
+      ) {
+        searchCoin(
+          input.value
+        );
+      }
+    }
+  );
+}
+
+
+function searchCoin(value) {
+  const result =
+    document.querySelector(
+      "#coinSearchResult"
+    );
+
+  if (!result) return;
+
+
+  let query =
+    String(value || "")
+      .trim()
+      .toUpperCase();
+
+
+  query =
+    query
+      .replace("/USDT", "")
+      .replace("-USDT", "")
+      .replace("USDT", "")
+      .trim();
+
+
+  if (!query) {
+    result.innerHTML =
+      "Coin adı yazın.";
+
+    return;
+  }
+
+
+  const symbol =
+    `${query}-USDT`;
+
+
+  const x =
+    rows.find(
+      item =>
+        item.symbol === symbol
+    );
+
+
+  if (!x) {
+    result.innerHTML = `
+      <div class="status">
+        ${query}/USDT şu anda
+        radar listesindeki ilk 50 coin
+        arasında değil.
+      </div>
+    `;
+
+    return;
+  }
+
+
+  const m =
+    x.metrics || {};
+
+
+  const h =
+    history().find(
+      item =>
+        item.symbol ===
+        x.symbol
+    );
+
+
+  const signalTime =
+    h?.time
+      ? new Date(
+          h.time
+        ).toLocaleString(
+          "tr-TR"
+        )
+      : "Henüz sinyal yok";
+
+
+  const firstPrice =
+    h?.price ??
+    "-";
+
+
+  const highPrice =
+    h?.high ??
+    "-";
+
+
+  const maxGain =
+    Number.isFinite(
+      Number(h?.maxGain)
+    )
+      ? `+%${f(
+          h.maxGain
+        )}`
+      : "-";
+
+
+  let explanation =
+    "Şu anda güçlü hazırlık şartları oluşmamış.";
+
+
+  if (
+    x.status ===
+    "KIRILIM TEYİDİ"
+  ) {
+    explanation =
+      "Direnç kırılımı tespit edilmiş. " +
+      "Hacim, işlem akışı ve alış baskısının devam edip etmediği izlenmeli.";
+
+  } else if (
+    x.status ===
+    "GÜÇLÜ PATLAMA HAZIRLIĞI"
+  ) {
+    explanation =
+      "Hacim ve işlem akışı güçlü biçimde hızlanmış, " +
+      "alıcı baskısı yüksek ve fiyat henüz aşırı ilerlememiş.";
+
+  } else if (
+    x.status ===
+    "PATLAMA HAZIRLIĞI"
+  ) {
+    explanation =
+      "Erken hazırlık şartları oluşuyor ancak güçlü teyit şartlarının tamamı henüz oluşmamış.";
+
+  } else if (
+    x.status ===
+    "BİRİKİM TESPİT EDİLDİ"
+  ) {
+    explanation =
+      "Hacim ve işlem yapısında birikim belirtileri var ancak kırılım henüz teyit edilmemiş.";
+
+  } else if (
+    x.status ===
+    "GEÇ KALINDI"
+  ) {
+    explanation =
+      "Fiyat hareketi önemli ölçüde gerçekleşmiş. Erken giriş bölgesi geçmiş olabilir.";
+  }
+
+
+  result.innerHTML = `
+    <div style="margin-top:8px">
+
+      <div class="top">
+        <div>
+          <div class="sym">
+            ${query}/USDT
+          </div>
+
+          <span class="status">
+            ${x.status}
+          </span>
+        </div>
+
+        <div>
+          <div class="score">
+            ${x.score}/100
+          </div>
+
+          <small>
+            ${x.price}
+          </small>
+        </div>
+      </div>
+
+
+      <div class="bar">
+        <i style="width:${Math.min(
+          100,
+          Number(x.score) || 0
+        )}%"></i>
+      </div>
+
+
+      <div class="metrics">
+
+        <div class="m">
+          <span>Anlık fiyat</span>
+          <b>${x.price}</b>
+        </div>
+
+        <div class="m">
+          <span>Radar puanı</span>
+          <b>${x.score}/100</b>
+        </div>
+
+        <div class="m">
+          <span>Hacim</span>
+          <b>
+            ${f(
+              m.volX
+            )}x
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            Hacim ivmesi
+          </span>
+          <b>
+            ${f(
+              m.volumeAcceleration
+            )}x
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            İşlem hızı
+          </span>
+          <b>
+            ${f(
+              m.tradeX
+            )}x
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            İşlem ivmesi
+          </span>
+          <b>
+            ${f(
+              m.tradeAcceleration
+            )}x
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            Alış baskısı
+          </span>
+          <b>
+            %${f(
+              m.w30?.buyRatio,
+              1
+            )}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            10 sn fiyat
+          </span>
+          <b>
+            %${f(
+              m.w10?.ret
+            )}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            30 sn fiyat
+          </span>
+          <b>
+            %${f(
+              m.w30?.ret
+            )}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            60 sn fiyat
+          </span>
+          <b>
+            %${f(
+              m.w60?.ret
+            )}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            120 sn fiyat
+          </span>
+          <b>
+            %${f(
+              m.w120?.ret
+            )}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>Sıkışma</span>
+          <b>
+            ${f(
+              m.compression,
+              0
+            )}/100
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            Trend yapısı
+          </span>
+          <b>
+            ${f(
+              m.trendScore,
+              0
+            )}/100
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            Dirence uzaklık
+          </span>
+          <b>
+            %${f(
+              m.resistanceDistance
+            )}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            İlk sinyal fiyatı
+          </span>
+          <b>
+            ${firstPrice}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            Sinyal sonrası zirve
+          </span>
+          <b>
+            ${highPrice}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            Maksimum yükseliş
+          </span>
+          <b>
+            ${maxGain}
+          </b>
+        </div>
+
+        <div class="m">
+          <span>
+            Son sinyal zamanı
+          </span>
+          <b>
+            ${signalTime}
+          </b>
+        </div>
+
+      </div>
+
+
+      <div
+        class="card"
+        style="margin-top:12px"
+      >
+        <div class="sym">
+          Neden bu durumda?
+        </div>
+
+        <p>
+          ${explanation}
+        </p>
+      </div>
+
+    </div>
+  `;
+}
 function draw() {
   if (
     activeView === "movers"
