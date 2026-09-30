@@ -1513,7 +1513,28 @@ async function pollRadar() {
         K.textContent =
           "Ekran hatası";
       }
+    } catch (e) {
+      console.error(
+        "Ekran çizme:",
+        e
+      );
+    }
 
+  } catch (e) {
+    console.error(
+      "Radar HTTP:",
+      e
+    );
+
+    if (
+      !wsConnected &&
+      K
+    ) {
+      K.textContent =
+        "HTTP bağlantı hatası";
+    }
+  }
+}
 // =====================================
 // HAREKET EDENLER VERİSİ
 // =====================================
