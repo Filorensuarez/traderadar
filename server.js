@@ -9,120 +9,23 @@ const app = express();
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
 
-app.use(express.static(DIR));
-
 const REST = "https://www.okx.com";
-const OKX_WS = "wss://ws.okx.com:8443/ws/v5/public";
+const OKXWS = "wss://ws.okx.com:8443/ws/v5/public";
+const DATA = "/data";
 
 const CFG = {
-  warmupMs: 8 * 60 * 1000,
-  keepMs: 15 * 60 * 1000,
-  groupSize: 70,
-  signalCooldown: 10 * 60 * 1000
+  warmup: 8 * 60 * 1000,
+  keep: 15 * 60 * 1000,
+  group: 70,
+  cooldown: 10 * 60 * 1000
 };
+
+app.use(express.json({ limit: "200kb" }));
+app.use(express.static(DIR));
 
 const states = new Map();
 const clients = new Set();
-
-
-// =====================================
-// KALICI SİNYAL GEÇMİŞİ
-// =====================================
-
-const DATA_DIR = "/data";
-const HISTORY_FILE =
-  `${DATA_DIR}/signals.json`;
-
-let signalHistory = [];
-
-const lastSignal =
-  new Map();
-
-
-function loadHistory() {
-  try {
-    fs.mkdirSync(
-      DATA_DIR,
-      { recursive: true }
-    );
-
-    if (
-      fs.existsSync(
-        HISTORY_FILE
-      )
-    ) {
-      const raw =
-        fs.readFileSync(
-          HISTORY_FILE,
-          "utf8"
-        );
-
-      const parsed =
-        JSON.parse(
-          raw || "[]"
-        );
-
-      signalHistory =
-        Array.isArray(parsed)
-          ? parsed
-          : [];
-    }
-
-    console.log(
-      `Geçmiş: ${signalHistory.length} sinyal`
-    );
-
-  } catch (e) {
-    console.error(
-      "Geçmiş okuma:",
-      e.message
-    );
-
-    signalHistory = [];
-  }
-}
-
-
-function saveHistory() {
-  try {
-    fs.mkdirSync(
-      DATA_DIR,
-      { recursive: true }
-    );
-
-    const temp =
-      `${HISTORY_FILE}.tmp`;
-
-    fs.writeFileSync(
-      temp,
-      JSON.stringify(
-        signalHistory.slice(
-          0,
-          1000
-        )
-      )
-    );
-
-    fs.renameSync(
-      temp,
-      HISTORY_FILE
-    );
-
-  } catch (e) {
-    console.error(
-      "Geçmiş yazma:",
-      e.message
-    );
-  }
-}
-
-
-loadHistory();
-
-
-// =====================================
-// HAREKET EDENLER ÖNBELLEĞİ
-// =====================================
+const lastSignal = new Map();
 
 let movers = {
   updatedAt: 0,
@@ -132,58 +35,195 @@ let movers = {
 
 
 // =====================================
-// YARDIMCI FONKSİYONLAR
+// DOSYA YARDIMCILARI
+// =====================================
+
+function readJSON(file, fallback = []) {
+  try {
+    if (!fs.existsSync(file)) return fallback;
+
+    const data = JSON.parse(
+      fs.readFileSync(file, "utf8") || "[]"
+    );
+
+    return data;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJSON(file, data) {
+  try {
+    fs.mkdirSync(DATA, { recursive: true });
+
+    const tmp = file + ".tmp";
+
+    fs.writeFileSync(
+      tmp,
+      JSON.stringify(data)
+    );
+
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    console.error("Dosya yazma:", e.message);
+  }
+}
+
+
+// =====================================
+// KALICI SİNYAL GEÇMİŞİ
+// =====================================
+
+const HISTORY_FILE = `${DATA}/signals.json`;
+
+let signalHistory = readJSON(
+  HISTORY_FILE,
+  []
+);
+
+if (!Array.isArray(signalHistory)) {
+  signalHistory = [];
+}
+
+console.log(
+  `Geçmiş: ${signalHistory.length} sinyal`
+);
+
+
+// =====================================
+// WEB PUSH
+// =====================================
+
+const PUSH_FILE =
+  `${DATA}/push-subscriptions.json`;
+
+let pushSubscriptions =
+  readJSON(PUSH_FILE, []);
+
+if (!Array.isArray(pushSubscriptions)) {
+  pushSubscriptions = [];
+}
+
+const VAPID_PUBLIC_KEY =
+  process.env.VAPID_PUBLIC_KEY;
+
+const VAPID_PRIVATE_KEY =
+  process.env.VAPID_PRIVATE_KEY;
+
+const VAPID_SUBJECT =
+  process.env.VAPID_SUBJECT ||
+  "mailto:traderadar@example.com";
+
+if (
+  VAPID_PUBLIC_KEY &&
+  VAPID_PRIVATE_KEY
+) {
+  webpush.setVapidDetails(
+    VAPID_SUBJECT,
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+
+  console.log("Web Push hazır.");
+} else {
+  console.log("Web Push anahtarları eksik.");
+}
+
+
+async function sendPush(signal) {
+  if (!pushSubscriptions.length) return;
+
+  const m = signal.metrics || {};
+
+  const payload = JSON.stringify({
+    title:
+      `${signal.symbol.replace(
+        "-USDT",
+        "/USDT"
+      )} — ${signal.status}`,
+
+    body:
+      `Puan ${signal.score}/100 | ` +
+      `Hacim ${Number(m.volX || 0).toFixed(2)}x | ` +
+      `İvme ${Number(
+        m.volumeAcceleration || 0
+      ).toFixed(2)}x | ` +
+      `Alış %${Number(
+        m.w30?.buyRatio || 0
+      ).toFixed(1)}`,
+
+    tag:
+      `traderadar-${signal.symbol}`,
+
+    url: "/"
+  });
+
+  const alive = [];
+
+  for (const sub of pushSubscriptions) {
+    try {
+      await webpush.sendNotification(
+        sub,
+        payload
+      );
+
+      alive.push(sub);
+
+    } catch (e) {
+      if (
+        e.statusCode !== 404 &&
+        e.statusCode !== 410
+      ) {
+        alive.push(sub);
+
+        console.error(
+          "Push:",
+          e.message
+        );
+      }
+    }
+  }
+
+  if (
+    alive.length !==
+    pushSubscriptions.length
+  ) {
+    pushSubscriptions = alive;
+
+    writeJSON(
+      PUSH_FILE,
+      pushSubscriptions
+    );
+  }
+}
+
+
+// =====================================
+// GENEL YARDIMCILAR
 // =====================================
 
 const sleep = ms =>
-  new Promise(
-    resolve =>
-      setTimeout(
-        resolve,
-        ms
-      )
-  );
-
+  new Promise(r => setTimeout(r, ms));
 
 const pct = (a, b) =>
-  a
-    ? (
-        (b - a) /
-        a
-      ) * 100
-    : 0;
-
+  a ? ((b - a) / a) * 100 : 0;
 
 function median(arr) {
-  const a =
-    arr
-      .filter(
-        x =>
-          Number.isFinite(x) &&
-          x > 0
-      )
-      .sort(
-        (x, y) =>
-          x - y
-      );
+  const a = arr
+    .filter(
+      x =>
+        Number.isFinite(x) &&
+        x > 0
+    )
+    .sort((x, y) => x - y);
 
-  if (!a.length) {
-    return 0;
-  }
+  if (!a.length) return 0;
 
-  const m =
-    Math.floor(
-      a.length / 2
-    );
+  const m = Math.floor(a.length / 2);
 
-  return (
-    a.length % 2
-      ? a[m]
-      : (
-          a[m - 1] +
-          a[m]
-        ) / 2
-  );
+  return a.length % 2
+    ? a[m]
+    : (a[m - 1] + a[m]) / 2;
 }
 
 
@@ -191,37 +231,23 @@ function median(arr) {
 // COİN DURUMU
 // =====================================
 
-function getState(symbol) {
-  if (
-    !states.has(symbol)
-  ) {
-    states.set(
+function S(symbol) {
+  if (!states.has(symbol)) {
+    states.set(symbol, {
       symbol,
-      {
-        symbol,
-
-        price: 0,
-        firstTradeAt: 0,
-
-        trades: [],
-        candles: [],
-
-        score: 0,
-        peak5m: 0,
-
-        scoreHistory: [],
-
-        status:
-          "VERİ TOPLANIYOR",
-
-        metrics: {}
-      }
-    );
+      price: 0,
+      first: 0,
+      trades: [],
+      candles: [],
+      score: 0,
+      peak5m: 0,
+      scores: [],
+      status: "VERİ TOPLANIYOR",
+      metrics: {}
+    });
   }
 
-  return states.get(
-    symbol
-  );
+  return states.get(symbol);
 }
 
 
@@ -229,21 +255,14 @@ function getState(symbol) {
 // SANİYELİK PENCERE
 // =====================================
 
-function windowStats(
-  s,
-  seconds
-) {
+function W(s, sec) {
   const from =
-    Date.now() -
-    seconds * 1000;
+    Date.now() - sec * 1000;
 
-  const rows =
-    s.trades.filter(
-      x =>
-        x.t >= from
-    );
+  const a =
+    s.trades.filter(x => x.t >= from);
 
-  if (!rows.length) {
+  if (!a.length) {
     return {
       ret: 0,
       vol: 0,
@@ -252,89 +271,58 @@ function windowStats(
     };
   }
 
-  const volume =
-    rows.reduce(
-      (sum, x) =>
-        sum + x.q,
-      0
-    );
+  const vol =
+    a.reduce((z, x) => z + x.q, 0);
 
-  const buyVolume =
-    rows.reduce(
-      (sum, x) =>
-        sum +
-        (
-          x.buy
-            ? x.q
-            : 0
-        ),
+  const buy =
+    a.reduce(
+      (z, x) => z + (x.buy ? x.q : 0),
       0
     );
 
   return {
-    ret:
-      pct(
-        rows[0].p,
-        rows[
-          rows.length - 1
-        ].p
-      ),
+    ret: pct(
+      a[0].p,
+      a[a.length - 1].p
+    ),
 
-    vol:
-      volume,
-
-    n:
-      rows.length,
+    vol,
+    n: a.length,
 
     buyRatio:
-      volume
-        ? (
-            buyVolume /
-            volume
-          ) * 100
-        : 50
+      vol ? buy / vol * 100 : 50
   };
 }
 
 
-// =====================================
-// 5 DK ZİRVE PUANI
-// =====================================
-
 function updatePeak(s) {
-  const now =
-    Date.now();
+  const now = Date.now();
 
-  s.scoreHistory.push({
+  s.scores.push({
     t: now,
-    score: s.score
+    v: s.score
   });
 
-  const cutoff =
-    now -
-    5 * 60 * 1000;
+  const cut =
+    now - 5 * 60 * 1000;
 
   while (
-    s.scoreHistory.length &&
-    s.scoreHistory[0].t <
-      cutoff
+    s.scores.length &&
+    s.scores[0].t < cut
   ) {
-    s.scoreHistory.shift();
+    s.scores.shift();
   }
 
   s.peak5m =
-    s.scoreHistory.length
-      ? Math.max(
-          ...s.scoreHistory.map(
-            x => x.score
-          )
-        )
-      : s.score;
+    Math.max(
+      0,
+      ...s.scores.map(x => x.v)
+    );
 }
 
 
 // =====================================
-// SİNYALİ SUNUCUDA KAYDET
+// SİNYAL KAYDI + PUSH
 // =====================================
 
 function recordSignal(s) {
@@ -344,127 +332,84 @@ function recordSignal(s) {
     "KIRILIM TEYİDİ"
   ];
 
+  if (!allowed.includes(s.status)) return;
+
+  const now = Date.now();
+  const key = `${s.symbol}|${s.status}`;
+
   if (
-    !allowed.includes(
-      s.status
-    )
+    now - (lastSignal.get(key) || 0) <
+    CFG.cooldown
   ) {
     return;
   }
 
-  const now =
-    Date.now();
+  lastSignal.set(key, now);
 
-  const key =
-    `${s.symbol}|${s.status}`;
+  const m = s.metrics || {};
 
-  const previous =
-    lastSignal.get(key) || 0;
-
-  if (
-    now - previous <
-    CFG.signalCooldown
-  ) {
-    return;
-  }
-
-  lastSignal.set(
-    key,
-    now
-  );
-
-  const m =
-    s.metrics || {};
-
-  signalHistory.unshift({
+  const row = {
     time: now,
-
-    symbol:
-      s.symbol,
-
-    status:
-      s.status,
-
-    price:
-      Number(s.price),
-
-    score:
-      Number(s.score),
-
-    peak:
-      Number(
-        s.peak5m ||
-        s.score
-      ),
+    symbol: s.symbol,
+    status: s.status,
+    price: Number(s.price),
+    score: Number(s.score),
+    peak: Number(s.peak5m || s.score),
 
     volX:
-      Number(
-        m.volX || 0
-      ),
+      Number(m.volX || 0),
 
     tradeX:
-      Number(
-        m.tradeX || 0
-      ),
+      Number(m.tradeX || 0),
 
     volAccel:
-      Number(
-        m.volumeAcceleration ||
-        0
-      ),
+      Number(m.volumeAcceleration || 0),
 
     tradeAccel:
-      Number(
-        m.tradeAcceleration ||
-        0
-      ),
+      Number(m.tradeAcceleration || 0),
 
     buy:
-      Number(
-        m.w30?.buyRatio ||
-        0
-      ),
+      Number(m.w30?.buyRatio || 0),
 
     ret10:
-      Number(
-        m.w10?.ret || 0
-      ),
+      Number(m.w10?.ret || 0),
 
     ret30:
-      Number(
-        m.w30?.ret || 0
-      ),
+      Number(m.w30?.ret || 0),
 
     ret60:
-      Number(
-        m.w60?.ret || 0
-      ),
+      Number(m.w60?.ret || 0),
 
     ret120:
-      Number(
-        m.w120?.ret || 0
-      ),
+      Number(m.w120?.ret || 0),
 
     resistance:
-      Number(
-        m.resistanceDistance ||
-        0
-      )
-  });
+      Number(m.resistanceDistance || 0)
+  };
+
+  signalHistory.unshift(row);
 
   signalHistory =
-    signalHistory.slice(
-      0,
-      1000
-    );
+    signalHistory.slice(0, 1000);
 
-  saveHistory();
+  writeJSON(
+    HISTORY_FILE,
+    signalHistory
+  );
 
   console.log(
     "SİNYAL:",
     s.symbol,
     s.status,
     s.score
+  );
+
+  sendPush(s).catch(
+    e =>
+      console.error(
+        "Push gönderme:",
+        e.message
+      )
   );
 }
 
@@ -473,280 +418,141 @@ function recordSignal(s) {
 // PATLAMA ÖNCESİ MOTOR
 // =====================================
 
-function calculate(s) {
-  const now =
-    Date.now();
+function calc(s) {
+  const now = Date.now();
 
-  const w5 =
-    windowStats(s, 5);
+  const w5 = W(s, 5);
+  const w10 = W(s, 10);
+  const w30 = W(s, 30);
+  const w60 = W(s, 60);
+  const w120 = W(s, 120);
 
-  const w10 =
-    windowStats(s, 10);
+  const base = [];
 
-  const w30 =
-    windowStats(s, 30);
+  for (let k = 2; k <= 7; k++) {
+    const lo = now - k * 120000;
+    const hi = now - (k - 1) * 120000;
 
-  const w60 =
-    windowStats(s, 60);
-
-  const w120 =
-    windowStats(s, 120);
-
-
-  // ===================================
-  // REFERANS HACİM
-  // ===================================
-
-  const baseline = [];
-
-  for (
-    let k = 2;
-    k <= 7;
-    k++
-  ) {
-    const lo =
-      now -
-      k * 120000;
-
-    const hi =
-      now -
-      (k - 1) *
-      120000;
-
-    const rows =
+    const a =
       s.trades.filter(
         x =>
           x.t >= lo &&
           x.t < hi
       );
 
-    if (
-      rows.length < 3
-    ) {
-      continue;
-    }
+    if (a.length < 3) continue;
 
-    const volume =
-      rows.reduce(
-        (sum, x) =>
-          sum + x.q,
+    const vol =
+      a.reduce((z, x) => z + x.q, 0);
+
+    if (!vol) continue;
+
+    const buy =
+      a.reduce(
+        (z, x) =>
+          z + (x.buy ? x.q : 0),
         0
       );
 
-    if (
-      volume <= 0
-    ) {
-      continue;
-    }
-
-    const buyVolume =
-      rows.reduce(
-        (sum, x) =>
-          sum +
-          (
-            x.buy
-              ? x.q
-              : 0
-          ),
-        0
-      );
-
-    baseline.push({
-      volume,
-
-      trades:
-        rows.length,
-
-      buyRatio:
-        (
-          buyVolume /
-          volume
-        ) * 100
+    base.push({
+      vol,
+      n: a.length,
+      buy: buy / vol * 100
     });
   }
 
-
   const age =
-    s.firstTradeAt
-      ? now -
-        s.firstTradeAt
-      : 0;
-
+    s.first ? now - s.first : 0;
 
   const ready =
-    age >=
-      CFG.warmupMs &&
+    age >= CFG.warmup &&
+    base.length >= 3;
 
-    baseline.length >= 3;
+  const bv =
+    median(base.map(x => x.vol));
 
+  const bn =
+    median(base.map(x => x.n));
 
-  const baseVolume =
-    median(
-      baseline.map(
-        x => x.volume
-      )
-    );
-
-
-  const baseTrades =
-    median(
-      baseline.map(
-        x => x.trades
-      )
-    );
-
-
-  const baseBuy =
-    median(
-      baseline.map(
-        x => x.buyRatio
-      )
-    );
-
+  const bb =
+    median(base.map(x => x.buy));
 
   const volX =
-    ready &&
-    baseVolume
-      ? Math.min(
-          99,
-          w120.vol /
-          baseVolume
-        )
+    ready && bv
+      ? Math.min(99, w120.vol / bv)
       : 0;
-
 
   const tradeX =
-    ready &&
-    baseTrades
-      ? Math.min(
-          99,
-          w120.n /
-          baseTrades
-        )
+    ready && bn
+      ? Math.min(99, w120.n / bn)
       : 0;
 
-
-  // ===================================
-  // HACİM VE İŞLEM İVMESİ
-  // ===================================
-
-  const volumeAcceleration =
-    w120.vol > 0
-      ? w30.vol /
-        (
-          w120.vol / 4
-        )
+  const volAccel =
+    w120.vol
+      ? w30.vol / (w120.vol / 4)
       : 0;
 
-
-  const tradeAcceleration =
-    w120.n > 0
-      ? w30.n /
-        (
-          w120.n / 4
-        )
+  const tradeAccel =
+    w120.n
+      ? w30.n / (w120.n / 4)
       : 0;
 
-
-  const microVolumeAcceleration =
-    w30.vol > 0
-      ? w10.vol /
-        (
-          w30.vol / 3
-        )
+  const microVol =
+    w30.vol
+      ? w10.vol / (w30.vol / 3)
       : 0;
 
-
-  const microTradeAcceleration =
-    w30.n > 0
-      ? w10.n /
-        (
-          w30.n / 3
-        )
+  const microTrade =
+    w30.n
+      ? w10.n / (w30.n / 3)
       : 0;
-
 
   const buyShift =
     ready
-      ? w30.buyRatio -
-        baseBuy
+      ? w30.buyRatio - bb
       : 0;
 
-
   const buyStrength =
-    w10.buyRatio *
-      0.35 +
-
-    w30.buyRatio *
-      0.45 +
-
-    w60.buyRatio *
-      0.20;
+    w10.buyRatio * 0.35 +
+    w30.buyRatio * 0.45 +
+    w60.buyRatio * 0.20;
 
 
   // ===================================
-  // MUM YAPISI
+  // 15 DK MUM / SIKIŞMA / DİRENÇ
   // ===================================
 
-  const candles =
-    s.candles.slice(-8);
+  const c = s.candles.slice(-8);
 
   let compression = 50;
-  let trendScore = 0;
-
-  let resistanceDistance =
-    99;
-
+  let trend = 0;
+  let resistanceDistance = 99;
   let breakout = false;
 
+  if (c.length >= 4) {
+    const highs = c.map(x => x.h);
+    const lows = c.map(x => x.l);
+    const closes = c.map(x => x.c);
 
-  if (
-    candles.length >= 4
-  ) {
-    const highs =
-      candles.map(
-        x => x.h
-      );
-
-    const lows =
-      candles.map(
-        x => x.l
-      );
-
-    const closes =
-      candles.map(
-        x => x.c
-      );
-
-
-    const middle =
-      median(closes) ||
-      1;
-
+    const mid =
+      median(closes) || 1;
 
     const range =
       (
-        Math.max(
-          ...highs
-        ) -
-        Math.min(
-          ...lows
-        )
+        Math.max(...highs) -
+        Math.min(...lows)
       ) /
-      middle *
+      mid *
       100;
-
 
     compression =
       Math.max(
         0,
         Math.min(
           100,
-          100 -
-          range * 14
+          100 - range * 14
         )
       );
-
 
     let rising = 0;
 
@@ -763,53 +569,31 @@ function calculate(s) {
       }
     }
 
-
-    trendScore =
+    trend =
       rising /
-      Math.max(
-        1,
-        closes.length - 1
-      ) *
+      Math.max(1, closes.length - 1) *
       100;
 
-
     const resistance =
-      Math.max(
-        ...highs.slice(
-          0,
-          -1
-        )
-      );
-
+      Math.max(...highs.slice(0, -1));
 
     resistanceDistance =
       resistance
         ? (
-            (
-              resistance -
-              s.price
-            ) /
+            (resistance - s.price) /
             resistance
           ) * 100
         : 99;
 
-
     breakout =
       resistance > 0 &&
-      s.price >
-        resistance;
+      s.price > resistance;
   }
 
 
-  // ===================================
-  // HAZIRLIK
-  // ===================================
-
   if (!ready) {
     s.score = 0;
-
-    s.status =
-      "VERİ TOPLANIYOR";
+    s.status = "VERİ TOPLANIYOR";
 
     s.metrics = {
       w5,
@@ -821,17 +605,18 @@ function calculate(s) {
       volX: 0,
       tradeX: 0,
 
-      volumeAcceleration,
-      tradeAcceleration,
+      volumeAcceleration: volAccel,
+      tradeAcceleration: tradeAccel,
 
-      microVolumeAcceleration,
-      microTradeAcceleration,
+      microVolumeAcceleration:
+        microVol,
+
+      microTradeAcceleration:
+        microTrade,
 
       buyStrength,
-
       compression,
-      trendScore,
-
+      trendScore: trend,
       resistanceDistance,
 
       ready: false,
@@ -839,8 +624,7 @@ function calculate(s) {
       warmupRemaining:
         Math.max(
           0,
-          CFG.warmupMs -
-          age
+          CFG.warmup - age
         ),
 
       peak5m: 0
@@ -851,7 +635,7 @@ function calculate(s) {
 
 
   // ===================================
-  // FİYAT ERKENLİK PUANI
+  // PUANLAMA
   // ===================================
 
   const moved =
@@ -860,34 +644,13 @@ function calculate(s) {
       w120.ret
     );
 
+  let early = 20;
 
-  let earlyScore = 20;
+  if (moved <= 0.5) early = 100;
+  else if (moved <= 1) early = 95;
+  else if (moved <= 2) early = 80;
+  else if (moved <= 3) early = 55;
 
-  if (
-    moved <= 0.5
-  ) {
-    earlyScore = 100;
-
-  } else if (
-    moved <= 1
-  ) {
-    earlyScore = 95;
-
-  } else if (
-    moved <= 2
-  ) {
-    earlyScore = 80;
-
-  } else if (
-    moved <= 3
-  ) {
-    earlyScore = 55;
-  }
-
-
-  // ===================================
-  // HACİM PUANI
-  // ===================================
 
   const volumeScore =
     Math.min(
@@ -897,21 +660,15 @@ function calculate(s) {
 
       Math.max(
         0,
-        volumeAcceleration -
-        1
+        volAccel - 1
       ) * 35 +
 
       Math.max(
         0,
-        microVolumeAcceleration -
-        1
+        microVol - 1
       ) * 20
     );
 
-
-  // ===================================
-  // İŞLEM HIZI PUANI
-  // ===================================
 
   const tradeScore =
     Math.min(
@@ -921,21 +678,15 @@ function calculate(s) {
 
       Math.max(
         0,
-        tradeAcceleration -
-        1
+        tradeAccel - 1
       ) * 35 +
 
       Math.max(
         0,
-        microTradeAcceleration -
-        1
+        microTrade - 1
       ) * 20
     );
 
-
-  // ===================================
-  // ALIŞ AKIŞI
-  // ===================================
 
   const flowScore =
     Math.min(
@@ -950,31 +701,19 @@ function calculate(s) {
     );
 
 
-  // ===================================
-  // MİKRO MOMENTUM
-  // ===================================
-
-  const momentumScore =
+  const momentum =
     Math.max(
       0,
-
       Math.min(
         100,
 
         50 +
-
         w5.ret * 90 +
-
         w10.ret * 65 +
-
         w30.ret * 30
       )
     );
 
-
-  // ===================================
-  // DİRENÇ PUANI
-  // ===================================
 
   let resistanceScore = 0;
 
@@ -984,8 +723,7 @@ function calculate(s) {
   ) {
     resistanceScore =
       100 -
-      resistanceDistance *
-      30;
+      resistanceDistance * 30;
 
   } else if (
     resistanceDistance < 0 &&
@@ -995,68 +733,31 @@ function calculate(s) {
   }
 
 
-  // ===================================
-  // TOPLAM PUAN
-  // ===================================
-
   let score =
-    volumeScore *
-      0.24 +
+    volumeScore * 0.24 +
+    tradeScore * 0.18 +
+    flowScore * 0.18 +
+    momentum * 0.10 +
+    compression * 0.09 +
+    trend * 0.08 +
+    resistanceScore * 0.07 +
+    early * 0.06;
 
-    tradeScore *
-      0.18 +
-
-    flowScore *
-      0.18 +
-
-    momentumScore *
-      0.10 +
-
-    compression *
-      0.09 +
-
-    trendScore *
-      0.08 +
-
-    resistanceScore *
-      0.07 +
-
-    earlyScore *
-      0.06;
-
-
-  // ===================================
-  // YANLIŞ SİNYAL FİLTRELERİ
-  // ===================================
 
   if (
-    volumeAcceleration <
-      1.05 &&
-
+    volAccel < 1.05 &&
     volX < 1.3
   ) {
     score =
-      Math.min(
-        score,
-        67
-      );
+      Math.min(score, 67);
   }
 
 
-  if (
-    w30.buyRatio < 55
-  ) {
+  if (w30.buyRatio < 55) {
     score =
-      Math.min(
-        score,
-        66
-      );
+      Math.min(score, 66);
   }
 
-
-  // ===================================
-  // GEÇ KALINDI
-  // ===================================
 
   const late =
     w120.ret >= 5 ||
@@ -1065,50 +766,31 @@ function calculate(s) {
 
   if (late) {
     score =
-      Math.min(
-        score,
-        55
-      );
+      Math.min(score, 55);
   }
 
 
-  // ===================================
-  // KIRILIM
-  // ===================================
-
-  const breakoutConfirmed =
+  const breakOK =
     breakout &&
-
     w30.buyRatio >= 58 &&
-
     (
       volX >= 1.5 ||
-      volumeAcceleration >=
-        1.25
+      volAccel >= 1.25
     ) &&
-
     w10.ret > -0.10;
 
 
-  if (
-    breakoutConfirmed
-  ) {
+  if (breakOK) {
     score =
-      Math.max(
-        score,
-        86
-      );
+      Math.max(score, 86);
   }
 
 
-    s.score =
+  s.score =
     Math.round(
       Math.max(
         0,
-        Math.min(
-          100,
-          score
-        )
+        Math.min(100, score)
       )
     );
 
@@ -1116,7 +798,7 @@ function calculate(s) {
 
 
   // ===================================
-  // SİNYAL SINIFLANDIRMASI
+  // DURUM
   // ===================================
 
   const accumulation =
@@ -1124,8 +806,8 @@ function calculate(s) {
     s.score >= 60 &&
     compression >= 55 &&
     (
-      volumeAcceleration >= 1.05 ||
-      tradeAcceleration >= 1.10
+      volAccel >= 1.05 ||
+      tradeAccel >= 1.10
     ) &&
     w30.buyRatio >= 53;
 
@@ -1135,51 +817,41 @@ function calculate(s) {
     s.score >= 72 &&
     (
       volX >= 1.3 ||
-      volumeAcceleration >= 1.20
+      volAccel >= 1.20
     ) &&
     (
       tradeX >= 1.2 ||
-      tradeAcceleration >= 1.20
+      tradeAccel >= 1.20
     ) &&
     w30.buyRatio >= 58 &&
     resistanceDistance <= 2.5;
 
 
-  const strongPreparation =
+  const strong =
     preparation &&
     s.score >= 82 &&
     buyStrength >= 62 &&
     (
-      microVolumeAcceleration >= 1.10 ||
-      microTradeAcceleration >= 1.10
+      microVol >= 1.10 ||
+      microTrade >= 1.10
     );
 
 
   if (late) {
-    s.status =
-      "GEÇ KALINDI";
+    s.status = "GEÇ KALINDI";
 
-  } else if (
-    breakoutConfirmed
-  ) {
-    s.status =
-      "KIRILIM TEYİDİ";
+  } else if (breakOK) {
+    s.status = "KIRILIM TEYİDİ";
 
-  } else if (
-    strongPreparation
-  ) {
+    } else if (strong) {
     s.status =
       "GÜÇLÜ PATLAMA HAZIRLIĞI";
 
-  } else if (
-    preparation
-  ) {
+  } else if (preparation) {
     s.status =
       "PATLAMA HAZIRLIĞI";
 
-  } else if (
-    accumulation
-  ) {
+  } else if (accumulation) {
     s.status =
       "BİRİKİM TESPİT EDİLDİ";
 
@@ -1208,22 +880,22 @@ function calculate(s) {
 
     volumeAcceleration:
       Number(
-        volumeAcceleration.toFixed(2)
+        volAccel.toFixed(2)
       ),
 
     tradeAcceleration:
       Number(
-        tradeAcceleration.toFixed(2)
+        tradeAccel.toFixed(2)
       ),
 
     microVolumeAcceleration:
       Number(
-        microVolumeAcceleration.toFixed(2)
+        microVol.toFixed(2)
       ),
 
     microTradeAcceleration:
       Number(
-        microTradeAcceleration.toFixed(2)
+        microTrade.toFixed(2)
       ),
 
     buyStrength:
@@ -1232,24 +904,21 @@ function calculate(s) {
       ),
 
     compression:
-      Math.round(
-        compression
-      ),
+      Math.round(compression),
 
     trendScore:
-      Math.round(
-        trendScore
-      ),
+      Math.round(trend),
 
     resistanceDistance:
       Number(
         resistanceDistance.toFixed(2)
       ),
 
-    breakoutConfirmed,
+    breakoutConfirmed:
+      breakOK,
 
     earlyPriceScore:
-      earlyScore,
+      early,
 
     preparationScore:
       s.score,
@@ -1261,13 +930,12 @@ function calculate(s) {
   };
 
 
-  // Sunucu sinyali kendi kaydeder.
   recordSignal(s);
 }
 
 
 // =====================================
-// TÜM AKTİF OKX USDT PARİTELERİ
+// TÜM AKTİF USDT PARİTELERİ
 // =====================================
 
 async function getSymbols() {
@@ -1278,7 +946,7 @@ async function getSymbols() {
 
   if (!r.ok) {
     throw new Error(
-      `OKX HTTP ${r.status}`
+      `OKX ${r.status}`
     );
   }
 
@@ -1290,10 +958,7 @@ async function getSymbols() {
       x =>
         x.instId.endsWith(
           "-USDT"
-        )
-    )
-    .filter(
-      x =>
+        ) &&
         Number(x.last) > 0 &&
         Number(
           x.volCcy24h || 0
@@ -1306,7 +971,7 @@ async function getSymbols() {
 
 
 // =====================================
-// 15 DK MUMLAR
+// 15 DK MUM VERİSİ
 // =====================================
 
 async function loadCandles(
@@ -1323,19 +988,12 @@ async function loadCandles(
           )}&bar=15m&limit=8`
         );
 
-      if (!r.ok) {
-        continue;
-      }
+      if (!r.ok) continue;
 
       const j =
         await r.json();
 
-      const s =
-        getState(
-          symbol
-        );
-
-      s.candles =
+      S(symbol).candles =
         (j.data || [])
           .map(
             x => ({
@@ -1353,19 +1011,13 @@ async function loadCandles(
 
       await sleep(35);
 
-    } catch (e) {
-      console.error(
-        "Mum:",
-        symbol,
-        e.message
-      );
-    }
+    } catch {}
   }
 }
 
 
 // =====================================
-// OKX CANLI BAĞLANTI
+// OKX CANLI İŞLEM AKIŞI
 // =====================================
 
 function connectOKX(
@@ -1374,7 +1026,7 @@ function connectOKX(
 ) {
   const ws =
     new WebSocket(
-      OKX_WS
+      OKXWS
     );
 
 
@@ -1450,7 +1102,7 @@ function connectOKX(
         const trade of data.data
       ) {
         const s =
-          getState(
+          S(
             trade.instId
           );
 
@@ -1479,11 +1131,8 @@ function connectOKX(
         }
 
 
-        if (
-          !s.firstTradeAt
-        ) {
-          s.firstTradeAt =
-            t;
+        if (!s.first) {
+          s.first = t;
         }
 
 
@@ -1508,7 +1157,7 @@ function connectOKX(
 
         const cutoff =
           Date.now() -
-          CFG.keepMs;
+          CFG.keep;
 
 
         while (
@@ -1520,7 +1169,7 @@ function connectOKX(
         }
 
 
-        calculate(s);
+        calc(s);
       }
     }
   );
@@ -1540,10 +1189,6 @@ function connectOKX(
   ws.on(
     "close",
     () => {
-      console.log(
-        `OKX grup ${groupNo} yeniden bağlanıyor`
-      );
-
       setTimeout(
         () =>
           connectOKX(
@@ -1558,7 +1203,7 @@ function connectOKX(
 
 
 // =====================================
-// RADAR ÖNCELİĞİ
+// RADAR LİSTESİ
 // =====================================
 
 function priority(status) {
@@ -1642,7 +1287,7 @@ function radarRows() {
 
 
 // =====================================
-// EN ÇOK YÜKSELEN / DÜŞEN
+// HAREKET EDENLER
 // =====================================
 
 async function updateMovers() {
@@ -1652,11 +1297,7 @@ async function updateMovers() {
         `${REST}/api/v5/market/tickers?instType=SPOT`
       );
 
-    if (!r.ok) {
-      throw new Error(
-        `OKX ${r.status}`
-      );
-    }
+    if (!r.ok) return;
 
     const j =
       await r.json();
@@ -1668,19 +1309,14 @@ async function updateMovers() {
           x =>
             x.instId.endsWith(
               "-USDT"
-            )
-        )
-        .filter(
-          x =>
+            ) &&
             Number(x.last) > 0 &&
             Number(x.open24h) > 0
         )
         .map(
           x => {
             const price =
-              Number(
-                x.last
-              );
+              Number(x.last);
 
             const open =
               Number(
@@ -1696,6 +1332,7 @@ async function updateMovers() {
               Number(
                 x.low24h
               );
+
 
             return {
               symbol:
@@ -1713,29 +1350,7 @@ async function updateMovers() {
                 high,
 
               low24:
-                low,
-
-              distanceFromHigh:
-                high
-                  ? (
-                      (
-                        high -
-                        price
-                      ) /
-                      high
-                    ) * 100
-                  : 0,
-
-              distanceFromLow:
                 low
-                  ? (
-                      (
-                        price -
-                        low
-                      ) /
-                      low
-                    ) * 100
-                  : 0
             };
           }
         );
@@ -1782,114 +1397,82 @@ async function updateMovers() {
 
       const momentum15 =
         Number(
-          m.w120?.ret ||
-          0
+          m.w120?.ret || 0
         );
 
 
       const momentum1h =
         Number(
-          m.w60?.ret ||
-          0
+          m.w60?.ret || 0
         );
 
 
       const volumeRatio =
         Number(
-          m.volX ||
-          0
+          m.volX || 0
         );
 
 
       if (up) {
-        let continuationScore =
-          0;
-
+        let score = 0;
 
         if (
           x.change24 > 0
-        ) {
-          continuationScore +=
-            15;
-        }
-
+        ) score += 15;
 
         if (
           momentum15 > 0
-        ) {
-          continuationScore +=
-            15;
-        }
-
+        ) score += 15;
 
         if (
           momentum1h > 0
-        ) {
-          continuationScore +=
-            15;
-        }
-
+        ) score += 15;
 
         if (
           volumeRatio >= 1.3
-        ) {
-          continuationScore +=
-            20;
-        }
-
+        ) score += 20;
 
         if (
           Number(
             m.volumeAcceleration ||
             0
           ) >= 1.2
-        ) {
-          continuationScore +=
-            20;
-        }
-
+        ) score += 20;
 
         if (
           Number(
             m.w30?.buyRatio ||
             0
           ) >= 60
-        ) {
-          continuationScore +=
-            15;
-        }
+        ) score += 15;
 
 
-        continuationScore =
+        score =
           Math.min(
             100,
-            continuationScore
+            score
           );
 
 
-        let continuationText =
+        let text =
           "DEVAM GÜCÜ ZAYIF";
 
-
         if (
-          continuationScore >=
-          75
+          score >= 75
         ) {
-          continuationText =
+          text =
             "MOMENTUM GÜÇLÜ";
 
         } else if (
-          continuationScore >=
-          55
+          score >= 55
         ) {
-          continuationText =
+          text =
             "YÜKSELİŞ KORUNUYOR";
 
         } else if (
-          continuationScore >=
-          35
+          score >= 35
         ) {
-          continuationText =
+          text =
             "TEYİT BEKLENİYOR";
         }
 
@@ -1897,7 +1480,7 @@ async function updateMovers() {
         if (
           x.change24 >= 40
         ) {
-          continuationText =
+          text =
             "AŞIRI UZAMIŞ — RİSK YÜKSEK";
         }
 
@@ -1909,96 +1492,12 @@ async function updateMovers() {
           momentum1h,
           volumeRatio,
 
-          continuationScore,
-          continuationText
+          continuationScore:
+            score,
+
+          continuationText:
+            text
         };
-      }
-
-
-      // Düşüşten tepki analizi
-
-      let reversalScore =
-        0;
-
-
-      if (
-        x.distanceFromLow <=
-        3
-      ) {
-        reversalScore +=
-          25;
-      }
-
-
-      if (
-        momentum15 > 0
-      ) {
-        reversalScore +=
-          20;
-      }
-
-
-      if (
-        Number(
-          m.volumeAcceleration ||
-          0
-        ) >= 1.2
-      ) {
-        reversalScore +=
-          20;
-      }
-
-
-      if (
-        Number(
-          m.w30?.buyRatio ||
-          0
-        ) >= 55
-      ) {
-        reversalScore +=
-          20;
-      }
-
-
-      if (
-        Number(
-          m.trendScore ||
-          0
-        ) >= 55
-      ) {
-        reversalScore +=
-          15;
-      }
-
-
-      reversalScore =
-        Math.min(
-          100,
-          reversalScore
-        );
-
-
-      let reversalText =
-        "DÜŞÜŞ DEVAM EDİYOR";
-
-
-      if (
-        reversalScore >= 75
-      ) {
-        reversalText =
-          "DÖNÜŞ TEYİDİ";
-
-      } else if (
-        reversalScore >= 55
-      ) {
-        reversalText =
-          "TEPKİ İHTİMALİ ARTIYOR";
-
-      } else if (
-        reversalScore >= 35
-      ) {
-        reversalText =
-          "DÖNÜŞ TEYİDİ BEKLENİYOR";
       }
 
 
@@ -2012,6 +1511,64 @@ async function updateMovers() {
         );
 
 
+      let score = 0;
+
+      if (
+        momentum15 > 0
+      ) score += 25;
+
+      if (
+        Number(
+          m.volumeAcceleration ||
+          0
+        ) >= 1.2
+      ) score += 25;
+
+      if (
+        Number(
+          m.w30?.buyRatio ||
+          0
+        ) >= 55
+      ) score += 25;
+
+      if (
+        Number(
+          m.trendScore ||
+          0
+        ) >= 55
+      ) score += 25;
+
+
+      score =
+        Math.min(
+          100,
+          score
+        );
+
+
+      let text =
+        "DÜŞÜŞ DEVAM EDİYOR";
+
+      if (
+        score >= 75
+      ) {
+        text =
+          "DÖNÜŞ TEYİDİ";
+
+      } else if (
+        score >= 50
+      ) {
+        text =
+          "TEPKİ İHTİMALİ ARTIYOR";
+
+      } else if (
+        score >= 25
+      ) {
+        text =
+          "DÖNÜŞ TEYİDİ BEKLENİYOR";
+      }
+
+
       return {
         ...x,
 
@@ -2019,8 +1576,11 @@ async function updateMovers() {
         momentum1h,
         volumeRatio,
 
-        reversalScore,
-        reversalText,
+        reversalScore:
+          score,
+
+        reversalText:
+          text,
 
         supportLow:
           Math.max(
@@ -2069,7 +1629,7 @@ async function updateMovers() {
 
   } catch (e) {
     console.error(
-      "Hareket analizi:",
+      "Movers:",
       e.message
     );
   }
@@ -2108,8 +1668,6 @@ app.get(
 );
 
 
-// Kalıcı sinyal geçmişi
-
 app.get(
   "/api/history",
   (req, res) => {
@@ -2134,8 +1692,6 @@ app.get(
   }
 );
 
-
-// Hareket edenler
 
 app.get(
   "/api/movers",
@@ -2166,7 +1722,192 @@ app.get(
 
 
 // =====================================
-// SUNUCUYU BAŞLAT
+// PUSH API
+// =====================================
+
+app.get(
+  "/api/push/public-key",
+  (req, res) => {
+    res.json({
+      publicKey:
+        VAPID_PUBLIC_KEY ||
+        ""
+    });
+  }
+);
+
+
+app.post(
+  "/api/push/subscribe",
+  (req, res) => {
+    const sub =
+      req.body;
+
+    if (
+      !sub ||
+      !sub.endpoint
+    ) {
+      return res
+        .status(400)
+        .json({
+          ok: false
+        });
+    }
+
+
+    const exists =
+      pushSubscriptions.some(
+        x =>
+          x.endpoint ===
+          sub.endpoint
+      );
+
+
+    if (!exists) {
+      pushSubscriptions.push(
+        sub
+      );
+
+      writeJSON(
+        PUSH_FILE,
+        pushSubscriptions
+      );
+    }
+
+
+    console.log(
+      `Push abonesi: ${pushSubscriptions.length}`
+    );
+
+
+    res.json({
+      ok: true,
+      count:
+        pushSubscriptions.length
+    });
+  }
+);
+
+
+// =====================================
+// PUSH TEST
+// =====================================
+
+app.post(
+  "/api/push/test",
+  async (
+    req,
+    res
+  ) => {
+    try {
+      const payload =
+        JSON.stringify({
+          title:
+            "TradeRadar Test",
+
+          body:
+            "Arka plan bildirimi çalışıyor.",
+
+          tag:
+            "traderadar-test",
+
+          url:
+            "/"
+        });
+
+
+      let sent = 0;
+      const alive = [];
+
+
+      for (
+        const sub of pushSubscriptions
+      ) {
+        try {
+          await webpush
+            .sendNotification(
+              sub,
+              payload
+            );
+
+          alive.push(sub);
+          sent++;
+
+        } catch (e) {
+          if (
+            e.statusCode !==
+              404 &&
+            e.statusCode !==
+              410
+          ) {
+            alive.push(sub);
+          }
+        }
+      }
+
+
+      pushSubscriptions =
+        alive;
+
+
+      writeJSON(
+        PUSH_FILE,
+        pushSubscriptions
+      );
+
+
+      res.json({
+        ok: true,
+        sent
+      });
+
+    } catch (e) {
+      res
+        .status(500)
+        .json({
+          ok: false,
+          error:
+            e.message
+        });
+    }
+  }
+);
+
+
+// =====================================
+// SAĞLIK
+// =====================================
+
+app.get(
+  "/health",
+  (req, res) => {
+    res.json({
+      ok: true,
+
+      tracked:
+        states.size,
+
+      signals:
+        signalHistory.length,
+
+      pushSubscribers:
+        pushSubscriptions.length,
+
+      pushReady:
+        Boolean(
+          VAPID_PUBLIC_KEY &&
+          VAPID_PRIVATE_KEY
+        ),
+
+      time:
+        Date.now()
+    });
+  }
+);
+
+
+// =====================================
+// SUNUCU
 // =====================================
 
 const server =
@@ -2176,6 +1917,7 @@ const server =
       console.log(
         `TradeRadar port ${PORT}`
       );
+
 
       try {
         const symbols =
@@ -2190,33 +1932,26 @@ const server =
         for (
           const symbol of symbols
         ) {
-          getState(
-            symbol
-          );
+          S(symbol);
         }
 
 
-        // Mumlar arka planda yüklenir.
         loadCandles(
           symbols
         );
 
 
-        // Tüm coinleri gruplara böl.
-        const groups =
-          [];
+        const groups = [];
 
         for (
           let i = 0;
           i < symbols.length;
-          i +=
-            CFG.groupSize
+          i += CFG.group
         ) {
           groups.push(
             symbols.slice(
               i,
-              i +
-              CFG.groupSize
+              i + CFG.group
             )
           );
         }
@@ -2252,13 +1987,12 @@ const server =
           e.message
         );
       }
-   
     }
   );
 
 
 // =====================================
-// TELEFON CANLI WEBSOCKET
+// TELEFONA CANLI VERİ
 // =====================================
 
 const ui =
@@ -2273,22 +2007,33 @@ ui.on(
   ws => {
     clients.add(ws);
 
+
     try {
       ws.send(
         JSON.stringify({
-          type: "radar",
-          source: "OKX",
-          tracked: states.size,
-          rows: radarRows()
+          type:
+            "radar",
+
+          source:
+            "OKX",
+
+          tracked:
+            states.size,
+
+          rows:
+            radarRows()
         })
       );
+
     } catch {}
 
 
     ws.on(
       "close",
       () => {
-        clients.delete(ws);
+        clients.delete(
+          ws
+        );
       }
     );
   }
@@ -2296,65 +2041,4 @@ ui.on(
 
 
 // =====================================
-// RADARI HER SANİYE TELEFONA GÖNDER
-// =====================================
-
-setInterval(
-  () => {
-    const message =
-      JSON.stringify({
-        type: "radar",
-        source: "OKX",
-        tracked: states.size,
-        rows: radarRows()
-      });
-
-
-    for (
-      const ws of clients
-    ) {
-      if (
-        ws.readyState ===
-        WebSocket.OPEN
-      ) {
-        try {
-          ws.send(message);
-        } catch {}
-      }
-    }
-  },
-  1000
-);
-
-
-// =====================================
-// HAREKET EDENLERİ GÜNCELLE
-// =====================================
-
-setInterval(
-  updateMovers,
-  60 * 1000
-);
-
-
-// =====================================
-// SAĞLIK KONTROLÜ
-// =====================================
-
-app.get(
-  "/health",
-  (req, res) => {
-    res.json({
-      ok: true,
-      source: "OKX",
-      tracked: states.size,
-      signals: signalHistory.length,
-      time: Date.now()
-    });
-  }
-);
-
-
-console.log(
-  "TradeRadar sistemi hazır."
-);
+//
