@@ -983,10 +983,458 @@ function renderMovers() {
 // =====================================
 
 function renderHistory() {
-  const list =
-    history();
+  const list = history();
 
   if (!list.length) {
     C.innerHTML = `
       <article class="card">
-        Henüz güçlü sinyal yok
+        <div class="sym">
+          Henüz güçlü sinyal yok
+        </div>
+
+        <p>
+          PATLAMA HAZIRLIĞI,
+          GÜÇLÜ PATLAMA HAZIRLIĞI
+          veya KIRILIM TEYİDİ
+          oluştuğunda burada
+          kaydedilecek.
+        </p>
+      </article>
+    `;
+
+    return;
+  }
+
+  C.innerHTML =
+    list.map(h => {
+      const d =
+        new Date(h.time);
+
+      const tarih =
+        d.toLocaleDateString(
+          "tr-TR"
+        );
+
+      const saat =
+        d.toLocaleTimeString(
+          "tr-TR"
+        );
+
+      return `
+        <article class="card">
+
+          <div class="top">
+            <div>
+              <div class="sym">
+                ${h.symbol.replace(
+                  "-USDT",
+                  "/USDT"
+                )}
+              </div>
+
+              <span class="status">
+                ${h.status}
+              </span>
+            </div>
+
+            <div>
+              <div class="score">
+                ${h.score}/100
+              </div>
+
+              <small>
+                ${tarih} ${saat}
+              </small>
+            </div>
+          </div>
+
+
+          <div class="metrics">
+
+            <div class="m">
+              <span>
+                İlk sinyal fiyatı
+              </span>
+              <b>
+                ${h.price}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                Sinyal sonrası zirve
+              </span>
+              <b>
+                ${h.high}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                Maksimum yükseliş
+              </span>
+              <b>
+                +%${f(h.maxGain)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                Sinyal puanı
+              </span>
+              <b>
+                ${h.score}/100
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                5 dk zirve puanı
+              </span>
+              <b>
+                ${f(h.peak, 0)}/100
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                Hacim
+              </span>
+              <b>
+                ${f(h.volX)}x
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                Hacim ivmesi
+              </span>
+              <b>
+                ${f(h.volAccel)}x
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                İşlem hızı
+              </span>
+              <b>
+                ${f(h.tradeX)}x
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                İşlem ivmesi
+              </span>
+              <b>
+                ${f(h.tradeAccel)}x
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                Alış baskısı
+              </span>
+              <b>
+                %${f(h.buy, 1)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                10 sn fiyat
+              </span>
+              <b>
+                %${f(h.ret10)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                30 sn fiyat
+              </span>
+              <b>
+                %${f(h.ret30)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                60 sn fiyat
+              </span>
+              <b>
+                %${f(h.ret60)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                120 sn fiyat
+              </span>
+              <b>
+                %${f(h.ret120)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                Dirence uzaklık
+              </span>
+              <b>
+                %${f(h.resistance)}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>
+                Son durum
+              </span>
+              <b>
+                ${h.lastStatus}
+              </b>
+            </div>
+
+          </div>
+
+        </article>
+      `;
+    }).join("");
+}
+
+
+// =====================================
+// EKRAN SEÇİMİ
+// =====================================
+
+function draw() {
+  if (
+    activeView === "movers"
+  ) {
+    renderMovers();
+    return;
+  }
+
+  if (
+    activeView === "history"
+  ) {
+    renderHistory();
+    return;
+  }
+
+  renderLive();
+}
+
+
+// =====================================
+// RADAR HTTP YEDEK
+// =====================================
+
+async function pollRadar() {
+  try {
+    const r =
+      await fetch(
+        "/api/radar?t=" +
+        Date.now(),
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!r.ok) {
+      throw new Error(
+        `HTTP ${r.status}`
+      );
+    }
+
+    const data =
+      await r.json();
+
+    if (
+      data.type === "radar" &&
+      Array.isArray(data.rows)
+    ) {
+      rows = data.rows;
+
+      processAlerts();
+      updateHistory();
+
+      if (T) {
+        T.textContent =
+          new Date()
+            .toLocaleTimeString(
+              "tr-TR"
+            );
+      }
+
+      if (!wsConnected && K) {
+        K.textContent =
+          `OKX HTTP — ${
+            data.tracked || "?"
+          } coin`;
+      }
+
+      if (
+        activeView === "live"
+      ) {
+        renderLive();
+      }
+    }
+
+  } catch {
+    if (
+      !wsConnected &&
+      K
+    ) {
+      K.textContent =
+        "Bağlantı bekleniyor...";
+    }
+  }
+}
+
+
+// =====================================
+// HAREKET EDENLER VERİSİ
+// =====================================
+
+async function pollMovers() {
+  try {
+    const r =
+      await fetch(
+        "/api/movers?t=" +
+        Date.now(),
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!r.ok) {
+      throw new Error(
+        `HTTP ${r.status}`
+      );
+    }
+
+    movers =
+      await r.json();
+
+    if (
+      activeView === "movers"
+    ) {
+      renderMovers();
+    }
+
+  } catch {}
+}
+
+
+// =====================================
+// CANLI WEBSOCKET
+// =====================================
+
+function connectWS() {
+  const protocol =
+    location.protocol === "https:"
+      ? "wss"
+      : "ws";
+
+  const ws =
+    new WebSocket(
+      `${protocol}://${location.host}/live`
+    );
+
+
+  ws.onopen = () => {
+    wsConnected = true;
+
+    if (K) {
+      K.textContent =
+        "OKX Canlı";
+    }
+  };
+
+
+  ws.onmessage = event => {
+    try {
+      const data =
+        JSON.parse(
+          event.data
+        );
+
+      if (
+        data.type === "radar" &&
+        Array.isArray(
+          data.rows
+        )
+      ) {
+        rows = data.rows;
+
+        processAlerts();
+        updateHistory();
+
+        if (T) {
+          T.textContent =
+            new Date()
+              .toLocaleTimeString(
+                "tr-TR"
+              );
+        }
+
+        if (K) {
+          K.textContent =
+            `OKX Canlı — ${
+              data.tracked || "?"
+            } coin`;
+        }
+
+        if (
+          activeView === "live"
+        ) {
+          renderLive();
+        }
+      }
+
+    } catch {}
+  };
+
+
+  ws.onerror = () => {
+    wsConnected = false;
+  };
+
+
+  ws.onclose = () => {
+    wsConnected = false;
+
+    if (K) {
+      K.textContent =
+        "OKX HTTP Yedek";
+    }
+
+    setTimeout(
+      connectWS,
+      3000
+    );
+  };
+}
+
+
+// =====================================
+// BAŞLAT
+// =====================================
+
+connectWS();
+
+pollRadar();
+pollMovers();
+
+setInterval(
+  pollRadar,
+  3000
+);
+
+setInterval(
+  pollMovers,
+  30000
+);
+
+draw();
