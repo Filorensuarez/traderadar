@@ -1455,7 +1455,7 @@ function renderSearch() {
 }
 
 
-function searchCoin(value) {
+async function searchCoin(value) {
   const result =
     document.querySelector(
       "#coinSearchResult"
@@ -1467,11 +1467,7 @@ function searchCoin(value) {
   let query =
     String(value || "")
       .trim()
-      .toUpperCase();
-
-
-  query =
-    query
+      .toUpperCase()
       .replace("/USDT", "")
       .replace("-USDT", "")
       .replace("USDT", "")
@@ -1481,351 +1477,491 @@ function searchCoin(value) {
   if (!query) {
     result.innerHTML =
       "Coin adı yazın.";
-
     return;
-  }
-
-
-  const symbol =
-    `${query}-USDT`;
-
-
-  const x =
-    rows.find(
-      item =>
-        item.symbol === symbol
-    );
-
-
-  if (!x) {
-    result.innerHTML = `
-      <div class="status">
-        ${query}/USDT şu anda
-        radar listesindeki ilk 50 coin
-        arasında değil.
-      </div>
-    `;
-
-    return;
-  }
-
-
-  const m =
-    x.metrics || {};
-
-
-  const h =
-    history().find(
-      item =>
-        item.symbol ===
-        x.symbol
-    );
-
-
-  const signalTime =
-    h?.time
-      ? new Date(
-          h.time
-        ).toLocaleString(
-          "tr-TR"
-        )
-      : "Henüz sinyal yok";
-
-
-  const firstPrice =
-    h?.price ??
-    "-";
-
-
-  const highPrice =
-    h?.high ??
-    "-";
-
-
-  const maxGain =
-    Number.isFinite(
-      Number(h?.maxGain)
-    )
-      ? `+%${f(
-          h.maxGain
-        )}`
-      : "-";
-
-
-  let explanation =
-    "Şu anda güçlü hazırlık şartları oluşmamış.";
-
-
-  if (
-    x.status ===
-    "KIRILIM TEYİDİ"
-  ) {
-    explanation =
-      "Direnç kırılımı tespit edilmiş. " +
-      "Hacim, işlem akışı ve alış baskısının devam edip etmediği izlenmeli.";
-
-  } else if (
-    x.status ===
-    "GÜÇLÜ PATLAMA HAZIRLIĞI"
-  ) {
-    explanation =
-      "Hacim ve işlem akışı güçlü biçimde hızlanmış, " +
-      "alıcı baskısı yüksek ve fiyat henüz aşırı ilerlememiş.";
-
-  } else if (
-    x.status ===
-    "PATLAMA HAZIRLIĞI"
-  ) {
-    explanation =
-      "Erken hazırlık şartları oluşuyor ancak güçlü teyit şartlarının tamamı henüz oluşmamış.";
-
-  } else if (
-    x.status ===
-    "BİRİKİM TESPİT EDİLDİ"
-  ) {
-    explanation =
-      "Hacim ve işlem yapısında birikim belirtileri var ancak kırılım henüz teyit edilmemiş.";
-
-  } else if (
-    x.status ===
-    "GEÇ KALINDI"
-  ) {
-    explanation =
-      "Fiyat hareketi önemli ölçüde gerçekleşmiş. Erken giriş bölgesi geçmiş olabilir.";
   }
 
 
   result.innerHTML = `
-    <div style="margin-top:8px">
-
-      <div class="top">
-        <div>
-          <div class="sym">
-            ${query}/USDT
-          </div>
-
-          <span class="status">
-            ${x.status}
-          </span>
-        </div>
-
-        <div>
-          <div class="score">
-            ${x.score}/100
-          </div>
-
-          <small>
-            ${x.price}
-          </small>
-        </div>
-      </div>
-
-
-      <div class="bar">
-        <i style="width:${Math.min(
-          100,
-          Number(x.score) || 0
-        )}%"></i>
-      </div>
-
-
-      <div class="metrics">
-
-        <div class="m">
-          <span>Anlık fiyat</span>
-          <b>${x.price}</b>
-        </div>
-
-        <div class="m">
-          <span>Radar puanı</span>
-          <b>${x.score}/100</b>
-        </div>
-
-        <div class="m">
-          <span>Hacim</span>
-          <b>
-            ${f(
-              m.volX
-            )}x
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            Hacim ivmesi
-          </span>
-          <b>
-            ${f(
-              m.volumeAcceleration
-            )}x
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            İşlem hızı
-          </span>
-          <b>
-            ${f(
-              m.tradeX
-            )}x
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            İşlem ivmesi
-          </span>
-          <b>
-            ${f(
-              m.tradeAcceleration
-            )}x
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            Alış baskısı
-          </span>
-          <b>
-            %${f(
-              m.w30?.buyRatio,
-              1
-            )}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            10 sn fiyat
-          </span>
-          <b>
-            %${f(
-              m.w10?.ret
-            )}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            30 sn fiyat
-          </span>
-          <b>
-            %${f(
-              m.w30?.ret
-            )}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            60 sn fiyat
-          </span>
-          <b>
-            %${f(
-              m.w60?.ret
-            )}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            120 sn fiyat
-          </span>
-          <b>
-            %${f(
-              m.w120?.ret
-            )}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>Sıkışma</span>
-          <b>
-            ${f(
-              m.compression,
-              0
-            )}/100
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            Trend yapısı
-          </span>
-          <b>
-            ${f(
-              m.trendScore,
-              0
-            )}/100
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            Dirence uzaklık
-          </span>
-          <b>
-            %${f(
-              m.resistanceDistance
-            )}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            İlk sinyal fiyatı
-          </span>
-          <b>
-            ${firstPrice}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            Sinyal sonrası zirve
-          </span>
-          <b>
-            ${highPrice}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            Maksimum yükseliş
-          </span>
-          <b>
-            ${maxGain}
-          </b>
-        </div>
-
-        <div class="m">
-          <span>
-            Son sinyal zamanı
-          </span>
-          <b>
-            ${signalTime}
-          </b>
-        </div>
-
-      </div>
-
-
-      <div
-        class="card"
-        style="margin-top:12px"
-      >
-        <div class="sym">
-          Neden bu durumda?
-        </div>
-
-        <p>
-          ${explanation}
-        </p>
-      </div>
-
+    <div class="status">
+      ${query}/USDT sorgulanıyor...
     </div>
   `;
+
+
+  try {
+    const response =
+      await fetch(
+        `/api/coin/${encodeURIComponent(
+          query
+        )}?t=${Date.now()}`,
+        {
+          cache: "no-store"
+        }
+      );
+
+
+    if (response.status === 404) {
+      result.innerHTML = `
+        <div class="status">
+          ${query}/USDT bulunamadı.
+        </div>
+      `;
+      return;
+    }
+
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status}`
+      );
+    }
+
+
+    const data =
+      await response.json();
+
+
+    if (
+      !data.ok ||
+      !data.symbol
+    ) {
+      throw new Error(
+        "Coin verisi alınamadı."
+      );
+    }
+
+
+    const m =
+      data.metrics || {};
+
+    const a =
+      data.analysis || {};
+
+    const h =
+      data.history;
+
+
+    const signalTime =
+      h?.time
+        ? new Date(
+            h.time
+          ).toLocaleString(
+            "tr-TR"
+          )
+        : "Henüz sinyal yok";
+
+
+    const firstPrice =
+      h?.price ?? "-";
+
+
+    const highPrice =
+      h?.high ?? "-";
+
+
+    const maxGain =
+      Number.isFinite(
+        Number(h?.maxGain)
+      )
+        ? `+%${f(
+            h.maxGain
+          )}`
+        : "-";
+
+
+    let explanation =
+      "Şu anda güçlü hazırlık şartlarının tamamı oluşmamış.";
+
+
+    if (
+      data.status ===
+      "KIRILIM TEYİDİ"
+    ) {
+      explanation =
+        "Direnç kırılımı tespit edilmiş. " +
+        "Hacim ve işlem akışının devamı izlenmeli.";
+
+    } else if (
+      data.status ===
+      "GÜÇLÜ PATLAMA HAZIRLIĞI"
+    ) {
+      explanation =
+        "Hacim, işlem akışı ve alıcı baskısı güçlü. " +
+        "Fiyat henüz aşırı ilerlememiş.";
+
+    } else if (
+      data.status ===
+      "PATLAMA HAZIRLIĞI"
+    ) {
+      explanation =
+        "Erken hazırlık şartları oluşmuş ancak güçlü teyit şartlarının tamamı henüz oluşmamış.";
+
+    } else if (
+      data.status ===
+      "BİRİKİM TESPİT EDİLDİ"
+    ) {
+      explanation =
+        "Birikim belirtileri mevcut ancak güçlü kırılım henüz teyit edilmemiş.";
+
+    } else if (
+      data.status ===
+      "GEÇ KALINDI"
+    ) {
+      explanation =
+        "Fiyat hareketinin önemli bölümü gerçekleşmiş olabilir.";
+    }
+
+
+    const check = (
+      name,
+      ok
+    ) => `
+      <div class="m">
+        <span>
+          ${name}
+        </span>
+
+        <b>
+          ${ok ? "UYGUN" : "YETERSİZ"}
+        </b>
+      </div>
+    `;
+
+
+    result.innerHTML = `
+      <div style="margin-top:8px">
+
+        <div class="top">
+
+          <div>
+            <div class="sym">
+              ${data.symbol.replace(
+                "-USDT",
+                "/USDT"
+              )}
+            </div>
+
+            <span class="status">
+              ${data.status}
+            </span>
+          </div>
+
+          <div>
+            <div class="score">
+              ${data.score}/100
+            </div>
+
+            <small>
+              ${data.price}
+            </small>
+          </div>
+
+        </div>
+
+
+        <div class="bar">
+          <i style="width:${Math.min(
+            100,
+            Number(
+              data.score
+            ) || 0
+          )}%"></i>
+        </div>
+
+
+        <div class="metrics">
+
+          <div class="m">
+            <span>
+              Anlık fiyat
+            </span>
+            <b>
+              ${data.price}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Radar puanı
+            </span>
+            <b>
+              ${data.score}/100
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              5 dk zirve puanı
+            </span>
+            <b>
+              ${f(
+                data.peak5m,
+                0
+              )}/100
+            </b>
+          </div>
+
+          <div class="m">
+            <span>Hacim</span>
+            <b>
+              ${f(
+                m.volX
+              )}x
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Hacim ivmesi
+            </span>
+            <b>
+              ${f(
+                m.volumeAcceleration
+              )}x
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              İşlem hızı
+            </span>
+            <b>
+              ${f(
+                m.tradeX
+              )}x
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              İşlem ivmesi
+            </span>
+            <b>
+              ${f(
+                m.tradeAcceleration
+              )}x
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Alış baskısı
+            </span>
+            <b>
+              %${f(
+                m.w30?.buyRatio,
+                1
+              )}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              5 sn fiyat
+            </span>
+            <b>
+              %${f(
+                m.w5?.ret
+              )}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              10 sn fiyat
+            </span>
+            <b>
+              %${f(
+                m.w10?.ret
+              )}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              30 sn fiyat
+            </span>
+            <b>
+              %${f(
+                m.w30?.ret
+              )}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              60 sn fiyat
+            </span>
+            <b>
+              %${f(
+                m.w60?.ret
+              )}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              120 sn fiyat
+            </span>
+            <b>
+              %${f(
+                m.w120?.ret
+              )}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Sıkışma
+            </span>
+            <b>
+              ${f(
+                m.compression,
+                0
+              )}/100
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Trend yapısı
+            </span>
+            <b>
+              ${f(
+                m.trendScore,
+                0
+              )}/100
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Dirence uzaklık
+            </span>
+            <b>
+              %${f(
+                m.resistanceDistance
+              )}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              İlk sinyal fiyatı
+            </span>
+            <b>
+              ${firstPrice}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Sinyal sonrası zirve
+            </span>
+            <b>
+              ${highPrice}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Maksimum yükseliş
+            </span>
+            <b>
+              ${maxGain}
+            </b>
+          </div>
+
+          <div class="m">
+            <span>
+              Son sinyal zamanı
+            </span>
+            <b>
+              ${signalTime}
+            </b>
+          </div>
+
+        </div>
+
+
+        <div
+          class="card"
+          style="margin-top:12px"
+        >
+          <div class="sym">
+            Güçlü Sinyal Kontrolü
+          </div>
+
+          <div class="metrics">
+
+            ${check(
+              "Hacim ≥ 2,00x",
+              a.volumeStrong
+            )}
+
+            ${check(
+              "Hacim ivmesi ≥ 1,40x",
+              a.volumeAccelerationStrong
+            )}
+
+            ${check(
+              "İşlem hızı ≥ 1,20x",
+              a.tradeStrong
+            )}
+
+            ${check(
+              "İşlem ivmesi ≥ 1,30x",
+              a.tradeAccelerationStrong
+            )}
+
+            ${check(
+              "Alış baskısı ≥ %65",
+              a.buyerStrong
+            )}
+
+            ${check(
+              "Dirence yakın",
+              a.resistanceNear
+            )}
+
+            ${check(
+              "Fiyat henüz kaçmamış",
+              a.priceNotExtended
+            )}
+
+          </div>
+        </div>
+
+
+        <div
+          class="card"
+          style="margin-top:12px"
+        >
+          <div class="sym">
+            Neden bu durumda?
+          </div>
+
+          <p>
+            ${explanation}
+          </p>
+        </div>
+
+      </div>
+    `;
+
+
+  } catch (e) {
+    console.error(
+      "Coin sorgu:",
+      e
+    );
+
+    result.innerHTML = `
+      <div class="status">
+        Coin sorgulanırken hata oluştu.
+      </div>
+    `;
+  }
 }
 function draw() {
   if (
