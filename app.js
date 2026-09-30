@@ -1031,4 +1031,719 @@ function moverCard(
           </b>
         </div>
 
+                <div class="m">
+          <span>
+            Momentum
+          </span>
+
+          <b>
+            %${f(
+              x.momentum15
+            )}
+          </b>
+        </div>
+
         <div class="m">
+          <span>
+            Hacim
+          </span>
+
+          <b>
+            ${f(
+              x.volumeRatio
+            )}x
+          </b>
+        </div>
+
+        ${
+          !up
+            ? `
+              <div class="m">
+                <span>
+                  Muhtemel tepki
+                </span>
+
+                <b>
+                  ${f(
+                    x.supportLow,
+                    8
+                  )}
+                  –
+                  ${f(
+                    x.supportHigh,
+                    8
+                  )}
+                </b>
+              </div>
+            `
+            : ""
+        }
+
+      </div>
+
+    </article>
+  `;
+}
+
+
+// =====================================
+// HAREKET EDENLER EKRANI
+// =====================================
+
+function renderMovers() {
+  if (!C) return;
+
+  const gainers =
+    movers.gainers || [];
+
+  const losers =
+    movers.losers || [];
+
+  C.innerHTML = `
+    <h2>
+      En Çok Yükselenler
+    </h2>
+
+    ${
+      gainers.length
+        ? gainers
+            .map(
+              x =>
+                moverCard(
+                  x,
+                  true
+                )
+            )
+            .join("")
+        : `
+          <article class="card">
+            Veri bekleniyor...
+          </article>
+        `
+    }
+
+
+    <h2 style="margin-top:24px">
+      En Çok Düşenler
+    </h2>
+
+    ${
+      losers.length
+        ? losers
+            .map(
+              x =>
+                moverCard(
+                  x,
+                  false
+                )
+            )
+            .join("")
+        : `
+          <article class="card">
+            Veri bekleniyor...
+          </article>
+        `
+    }
+  `;
+}
+
+
+// =====================================
+// SİNYAL GEÇMİŞİ
+// =====================================
+
+function renderHistory() {
+  if (!C) return;
+
+  const list =
+    history();
+
+  if (!list.length) {
+    C.innerHTML = `
+      <article class="card">
+
+        <div class="sym">
+          Henüz yeni sinyal yok
+        </div>
+
+        <p>
+          Patlama hazırlığı veya
+          kırılım teyidi oluştuğunda
+          burada görünecek.
+        </p>
+
+      </article>
+    `;
+
+    return;
+  }
+
+
+  C.innerHTML =
+    list
+      .map(
+        h => {
+          const date =
+            new Date(
+              h.time
+            );
+
+          return `
+            <article class="card">
+
+              <div class="top">
+
+                <div>
+                  <div class="sym">
+                    ${h.symbol.replace(
+                      "-USDT",
+                      "/USDT"
+                    )}
+                  </div>
+
+                  <span class="status">
+                    ${h.status}
+                  </span>
+                </div>
+
+                <div>
+                  <div class="score">
+                    ${h.score}/100
+                  </div>
+
+                  <small>
+                    ${date.toLocaleString(
+                      "tr-TR"
+                    )}
+                  </small>
+                </div>
+
+              </div>
+
+
+              <div class="metrics">
+
+                <div class="m">
+                  <span>
+                    İlk sinyal fiyatı
+                  </span>
+
+                  <b>
+                    ${h.price}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    Sinyal sonrası zirve
+                  </span>
+
+                  <b>
+                    ${h.high}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    Maksimum yükseliş
+                  </span>
+
+                  <b>
+                    +%${f(
+                      h.maxGain
+                    )}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    Hacim
+                  </span>
+
+                  <b>
+                    ${f(
+                      h.volX
+                    )}x
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    Hacim ivmesi
+                  </span>
+
+                  <b>
+                    ${f(
+                      h.volAccel
+                    )}x
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    İşlem hızı
+                  </span>
+
+                  <b>
+                    ${f(
+                      h.tradeX
+                    )}x
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    İşlem ivmesi
+                  </span>
+
+                  <b>
+                    ${f(
+                      h.tradeAccel
+                    )}x
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    Alış baskısı
+                  </span>
+
+                  <b>
+                    %${f(
+                      h.buy,
+                      1
+                    )}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    120 sn fiyat
+                  </span>
+
+                  <b>
+                    %${f(
+                      h.ret120
+                    )}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    Dirence uzaklık
+                  </span>
+
+                  <b>
+                    %${f(
+                      h.resistance
+                    )}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>
+                    Son durum
+                  </span>
+
+                  <b>
+                    ${h.lastStatus}
+                  </b>
+                </div>
+
+              </div>
+
+            </article>
+          `;
+        }
+      )
+      .join("");
+}
+
+
+// =====================================
+// EKRAN SEÇİMİ
+// =====================================
+
+function draw() {
+  if (
+    activeView === "movers"
+  ) {
+    renderMovers();
+    return;
+  }
+
+  if (
+    activeView === "history"
+  ) {
+    renderHistory();
+    return;
+  }
+
+  renderLive();
+}
+
+
+// =====================================
+// RADAR HTTP YEDEK
+// =====================================
+
+async function pollRadar() {
+  try {
+    const response =
+      await fetch(
+        "/api/radar?t=" +
+        Date.now(),
+        {
+          cache: "no-store"
+        }
+      );
+
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status}`
+      );
+    }
+
+
+    const data =
+      await response.json();
+
+
+    if (
+      !data ||
+      !Array.isArray(
+        data.rows
+      )
+    ) {
+      throw new Error(
+        "Radar verisi geçersiz."
+      );
+    }
+
+
+    rows =
+      data.rows;
+
+
+    if (T) {
+      T.textContent =
+        new Date()
+          .toLocaleTimeString(
+            "tr-TR"
+          );
+    }
+
+
+    if (
+      !wsConnected &&
+      K
+    ) {
+      K.textContent =
+        `OKX HTTP — ${
+          data.tracked || 0
+        } coin`;
+    }
+
+
+    try {
+      processAlerts();
+    } catch (e) {
+      console.error(
+        "Alarm:",
+        e
+      );
+    }
+
+
+    try {
+      updateHistory();
+    } catch (e) {
+      console.error(
+        "Geçmiş:",
+        e
+      );
+    }
+
+
+    if (
+      activeView === "live"
+    ) {
+      renderLive();
+    }
+
+
+  } catch (e) {
+    console.error(
+      "Radar HTTP:",
+      e
+    );
+
+    if (
+      !wsConnected &&
+      K
+    ) {
+      K.textContent =
+        "HTTP bağlantı hatası";
+    }
+  }
+}
+
+
+// =====================================
+// HAREKET EDENLER VERİSİ
+// =====================================
+
+async function pollMovers() {
+  try {
+    const response =
+      await fetch(
+        "/api/movers?t=" +
+        Date.now(),
+        {
+          cache: "no-store"
+        }
+      );
+
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status}`
+      );
+    }
+
+
+    const data =
+      await response.json();
+
+
+    movers = {
+      gainers:
+        Array.isArray(
+          data.gainers
+        )
+          ? data.gainers
+          : [],
+
+      losers:
+        Array.isArray(
+          data.losers
+        )
+          ? data.losers
+          : [],
+
+      updatedAt:
+        data.updatedAt || 0
+    };
+
+
+    if (
+      activeView === "movers"
+    ) {
+      renderMovers();
+    }
+
+
+  } catch (e) {
+    console.error(
+      "Movers:",
+      e
+    );
+  }
+}
+
+
+// =====================================
+// WEBSOCKET
+// =====================================
+
+function connectWS() {
+  try {
+    if (
+      ws &&
+      (
+        ws.readyState ===
+          WebSocket.OPEN ||
+
+        ws.readyState ===
+          WebSocket.CONNECTING
+      )
+    ) {
+      return;
+    }
+
+
+    const protocol =
+      location.protocol ===
+      "https:"
+        ? "wss"
+        : "ws";
+
+
+    ws =
+      new WebSocket(
+        `${protocol}://${location.host}/live`
+      );
+
+
+    ws.onopen = () => {
+      wsConnected = true;
+
+      if (K) {
+        K.textContent =
+          "OKX Canlı";
+      }
+    };
+
+
+    ws.onmessage =
+      event => {
+        try {
+          const data =
+            JSON.parse(
+              event.data
+            );
+
+
+          if (
+            data.type !==
+              "radar" ||
+
+            !Array.isArray(
+              data.rows
+            )
+          ) {
+            return;
+          }
+
+
+          rows =
+            data.rows;
+
+
+          if (T) {
+            T.textContent =
+              new Date()
+                .toLocaleTimeString(
+                  "tr-TR"
+                );
+          }
+
+
+          if (K) {
+            K.textContent =
+              `OKX Canlı — ${
+                data.tracked || 0
+              } coin`;
+          }
+
+
+          try {
+            processAlerts();
+          } catch {}
+
+
+          try {
+            updateHistory();
+          } catch {}
+
+
+          if (
+            activeView ===
+            "live"
+          ) {
+            renderLive();
+          }
+
+
+        } catch (e) {
+          console.error(
+            "WebSocket veri:",
+            e
+          );
+        }
+      };
+
+
+    ws.onerror = () => {
+      wsConnected = false;
+
+      if (K) {
+        K.textContent =
+          "OKX HTTP Yedek";
+      }
+    };
+
+
+    ws.onclose = () => {
+      wsConnected = false;
+      ws = null;
+
+      if (K) {
+        K.textContent =
+          "OKX HTTP Yedek";
+      }
+
+      setTimeout(
+        connectWS,
+        3000
+      );
+    };
+
+
+  } catch (e) {
+    wsConnected = false;
+
+    console.error(
+      "WebSocket:",
+      e
+    );
+
+    setTimeout(
+      connectWS,
+      3000
+    );
+  }
+}
+
+
+// =====================================
+// BAŞLAT
+// =====================================
+
+if (K) {
+  K.textContent =
+    "Bağlanıyor...";
+}
+
+
+draw();
+
+
+// HTTP'yi önce başlat.
+// WebSocket bozuk olsa bile
+// radar açılır.
+pollRadar();
+pollMovers();
+
+
+// Ardından canlı bağlantı.
+connectWS();
+
+
+// HTTP her zaman yedek olarak
+// çalışmaya devam eder.
+setInterval(
+  pollRadar,
+  3000
+);
+
+setInterval(
+  pollMovers,
+  30000
+);
+
+
+console.log(
+  "TradeRadar arayüzü hazır."
+);
