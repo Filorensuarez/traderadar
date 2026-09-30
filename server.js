@@ -2083,3 +2083,4 @@ setInterval(
 console.log(
   "TradeRadar + Web Push hazır."
 );
+// Web Push aktif
