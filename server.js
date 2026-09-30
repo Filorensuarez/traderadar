@@ -801,36 +801,77 @@ function calc(s) {
   // DURUM
   // ===================================
 
+    // ===================================
+  // DAHA SIKI SİNYAL FİLTRELERİ
+  // ===================================
+
   const accumulation =
     !late &&
-    s.score >= 60 &&
+    s.score >= 65 &&
+
+    // Minimum gerçek aktivite
+    volX >= 1.0 &&
+    tradeX >= 0.8 &&
+
     compression >= 55 &&
+
     (
-      volAccel >= 1.05 ||
-      tradeAccel >= 1.10
+      volAccel >= 1.15 ||
+      tradeAccel >= 1.20
     ) &&
-    w30.buyRatio >= 53;
+
+    w30.buyRatio >= 55;
 
 
   const preparation =
     !late &&
-    s.score >= 72 &&
-    (
-      volX >= 1.3 ||
-      volAccel >= 1.20
-    ) &&
-    (
-      tradeX >= 1.2 ||
-      tradeAccel >= 1.20
-    ) &&
-    w30.buyRatio >= 58 &&
-    resistanceDistance <= 2.5;
+    s.score >= 75 &&
+
+    // Hacim gerçekten normalin üzerinde olmalı
+    volX >= 1.50 &&
+
+    // İşlem sayısı da yeterli olmalı
+    tradeX >= 1.00 &&
+
+    // Akış hızlanıyor olmalı
+    volAccel >= 1.20 &&
+    tradeAccel >= 1.15 &&
+
+    // Alıcı üstünlüğü
+    w30.buyRatio >= 60 &&
+
+    // Dirence yakınlık
+    resistanceDistance >= -0.50 &&
+    resistanceDistance <= 2.50 &&
+
+    // Hareket bittikten sonra yakalama
+    // ihtimalini azalt
+    w120.ret < 3.0;
 
 
   const strong =
     preparation &&
+
     s.score >= 82 &&
-    buyStrength >= 62 &&
+
+    // Güçlü sinyal için daha sert filtre
+    volX >= 2.00 &&
+    tradeX >= 1.20 &&
+
+    volAccel >= 1.40 &&
+    tradeAccel >= 1.30 &&
+
+    buyStrength >= 65 &&
+
+    w30.buyRatio >= 65 &&
+
+    // Dirence daha yakın olsun
+    resistanceDistance >= -0.30 &&
+    resistanceDistance <= 2.00 &&
+
+    // Son iki dakikada zaten uçmuş olmasın
+    w120.ret < 2.50 &&
+
     (
       microVol >= 1.10 ||
       microTrade >= 1.10
