@@ -787,4 +787,514 @@ function radarRows() {
     .sort(
       (a, b) =>
         priority(b.status) -
-          priority(a
+          priority(a.status) ||
+        b.score - a.score
+    )
+    .slice(0, 50)
+    .map(x => ({
+      symbol: x.symbol,
+      price: x.price,
+      score: x.score,
+      peak5m: x.peak5m,
+      status: x.status,
+      rawStatus: x.status,
+      metrics: x.metrics,
+      source: "OKX"
+    }));
+}
+
+
+// =====================================
+// HAREKET EDENLER
+// =====================================
+
+async function updateMovers() {
+  try {
+    const r = await fetch(
+      `${REST}/api/v5/market/tickers?instType=SPOT`
+    );
+
+    if (!r.ok) {
+      throw new Error(`OKX ${r.status}`);
+    }
+
+    const j = await r.json();
+
+    const all = (j.data || [])
+      .filter(
+        x =>
+          x.instId.endsWith("-USDT") &&
+          Number(x.last) > 0 &&
+          Number(x.open24h) > 0
+      )
+      .map(x => {
+        const price = Number(x.last);
+        const open = Number(x.open24h);
+        const high = Number(x.high24h);
+        const low = Number(x.low24h);
+
+        return {
+          symbol: x.instId,
+          price,
+
+          change24:
+            pct(open, price),
+
+          high24: high,
+          low24: low,
+
+          distanceFromHigh:
+            high
+              ? ((high - price) / high) * 100
+              : 0,
+
+          distanceFromLow:
+            low
+              ? ((price - low) / low) * 100
+              : 0
+        };
+      });
+
+
+    const gainers = [...all]
+      .sort(
+        (a, b) =>
+          b.change24 - a.change24
+      )
+      .slice(0, 15);
+
+
+    const losers = [...all]
+      .sort(
+        (a, b) =>
+          a.change24 - b.change24
+      )
+      .slice(0, 15);
+
+
+    function enrich(x, up) {
+      const s =
+        states.get(x.symbol);
+
+      const m =
+        s?.metrics || {};
+
+      const momentum15 =
+        Number(
+          m.w120?.ret || 0
+        );
+
+      const momentum1h =
+        Number(
+          m.w60?.ret || 0
+        );
+
+      const volumeRatio =
+        Number(
+          m.volX || 0
+        );
+
+      if (up) {
+        let continuationScore = 0;
+
+        if (x.change24 > 0)
+          continuationScore += 15;
+
+        if (momentum15 > 0)
+          continuationScore += 15;
+
+        if (momentum1h > 0)
+          continuationScore += 15;
+
+        if (volumeRatio >= 1.3)
+          continuationScore += 20;
+
+        if (
+          Number(
+            m.volumeAcceleration || 0
+          ) >= 1.2
+        ) {
+          continuationScore += 20;
+        }
+
+        if (
+          Number(
+            m.w30?.buyRatio || 0
+          ) >= 60
+        ) {
+          continuationScore += 15;
+        }
+
+        continuationScore =
+          Math.min(
+            100,
+            continuationScore
+          );
+
+        let continuationText =
+          "DEVAM GÜCÜ ZAYIF";
+
+        if (
+          continuationScore >= 75
+        ) {
+          continuationText =
+            "MOMENTUM GÜÇLÜ";
+
+        } else if (
+          continuationScore >= 55
+        ) {
+          continuationText =
+            "YÜKSELİŞ KORUNUYOR";
+
+        } else if (
+          continuationScore >= 35
+        ) {
+          continuationText =
+            "TEYİT BEKLENİYOR";
+        }
+
+        if (
+          x.change24 >= 40
+        ) {
+          continuationText =
+            "AŞIRI UZAMIŞ — RİSK YÜKSEK";
+        }
+
+        return {
+          ...x,
+          momentum15,
+          momentum1h,
+          volumeRatio,
+          continuationScore,
+          continuationText
+        };
+      }
+
+
+      let reversalScore = 0;
+
+      if (
+        x.distanceFromLow <= 3
+      ) {
+        reversalScore += 25;
+      }
+
+      if (momentum15 > 0) {
+        reversalScore += 20;
+      }
+
+      if (
+        Number(
+          m.volumeAcceleration || 0
+        ) >= 1.2
+      ) {
+        reversalScore += 20;
+      }
+
+      if (
+        Number(
+          m.w30?.buyRatio || 0
+        ) >= 55
+      ) {
+        reversalScore += 20;
+      }
+
+      if (
+        Number(
+          m.trendScore || 0
+        ) >= 55
+      ) {
+        reversalScore += 15;
+      }
+
+      reversalScore =
+        Math.min(
+          100,
+          reversalScore
+        );
+
+
+      let reversalText =
+        "DÜŞÜŞ DEVAM EDİYOR";
+
+      if (
+        reversalScore >= 75
+      ) {
+        reversalText =
+          "DÖNÜŞ TEYİDİ";
+
+      } else if (
+        reversalScore >= 55
+      ) {
+        reversalText =
+          "TEPKİ İHTİMALİ ARTIYOR";
+
+      } else if (
+        reversalScore >= 35
+      ) {
+        reversalText =
+          "DÖNÜŞ TEYİDİ BEKLENİYOR";
+      }
+
+
+      const range =
+        Math.max(
+          x.high24 - x.low24,
+          x.price * 0.001
+        );
+
+      return {
+        ...x,
+
+        momentum15,
+        momentum1h,
+        volumeRatio,
+
+        reversalScore,
+        reversalText,
+
+        supportLow:
+          Math.max(
+            0,
+            x.low24 -
+              range * 0.02
+          ),
+
+        supportHigh:
+          x.low24 +
+          range * 0.08
+      };
+    }
+
+
+    movers = {
+      updatedAt: Date.now(),
+
+      gainers:
+        gainers.map(
+          x => enrich(x, true)
+        ),
+
+      losers:
+        losers.map(
+          x => enrich(x, false)
+        )
+    };
+
+
+    console.log(
+      "Hareket analizi güncellendi"
+    );
+
+  } catch (e) {
+    console.error(
+      "Hareket analizi:",
+      e.message
+    );
+  }
+}
+
+
+// =====================================
+// API
+// =====================================
+
+app.get(
+  "/api/radar",
+  (req, res) => {
+    res.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+    res.json({
+      type: "radar",
+      source: "OKX",
+      tracked: states.size,
+      rows: radarRows(),
+      ts: Date.now()
+    });
+  }
+);
+
+
+app.get(
+  "/api/movers",
+  (req, res) => {
+    res.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+    res.json({
+      type: "movers",
+      source: "OKX",
+
+      updatedAt:
+        movers.updatedAt,
+
+      gainers:
+        movers.gainers,
+
+      losers:
+        movers.losers
+    });
+  }
+);
+
+
+// =====================================
+// SUNUCU
+// =====================================
+
+const server =
+  app.listen(
+    PORT,
+    async () => {
+      console.log(
+        `TradeRadar port ${PORT}`
+      );
+
+      try {
+        const list =
+          await symbols();
+
+        console.log(
+          `${list.length} aktif USDT paritesi`
+        );
+
+
+        for (
+          const symbol of list
+        ) {
+          state(symbol);
+        }
+
+
+        // Mum yükleme arka planda.
+        candles(list);
+
+
+        // Tüm coinleri gruplara ayır.
+        const groups = [];
+
+        for (
+          let i = 0;
+          i < list.length;
+          i += CFG.group
+        ) {
+          groups.push(
+            list.slice(
+              i,
+              i + CFG.group
+            )
+          );
+        }
+
+
+        groups.forEach(
+          (group, i) => {
+            setTimeout(
+              () =>
+                connect(
+                  group,
+                  i + 1
+                ),
+
+              i * 1200
+            );
+          }
+        );
+
+
+        setTimeout(
+          updateMovers,
+          5000
+        );
+
+      } catch (e) {
+        console.error(
+          "Başlatma:",
+          e.message
+        );
+      }
+    }
+  );
+
+
+// =====================================
+// TELEFON CANLI BAĞLANTI
+// =====================================
+
+const ui =
+  new WebSocketServer({
+    server,
+    path: "/live"
+  });
+
+
+ui.on(
+  "connection",
+  ws => {
+    clients.add(ws);
+
+    try {
+      ws.send(
+        JSON.stringify({
+          type: "radar",
+          source: "OKX",
+          tracked: states.size,
+          rows: radarRows()
+        })
+      );
+    } catch {}
+
+
+    ws.on(
+      "close",
+      () => {
+        clients.delete(ws);
+      }
+    );
+  }
+);
+
+
+// =====================================
+// HER SANİYE RADAR
+// =====================================
+
+setInterval(
+  () => {
+    const message =
+      JSON.stringify({
+        type: "radar",
+        source: "OKX",
+        tracked: states.size,
+        rows: radarRows()
+      });
+
+
+    for (
+      const ws of clients
+    ) {
+      if (
+        ws.readyState ===
+        WebSocket.OPEN
+      ) {
+        ws.send(message);
+      }
+    }
+  },
+  1000
+);
+
+
+// =====================================
+// HAREKET EDENLER
+// =====================================
+
+setInterval(
+  updateMovers,
+  60 * 1000
+);
