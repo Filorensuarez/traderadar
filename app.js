@@ -1428,19 +1428,25 @@ function draw() {
 // =====================================
 
 async function pollRadar() {
+async function pollRadar() {
   try {
     const r =
       await fetch(
         "/api/radar?t=" +
         Date.now(),
         {
-          cache: "no-store"
+          method: "GET",
+          cache: "no-store",
+          headers: {
+            "Accept":
+              "application/json"
+          }
         }
       );
 
     if (!r.ok) {
       throw new Error(
-        `HTTP ${r.status}`
+        `Radar HTTP ${r.status}`
       );
     }
 
@@ -1448,43 +1454,83 @@ async function pollRadar() {
       await r.json();
 
     if (
-      data.type === "radar" &&
-      Array.isArray(data.rows)
+      !data ||
+      !Array.isArray(data.rows)
     ) {
-      rows = data.rows;
+      throw new Error(
+        "Radar verisi geçersiz"
+      );
+    }
 
+    rows =
+      data.rows;
+
+    if (T) {
+      T.textContent =
+        new Date()
+          .toLocaleTimeString(
+            "tr-TR"
+          );
+    }
+
+    if (!wsConnected && K) {
+      K.textContent =
+        `OKX HTTP — ${
+          data.tracked || 0
+        } coin`;
+    }
+
+    try {
       processAlerts();
+    } catch (e) {
+      console.error(
+        "Alarm işleme:",
+        e
+      );
+    }
+
+    try {
       updateHistory();
+    } catch (e) {
+      console.error(
+        "Geçmiş işleme:",
+        e
+      );
+    }
 
-      if (T) {
-        T.textContent =
-          new Date()
-            .toLocaleTimeString(
-              "tr-TR"
-            );
-      }
-
-      if (!wsConnected && K) {
-        K.textContent =
-          `OKX HTTP — ${
-            data.tracked || "?"
-          } coin`;
-      }
-
+    try {
       if (
         activeView === "live"
       ) {
         renderLive();
       }
+    } catch (e) {
+      console.error(
+        "Ekran çizme:",
+        e
+      );
+
+      if (K) {
+        K.textContent =
+          "Ekran hatası";
+      }
     }
 
-  } catch {
+  } catch (e) {
+    console.error(
+      "Radar HTTP:",
+      e
+    );
+
     if (
       !wsConnected &&
       K
     ) {
       K.textContent =
-        "Bağlantı bekleniyor...";
+        "HTTP bağlantı hatası";
+    }
+  }
+}
     }
   }
 }
