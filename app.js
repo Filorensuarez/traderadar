@@ -90,7 +90,204 @@ async function beep(
 // BİLDİRİMLERİ AÇ
 // =====================================
 
+function urlBase64ToUint8Array(base64String) {
+  const padding =
+    "=".repeat(
+      (4 - base64String.length % 4) % 4
+    );
+
+  const base64 =
+    (
+      base64String +
+      padding
+    )
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+  const rawData =
+    window.atob(base64);
+
+  return Uint8Array.from(
+    [...rawData].map(
+      char =>
+        char.charCodeAt(0)
+    )
+  );
+}
+
+
 async function enableNotifications() {
+  try {
+    await unlockAudio();
+
+    if (
+      !("serviceWorker" in navigator)
+    ) {
+      alert(
+        "Bu tarayıcı arka plan bildirimini desteklemiyor."
+      );
+      return;
+    }
+
+
+    if (
+      !("PushManager" in window)
+    ) {
+      alert(
+        "Bu tarayıcı Push bildirimini desteklemiyor."
+      );
+      return;
+    }
+
+
+    // Bildirim izni
+    const permission =
+      await Notification
+        .requestPermission();
+
+
+    if (
+      permission !== "granted"
+    ) {
+      alert(
+        "Bildirim izni verilmedi."
+      );
+      return;
+    }
+
+
+    // Service Worker
+    const registration =
+      await navigator
+        .serviceWorker
+        .register(
+          "/service-worker.js"
+        );
+
+
+    await navigator
+      .serviceWorker
+      .ready;
+
+
+    // Sunucudan VAPID public key
+    const keyResponse =
+      await fetch(
+        "/api/push/public-key",
+        {
+          cache: "no-store"
+        }
+      );
+
+
+    if (!keyResponse.ok) {
+      throw new Error(
+        "Push anahtarı alınamadı."
+      );
+    }
+
+
+    const keyData =
+      await keyResponse.json();
+
+
+    if (
+      !keyData.publicKey
+    ) {
+      throw new Error(
+        "VAPID public key bulunamadı."
+      );
+    }
+
+
+    // Daha önce abone olmuş mu?
+    let subscription =
+      await registration
+        .pushManager
+        .getSubscription();
+
+
+    // Değilse yeni abonelik oluştur
+    if (!subscription) {
+      subscription =
+        await registration
+          .pushManager
+          .subscribe({
+            userVisibleOnly: true,
+
+            applicationServerKey:
+              urlBase64ToUint8Array(
+                keyData.publicKey
+              )
+          });
+    }
+
+
+    // Aboneliği Railway sunucusuna kaydet
+    const response =
+      await fetch(
+        "/api/push/subscribe",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify(
+              subscription
+            )
+        }
+      );
+
+
+    if (!response.ok) {
+      throw new Error(
+        "Push aboneliği sunucuya kaydedilemedi."
+      );
+    }
+
+
+    const result =
+      await response.json();
+
+
+    notifyBtn.textContent =
+      "Arka Plan Bildirimi Açık";
+
+
+    // Ses testi
+    await beep(false);
+
+
+    if (
+      "vibrate" in navigator
+    ) {
+      navigator.vibrate(
+        [250, 100, 250]
+      );
+    }
+
+
+    alert(
+      `Arka plan bildirimi etkinleştirildi.\nKayıtlı cihaz: ${result.count || 1}`
+    );
+
+
+  } catch (e) {
+    console.error(
+      "Push kurulum:",
+      e
+    );
+
+    alert(
+      "Arka plan bildirimi açılamadı: " +
+      e.message
+    );
+  }
+}
   await unlockAudio();
 
   let granted = false;
