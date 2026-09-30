@@ -1327,3 +1327,491 @@ setInterval(() => {
     }
   }
 }, 1000);
+
+    // =====================================
+// HAREKET EDENLER
+// =====================================
+
+let moversCache = {
+  updatedAt: 0,
+  gainers: [],
+  losers: []
+};
+
+async function moverCandles(symbol) {
+  try {
+    const r = await fetch(
+      `${REST}/api/v5/market/candles?instId=${encodeURIComponent(symbol)}&bar=15m&limit=20`
+    );
+
+    if (!r.ok) return [];
+
+    const j = await r.json();
+
+    return (j.data || [])
+      .map(x => ({
+        o: Number(x[1]),
+        h: Number(x[2]),
+        l: Number(x[3]),
+        c: Number(x[4]),
+        v: Number(x[7] || x[6] || x[5] || 0)
+      }))
+      .reverse();
+
+  } catch {
+    return [];
+  }
+}
+
+
+function analyzeMover(t, candles) {
+
+  const price = Number(t.last);
+  const open24 = Number(t.open24h);
+  const high24 = Number(t.high24h);
+  const low24 = Number(t.low24h);
+
+  const change24 =
+    open24
+      ? ((price - open24) / open24) * 100
+      : 0;
+
+  if (candles.length < 6) {
+    return {
+      symbol: t.instId,
+      price,
+      change24,
+      continuationScore: 0,
+      reversalScore: 0,
+      continuationText: "VERİ BEKLENİYOR",
+      reversalText: "VERİ BEKLENİYOR",
+      momentum15: 0,
+      momentum1h: 0,
+      volumeRatio: 0,
+      supportLow: low24,
+      supportHigh: low24,
+      distanceFromHigh: 0
+    };
+  }
+
+  const cur =
+    candles[candles.length - 1];
+
+  const prev =
+    candles[candles.length - 2];
+
+  const h1 =
+    candles[
+      Math.max(
+        0,
+        candles.length - 5
+      )
+    ];
+
+  const momentum15 =
+    prev.c
+      ? ((cur.c - prev.c) / prev.c) * 100
+      : 0;
+
+  const momentum1h =
+    h1.c
+      ? ((cur.c - h1.c) / h1.c) * 100
+      : 0;
+
+
+  const oldVolumes =
+    candles
+      .slice(-8, -1)
+      .map(x => x.v)
+      .filter(x => x > 0);
+
+  const normalVolume =
+    median(oldVolumes);
+
+  const volumeRatio =
+    normalVolume
+      ? cur.v / normalVolume
+      : 0;
+
+
+  const recent =
+    candles.slice(-12);
+
+  const lows =
+    recent.map(x => x.l);
+
+  const highs =
+    recent.map(x => x.h);
+
+
+  const support =
+    Math.min(...lows);
+
+  const resistance =
+    Math.max(...highs);
+
+  const range =
+    Math.max(
+      resistance - support,
+      price * 0.001
+    );
+
+
+  const supportLow =
+    Math.max(
+      0,
+      support - range * 0.05
+    );
+
+  const supportHigh =
+    support + range * 0.12;
+
+
+  const distanceFromHigh =
+    high24
+      ? ((high24 - price) / high24) * 100
+      : 0;
+
+  const distanceFromLow =
+    low24
+      ? ((price - low24) / low24) * 100
+      : 0;
+
+
+  // YÜKSELİŞ DEVAM GÜCÜ
+
+  let continuationScore = 0;
+
+  if (change24 > 0)
+    continuationScore += 15;
+
+  if (momentum15 > 0)
+    continuationScore += 15;
+
+  if (momentum15 > 0.5)
+    continuationScore += 10;
+
+  if (momentum1h > 0)
+    continuationScore += 15;
+
+  if (momentum1h > 2)
+    continuationScore += 10;
+
+  if (volumeRatio >= 1.5)
+    continuationScore += 15;
+
+  if (volumeRatio >= 2.5)
+    continuationScore += 10;
+
+  if (distanceFromHigh <= 2)
+    continuationScore += 10;
+
+  // Fazla yükselmiş coinlerde risk cezası
+  if (change24 >= 30)
+    continuationScore -= 10;
+
+  if (change24 >= 60)
+    continuationScore -= 15;
+
+
+  continuationScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        continuationScore
+      )
+    );
+
+
+  let continuationText =
+    "DEVAM GÜCÜ ZAYIF";
+
+  if (continuationScore >= 75) {
+    continuationText =
+      "MOMENTUM GÜÇLÜ";
+
+  } else if (
+    continuationScore >= 55
+  ) {
+    continuationText =
+      "YÜKSELİŞ KORUNUYOR";
+
+  } else if (
+    continuationScore >= 35
+  ) {
+    continuationText =
+      "TEYİT BEKLENİYOR";
+  }
+
+
+  if (
+    change24 >= 40 &&
+    distanceFromHigh < 3
+  ) {
+    continuationText =
+      "AŞIRI UZAMIŞ — RİSK YÜKSEK";
+  }
+
+
+  // DÜŞÜŞTEN TEPKİ ANALİZİ
+
+  let reversalScore = 0;
+
+  if (change24 < 0)
+    reversalScore += 10;
+
+  if (distanceFromLow <= 3)
+    reversalScore += 20;
+
+  if (momentum15 > 0)
+    reversalScore += 20;
+
+  if (volumeRatio >= 1.3)
+    reversalScore += 15;
+
+  if (cur.c > cur.o)
+    reversalScore += 15;
+
+  if (
+    momentum15 > 0 &&
+    momentum1h > -1
+  )
+    reversalScore += 20;
+
+
+  reversalScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        reversalScore
+      )
+    );
+
+
+  let reversalText =
+    "DÜŞÜŞ DEVAM EDİYOR";
+
+  if (reversalScore >= 75) {
+    reversalText =
+      "DÖNÜŞ TEYİDİ";
+
+  } else if (
+    reversalScore >= 55
+  ) {
+    reversalText =
+      "TEPKİ İHTİMALİ ARTIYOR";
+
+  } else if (
+    reversalScore >= 35
+  ) {
+    reversalText =
+      "DÖNÜŞ TEYİDİ BEKLENİYOR";
+  }
+
+
+  return {
+    symbol: t.instId,
+    price,
+    change24,
+
+    momentum15,
+    momentum1h,
+    volumeRatio,
+
+    continuationScore,
+    continuationText,
+
+    reversalScore,
+    reversalText,
+
+    supportLow,
+    supportHigh,
+
+    distanceFromHigh
+  };
+}
+
+
+async function updateMovers() {
+
+  try {
+
+    const r = await fetch(
+      `${REST}/api/v5/market/tickers?instType=SPOT`
+    );
+
+    if (!r.ok) {
+      throw new Error(
+        `OKX ${r.status}`
+      );
+    }
+
+    const j = await r.json();
+
+
+    const all =
+      (j.data || [])
+        .filter(
+          x =>
+            x.instId.endsWith("-USDT")
+        )
+        .filter(
+          x =>
+            Number(x.last) > 0 &&
+            Number(x.open24h) > 0
+        )
+        .map(x => ({
+          ...x,
+
+          change24:
+            (
+              (
+                Number(x.last) -
+                Number(x.open24h)
+              ) /
+              Number(x.open24h)
+            ) * 100
+        }));
+
+
+    const gainers =
+      [...all]
+        .sort(
+          (a, b) =>
+            b.change24 -
+            a.change24
+        )
+        .slice(0, 12);
+
+
+    const losers =
+      [...all]
+        .sort(
+          (a, b) =>
+            a.change24 -
+            b.change24
+        )
+        .slice(0, 12);
+
+
+    const selected =
+      [
+        ...new Map(
+          [
+            ...gainers,
+            ...losers
+          ].map(
+            x => [
+              x.instId,
+              x
+            ]
+          )
+        ).values()
+      ];
+
+
+    const result =
+      new Map();
+
+
+    for (
+      const ticker of selected
+    ) {
+
+      const candles =
+        await moverCandles(
+          ticker.instId
+        );
+
+      result.set(
+        ticker.instId,
+        analyzeMover(
+          ticker,
+          candles
+        )
+      );
+
+      await sleep(80);
+    }
+
+
+    moversCache = {
+      updatedAt:
+        Date.now(),
+
+      gainers:
+        gainers
+          .map(
+            x =>
+              result.get(
+                x.instId
+              )
+          )
+          .filter(Boolean),
+
+      losers:
+        losers
+          .map(
+            x =>
+              result.get(
+                x.instId
+              )
+          )
+          .filter(Boolean)
+    };
+
+
+    console.log(
+      "Hareket analizi güncellendi"
+    );
+
+  } catch (e) {
+
+    console.error(
+      "Hareket analizi hatası:",
+      e.message
+    );
+  }
+}
+
+
+app.get(
+  "/api/movers",
+  (req, res) => {
+
+    res.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+    res.json({
+      type: "movers",
+      source: "OKX",
+
+      updatedAt:
+        moversCache.updatedAt,
+
+      gainers:
+        moversCache.gainers,
+
+      losers:
+        moversCache.losers
+    });
+  }
+);
+
+
+// Sunucu açıldıktan 5 saniye sonra başlat
+setTimeout(
+  updateMovers,
+  5000
+);
+
+
+// Her 60 saniyede yeniden analiz et
+setInterval(
+  updateMovers,
+  60000
+);
