@@ -2042,3 +2042,44 @@ ui.on(
 
 // =====================================
 //
+// RADARI HER SANİYE GÖNDER
+// =====================================
+
+setInterval(
+  () => {
+    const message =
+      JSON.stringify({
+        type: "radar",
+        source: "OKX",
+        tracked: states.size,
+        rows: radarRows()
+      });
+
+    for (const ws of clients) {
+      if (
+        ws.readyState ===
+        WebSocket.OPEN
+      ) {
+        try {
+          ws.send(message);
+        } catch {}
+      }
+    }
+  },
+  1000
+);
+
+
+// =====================================
+// HAREKET EDENLERİ GÜNCELLE
+// =====================================
+
+setInterval(
+  updateMovers,
+  60 * 1000
+);
+
+
+console.log(
+  "TradeRadar + Web Push hazır."
+);
