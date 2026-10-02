@@ -2317,7 +2317,7 @@ async function renderPerformance() {
           <b>${data.totalSignals || 0}</b>
         </div>
       </article>
-
+${signalCards}
       ${cards}
     `;
   } catch (error) {
