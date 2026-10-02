@@ -1078,6 +1078,20 @@ function connectOKX(
   ws.on(
     "open",
     () => {
+            try {
+        Ultimate.systemHealth
+          .websocketConnected();
+
+        Ultimate.systemHealth
+          .scannerUpdate(
+            states.size
+          );
+      } catch (error) {
+        console.error(
+          "Ultimate health open:",
+          error.message
+        );
+            }
       const args =
         symbols.map(
           instId => ({
