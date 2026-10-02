@@ -49,41 +49,9 @@ async function unlockAudio() {
   }
 }
 
-
 async function beep(strong = false) {
-  if (!(await unlockAudio())) return;
-
-  try {
-    const osc =
-      audioCtx.createOscillator();
-
-    const gain =
-      audioCtx.createGain();
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    osc.type =
-      strong ? "square" : "sine";
-
-    osc.frequency.value =
-      strong ? 950 : 720;
-
-    gain.gain.value = 0.25;
-
-    osc.start();
-
-    setTimeout(
-      () => {
-        try {
-          osc.stop();
-        } catch {}
-      },
-      strong ? 800 : 450
-    );
-  } catch {}
+  return;
 }
-
 
 // =====================================
 // PUSH YARDIMCISI
