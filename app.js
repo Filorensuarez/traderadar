@@ -2199,7 +2199,114 @@ async function renderPerformance() {
           </article>
         `)
         .join("");
+    
+    const signalCards =
+      (data.signals || [])
+        .map(s => {
+          const p5 =
+            s.performance?.m5;
 
+          const p15 =
+            s.performance?.m15;
+
+          const p30 =
+            s.performance?.m30;
+
+          const p1h =
+            s.performance?.h1;
+
+          const p4h =
+            s.performance?.h4;
+
+          return `
+            <article class="card">
+              <div class="sym">
+                ${s.symbol.replace(
+                  "-USDT",
+                  "/USDT"
+                )}
+              </div>
+
+              <div class="metrics">
+                <div class="m">
+                  <span>Sinyal</span>
+                  <b>${s.status}</b>
+                </div>
+
+                <div class="m">
+                  <span>Radar puanı</span>
+                  <b>${s.score}/100</b>
+                </div>
+
+                <div class="m">
+                  <span>Sinyal fiyatı</span>
+                  <b>${s.signalPrice}</b>
+                </div>
+
+                <div class="m">
+                  <span>5 dk</span>
+                  <b>
+                    ${p5
+                      ? `%${f(
+                          p5.changePct,
+                          3
+                        )}`
+                      : "BEKLENİYOR"}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>15 dk</span>
+                  <b>
+                    ${p15
+                      ? `%${f(
+                          p15.changePct,
+                          3
+                        )}`
+                      : "BEKLENİYOR"}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>30 dk</span>
+                  <b>
+                    ${p30
+                      ? `%${f(
+                          p30.changePct,
+                          3
+                        )}`
+                      : "BEKLENİYOR"}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>1 saat</span>
+                  <b>
+                    ${p1h
+                      ? `%${f(
+                          p1h.changePct,
+                          3
+                        )}`
+                      : "BEKLENİYOR"}
+                  </b>
+                </div>
+
+                <div class="m">
+                  <span>4 saat</span>
+                  <b>
+                    ${p4h
+                      ? `%${f(
+                          p4h.changePct,
+                          3
+                        )}`
+                      : "BEKLENİYOR"}
+                  </b>
+                </div>
+              </div>
+            </article>
+          `;
+        })
+        .join("");
     C.innerHTML = `
       <article class="card">
         <div class="sym">
