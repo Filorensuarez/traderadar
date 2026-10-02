@@ -1090,4 +1090,267 @@ export class RiskFiltersEngine {
             .tradeAcceleration
             ?.s10,
 
-        buyRatio
+                buyRatio:
+          orderFlow
+            .buySell
+            ?.s30
+            ?.buyRatio,
+
+        cvd:
+          orderFlow.cvd ||
+          {},
+
+        spreadPct:
+          market.spreadPct,
+
+        orderBook,
+
+        candleClosed,
+
+        retest:
+          technical.retest ||
+          {},
+
+        higherTimeframeBullish
+      });
+
+
+    // =================================
+    // İŞLEM İZNİ
+    // =================================
+
+    const blockers = [];
+
+
+    if (
+      !liquidity.sufficient
+    ) {
+      blockers.push(
+        "LIQUIDITY_INSUFFICIENT"
+      );
+    }
+
+
+    if (
+      manipulation.suspicious
+    ) {
+      blockers.push(
+        "SUSPICIOUS_MOVEMENT"
+      );
+    }
+
+
+    if (
+      fakeBreakout
+        .breakoutDetected &&
+      fakeBreakout
+        .fakeBreakoutRisk
+    ) {
+      blockers.push(
+        "FAKE_BREAKOUT_RISK"
+      );
+    }
+
+
+    if (
+      slippage.ready &&
+      slippage.complete === false
+    ) {
+      blockers.push(
+        "ORDER_BOOK_DEPTH_INSUFFICIENT"
+      );
+    }
+
+
+    const tradingAllowed =
+      blockers.length === 0;
+
+
+    // =================================
+    // GÜVENLİK PUANI
+    // =================================
+
+    let safetyScore =
+      liquidity.score;
+
+
+    if (
+      manipulation.suspicious
+    ) {
+      safetyScore -=
+        manipulation.riskScore *
+        0.50;
+    }
+
+
+    if (
+      fakeBreakout
+        .breakoutDetected
+    ) {
+      safetyScore =
+        (
+          safetyScore +
+          fakeBreakout
+            .confirmationScore
+        ) / 2;
+    }
+
+
+    if (
+      slippage.ready &&
+      slippage.slippagePct !==
+        null
+    ) {
+      if (
+        slippage.slippagePct >
+        this.config
+          .maxSlippagePct
+      ) {
+        safetyScore -= 30;
+      }
+    }
+
+
+    safetyScore =
+      this.clamp(
+        safetyScore
+      );
+
+
+    // =================================
+    // ANA MESAJ
+    // =================================
+
+    let message =
+      "RİSK FİLTRELERİ UYGUN";
+
+
+    if (
+      !liquidity.sufficient
+    ) {
+      message =
+        "LİKİDİTE YETERSİZ";
+
+    } else if (
+      manipulation.suspicious
+    ) {
+      message =
+        "ANORMAL HAREKET – İŞLEME GİRME";
+
+    } else if (
+      fakeBreakout
+        .fakeBreakoutRisk
+    ) {
+      message =
+        "SAHTE KIRILIM RİSKİ";
+
+    } else if (
+      fakeBreakout
+        .breakoutDetected &&
+      !fakeBreakout.confirmed
+    ) {
+      message =
+        "TEYİT BEKLENİYOR";
+    }
+
+
+    return {
+      ready: true,
+
+      tradingAllowed,
+
+      safetyScore,
+
+      message,
+
+      blockers,
+
+      liquidity,
+
+      slippage,
+
+      manipulation,
+
+      fakeBreakout,
+
+      checkedAt:
+        Date.now()
+    };
+  }
+
+
+  // ===================================
+  // HIZLI FAIL-SAFE KONTROLÜ
+  // ===================================
+
+  canTrade(result) {
+    if (!result) {
+      return false;
+    }
+
+
+    if (
+      result.ready !== true
+    ) {
+      return false;
+    }
+
+
+    if (
+      result.tradingAllowed !==
+      true
+    ) {
+      return false;
+    }
+
+
+    if (
+      Number(
+        result.safetyScore ||
+        0
+      ) < 60
+    ) {
+      return false;
+    }
+
+
+    return true;
+  }
+
+
+  // ===================================
+  // ORDER BOOK GEÇMİŞİNİ TEMİZLE
+  // ===================================
+
+  clearSymbol(symbol) {
+    const key =
+      String(
+        symbol || ""
+      )
+        .trim()
+        .toUpperCase();
+
+
+    this.bookHistory.delete(
+      key
+    );
+  }
+
+
+  reset() {
+    this.bookHistory.clear();
+  }
+}
+
+
+// =====================================
+// FACTORY
+// =====================================
+
+export function createRiskFiltersEngine(
+  options = {}
+) {
+  return new RiskFiltersEngine(
+    options
+  );
+}
