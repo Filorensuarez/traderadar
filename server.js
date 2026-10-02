@@ -2058,7 +2058,30 @@ app.post(
   }
 );
 
+// =====================================
+// TRADERADAR ULTIMATE - DURUM
+// =====================================
 
+app.get(
+  "/api/ultimate/status",
+  (req, res) => {
+    try {
+      res.json({
+        ok: true,
+        ultimate:
+          ultimateStatus(),
+        signalPermission:
+          ultimateCanGenerateSignal()
+      });
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        error:
+          error.message
+      });
+    }
+  }
+);
 // =====================================
 // SAĞLIK
 // =====================================
