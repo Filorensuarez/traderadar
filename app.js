@@ -2120,6 +2120,107 @@ const entryMax =
     `;
   }
 }
+async function renderPerformance() {
+  C.innerHTML = `
+    <article class="card">
+      <div class="sym">
+        SİNYAL PERFORMANS TESTİ
+      </div>
+      <div class="status">
+        Sonuçlar yükleniyor...
+      </div>
+    </article>
+  `;
+
+  try {
+    const response =
+      await fetch(
+        `/api/performance?t=${Date.now()}`,
+        { cache: "no-store" }
+      );
+
+    const data =
+      await response.json();
+
+    const labels = {
+      m5: "5 dakika",
+      m15: "15 dakika",
+      m30: "30 dakika",
+      h1: "1 saat",
+      h4: "4 saat"
+    };
+
+    const cards =
+      Object.entries(
+        data.summary || {}
+      )
+        .map(([key, x]) => `
+          <article class="card">
+            <div class="sym">
+              ${labels[key] || key}
+            </div>
+
+            <div class="metrics">
+              <div class="m">
+                <span>Test edilen</span>
+                <b>${x.tested}</b>
+              </div>
+
+              <div class="m">
+                <span>Başarı oranı</span>
+                <b>%${f(x.successRate, 1)}</b>
+              </div>
+
+              <div class="m">
+                <span>Pozitif</span>
+                <b>${x.positive}</b>
+              </div>
+
+              <div class="m">
+                <span>Negatif</span>
+                <b>${x.negative}</b>
+              </div>
+
+              <div class="m">
+                <span>Ortalama</span>
+                <b>%${f(x.averagePct, 3)}</b>
+              </div>
+
+              <div class="m">
+                <span>En iyi</span>
+                <b>%${f(x.bestPct, 3)}</b>
+              </div>
+
+              <div class="m">
+                <span>En kötü</span>
+                <b>%${f(x.worstPct, 3)}</b>
+              </div>
+            </div>
+          </article>
+        `)
+        .join("");
+
+    C.innerHTML = `
+      <article class="card">
+        <div class="sym">
+          PERFORMANS TESTİ
+        </div>
+        <div class="m">
+          <span>Toplam sinyal</span>
+          <b>${data.totalSignals || 0}</b>
+        </div>
+      </article>
+
+      ${cards}
+    `;
+  } catch (error) {
+    C.innerHTML = `
+      <article class="card">
+        Performans verisi alınamadı.
+      </article>
+    `;
+  }
+}
 function draw() {
   if (
     activeView === "movers"
