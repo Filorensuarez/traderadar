@@ -2002,7 +2002,40 @@ app.get(
     const m =
       s.metrics || {};
 
+    const ultimateReady =
+      ["1m", "3m", "5m", "15m", "1h", "4h"]
+        .every(
+          tf =>
+            Array.isArray(
+              s.multiCandles?.[tf]
+            ) &&
+            s.multiCandles[tf].length >= 200
+        );
 
+    let ultimateResult =
+      null;
+
+    if (ultimateReady) {
+      try {
+        const response =
+          await fetch(
+            `http://127.0.0.1:${PORT}/api/ultimate/coin/${encodeURIComponent(
+              symbol
+            )}`
+          );
+
+        if (response.ok) {
+          ultimateResult =
+            await response.json();
+        }
+      } catch (error) {
+        console.error(
+          "Ultimate coin detay:",
+          symbol,
+          error.message
+        );
+      }
+      }
     res.json({
       ok: true,
 
