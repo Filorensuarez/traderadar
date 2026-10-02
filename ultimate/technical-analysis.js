@@ -1710,3 +1710,241 @@ export class TechnicalAnalysisEngine {
     const supportResistance =
       this.supportResistance(
         candles
+      );
+
+
+    const structure =
+      this.marketStructure(
+        candles
+      );
+
+
+    const compression =
+      this.compression(
+        candles
+      );
+
+
+    const breakout =
+      this.breakout(
+        candles
+      );
+
+
+    const retest =
+      this.retest(
+        candles
+      );
+
+
+    const lastPrice =
+      closes.at(-1) ??
+      null;
+
+
+    // =================================
+    // EMA TREND YAPISI
+    // =================================
+
+    let trend =
+      "NEUTRAL";
+
+
+    const ema9 =
+      ema.ema9;
+
+    const ema20 =
+      ema.ema20;
+
+    const ema50 =
+      ema.ema50;
+
+    const ema200 =
+      ema.ema200;
+
+
+    if (
+      ema9 !== null &&
+      ema20 !== null &&
+      ema50 !== null
+    ) {
+
+      if (
+        ema9 >
+          ema20 &&
+        ema20 >
+          ema50
+      ) {
+        trend =
+          "UPTREND";
+
+      } else if (
+        ema9 <
+          ema20 &&
+        ema20 <
+          ema50
+      ) {
+        trend =
+          "DOWNTREND";
+      }
+    }
+
+
+    // =================================
+    // EMA 200 BÜYÜK TREND
+    // =================================
+
+    let longTrend =
+      "UNKNOWN";
+
+
+    if (
+      lastPrice !== null &&
+      ema200 !== null
+    ) {
+      longTrend =
+        lastPrice >
+          ema200
+          ? "ABOVE_EMA200"
+          : "BELOW_EMA200";
+    }
+
+
+    // =================================
+    // MOMENTUM
+    // =================================
+
+    let momentum =
+      "NEUTRAL";
+
+
+    if (
+      rsi !== null &&
+      macd.histogram !== null
+    ) {
+
+      if (
+        rsi >= 55 &&
+        macd.histogram > 0
+      ) {
+        momentum =
+          "POSITIVE";
+
+      } else if (
+        rsi <= 45 &&
+        macd.histogram < 0
+      ) {
+        momentum =
+          "NEGATIVE";
+      }
+    }
+
+
+    // =================================
+    // VOLATİLİTE
+    // =================================
+
+    const atrPct =
+      (
+        atr !== null &&
+        lastPrice !== null &&
+        lastPrice > 0
+      )
+        ? (
+            atr /
+            lastPrice
+          ) * 100
+        : null;
+
+
+    // =================================
+    // VWAP KONUMU
+    // =================================
+
+    let vwapPosition =
+      "UNKNOWN";
+
+
+    if (
+      lastPrice !== null &&
+      vwap !== null
+    ) {
+      vwapPosition =
+        lastPrice >=
+          vwap
+          ? "ABOVE"
+          : "BELOW";
+    }
+
+
+    // =================================
+    // SONUÇ
+    // =================================
+
+    return {
+      ready: true,
+
+      candleCount:
+        candles.length,
+
+      price:
+        lastPrice,
+
+      ema,
+
+      rsi,
+
+      macd,
+
+      bollinger,
+
+      atr,
+
+      atrPct,
+
+      vwap,
+
+      vwapPosition,
+
+      adx,
+
+      support:
+        supportResistance
+          .support,
+
+      resistance:
+        supportResistance
+          .resistance,
+
+      structure,
+
+      compression,
+
+      breakout,
+
+      retest,
+
+      trend,
+
+      longTrend,
+
+      momentum,
+
+      generatedAt:
+        Date.now()
+    };
+  }
+}
+
+
+// =====================================
+// FACTORY
+// =====================================
+
+export function createTechnicalAnalysis(
+  options = {}
+) {
+  return new TechnicalAnalysisEngine(
+    options
+  );
+}
