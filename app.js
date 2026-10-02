@@ -1936,7 +1936,111 @@ async function searchCoin(value) {
 
         </div>
 
+        <div
+          class="card"
+          style="margin-top:12px"
+        >
+          <div class="sym">
+            ULTIMATE ANALİZ
+          </div>
 
+          <div class="metrics">
+
+            <div class="m">
+              <span>Ultimate hazır</span>
+              <b>
+                ${data.ultimateReady
+                  ? "EVET"
+                  : "HAYIR"}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Ultimate puanı</span>
+              <b>
+                ${ultimateScore}/100
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Karar</span>
+              <b>
+                ${ultimateStatus}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Piyasa rejimi</span>
+              <b>
+                ${regimeText}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Risk filtresi</span>
+              <b>
+                ${riskAllowed}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>İdeal giriş</span>
+              <b>
+                ${entryIdeal}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Giriş alt sınır</span>
+              <b>
+                ${entryMin}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Giriş üst sınır</span>
+              <b>
+                ${entryMax}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Stop</span>
+              <b>
+                ${stopPrice}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Hedef 1</span>
+              <b>
+                ${target1}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Hedef 2</span>
+              <b>
+                ${target2}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Hedef 3</span>
+              <b>
+                ${target3}
+              </b>
+            </div>
+
+            <div class="m">
+              <span>Net R/R</span>
+              <b>
+                ${netRR}
+              </b>
+            </div>
+
+          </div>
+        </div>
         <div
           class="card"
           style="margin-top:12px"
