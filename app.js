@@ -1551,14 +1551,13 @@ async function searchCoin(value) {
       "-";
 
     const entryMin =
-      ultimateEntry?.entry?.minimum ??
-      ultimateEntry?.entry?.min ??
-      "-";
+  ultimateEntry?.entry?.low ??
+  "-";
 
-    const entryMax =
-      ultimateEntry?.entry?.maximum ??
-      ultimateEntry?.entry?.max ??
-      "-";
+const entryMax =
+  ultimateEntry?.entry?.high ??
+  ultimateEntry?.entry?.maximum ??
+  "-";
 
     const stopPrice =
       ultimateStop?.stop ??
@@ -1580,9 +1579,8 @@ async function searchCoin(value) {
       "-";
 
     const netRR =
-      ultimateTarget?.netRR ??
-      ultimateTarget?.riskReward ??
-      "-";
+  ultimateTarget?.riskReward?.netRR ??
+  "-";
 
     const regimeText =
       ultimateRegime?.regime ||
