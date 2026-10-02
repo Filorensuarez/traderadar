@@ -1130,7 +1130,24 @@ function connectOKX(
         );
       }
 
+      for (
+        let i = 0;
+        i < bookArgs.length;
+        i += 20
+      ) {
+        ws.send(
+          JSON.stringify({
+            op:
+              "subscribe",
 
+            args:
+              bookArgs.slice(
+                i,
+                i + 20
+              )
+          })
+        );
+      }
       console.log(
         `OKX grup ${groupNo}: ${symbols.length} parite`
       );
