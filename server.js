@@ -2029,7 +2029,45 @@ app.get(
 
       history:
         lastHistory || null,
+      ultimateReady:
+        Array.isArray(
+          s.multiCandles?.["1m"]
+        ) &&
+        s.multiCandles["1m"].length >= 200 &&
+        Array.isArray(
+          s.multiCandles?.["15m"]
+        ) &&
+        s.multiCandles["15m"].length >= 200 &&
+        Array.isArray(
+          s.multiCandles?.["1h"]
+        ) &&
+        s.multiCandles["1h"].length >= 200,
 
+      ultimateTimeframes: {
+        "1m":
+          s.multiCandles?.["1m"]
+            ?.length || 0,
+
+        "3m":
+          s.multiCandles?.["3m"]
+            ?.length || 0,
+
+        "5m":
+          s.multiCandles?.["5m"]
+            ?.length || 0,
+
+        "15m":
+          s.multiCandles?.["15m"]
+            ?.length || 0,
+
+        "1h":
+          s.multiCandles?.["1h"]
+            ?.length || 0,
+
+        "4h":
+          s.multiCandles?.["4h"]
+            ?.length || 0
+      },
       analysis: {
         volumeStrong:
           Number(
