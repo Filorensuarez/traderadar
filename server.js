@@ -2502,11 +2502,8 @@ app.get(
             orderFlow:
               orderFlowAnalysis,
 
-            regime: {
-              ready: false,
-              score: 50,
-              status: "PENDING_MULTI_TIMEFRAME"
-            },
+            regime:
+  marketRegime,
 
             riskFilters,
 
