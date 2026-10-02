@@ -2530,6 +2530,9 @@ app.get(
 
         windows,
                 technicalAnalysis,
+                timeframeAnalysis,
+
+        marketRegime,
         volumeAnalysis,
 
         orderFlowAnalysis,
