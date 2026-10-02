@@ -1530,11 +1530,11 @@ async function searchCoin(value) {
       u?.riskFilters || {};
 
     const ultimateScore =
-      Number(
-        ultimateSignal.score ??
-        ultimateSignal.totalScore ??
-        0
-      );
+  Number(
+    ultimateSignal.technicalScore ??
+    ultimateSignal.scoreDetails?.total ??
+    0
+  );
 
     const ultimateStatus =
       ultimateSignal.status ||
