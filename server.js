@@ -1198,7 +1198,57 @@ function connectOKX(
             trade.side ===
             "buy"
         });
+        // =================================
+        // ULTIMATE CANLI VERİ KÖPRÜSÜ
+        // =================================
 
+        try {
+          const ultimateTick = {
+            symbol:
+              trade.instId,
+
+            price,
+
+            quantity:
+              size,
+
+            quoteVolume:
+              price * size,
+
+            side:
+              trade.side,
+
+            timestamp:
+              t
+          };
+
+          const quality =
+            Ultimate.dataQuality
+              .validateTick({
+                symbol:
+                  trade.instId,
+
+                price,
+
+                volume:
+                  price * size,
+
+                timestamp:
+                  t
+              });
+
+          if (quality.valid) {
+            Ultimate.marketData
+              .addTick(
+                ultimateTick
+              );
+          }
+        } catch (error) {
+          console.error(
+            "Ultimate veri köprüsü:",
+            error.message
+          );
+        }
 
         const cutoff =
           Date.now() -
