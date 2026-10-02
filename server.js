@@ -243,6 +243,14 @@ function S(symbol) {
       first: 0,
       trades: [],
       candles: [],
+              multiCandles: {
+          "1m": [],
+          "3m": [],
+          "5m": [],
+          "15m": [],
+          "1h": [],
+          "4h": []
+        },
       score: 0,
       peak5m: 0,
       scores: [],
