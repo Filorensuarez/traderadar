@@ -1170,7 +1170,55 @@ function connectOKX(
         return;
       }
 
+      // =================================
+      // ULTIMATE ORDER BOOK KÖPRÜSÜ
+      // =================================
 
+      if (
+        data.arg?.channel ===
+          "books5" &&
+        Array.isArray(data.data)
+      ) {
+        try {
+          const symbol =
+            data.arg.instId;
+
+          for (
+            const book of data.data
+          ) {
+            const bids =
+              Array.isArray(book.bids)
+                ? book.bids
+                : [];
+
+            const asks =
+              Array.isArray(book.asks)
+                ? book.asks
+                : [];
+
+            const timestamp =
+              Number(
+                book.ts ||
+                Date.now()
+              );
+
+            Ultimate.marketData
+              .updateOrderBook(
+                symbol,
+                bids,
+                asks,
+                timestamp
+              );
+          }
+        } catch (error) {
+          console.error(
+            "Ultimate order book:",
+            error.message
+          );
+        }
+
+        return;
+                }
       if (
         data.arg?.channel !==
           "trades" ||
