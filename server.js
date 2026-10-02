@@ -2327,10 +2327,54 @@ app.get(
               candle.confirmed
           }));
 
-      const technicalAnalysis =
-        Ultimate.technical
-          .analyze(
-            technicalCandles
+            const timeframeAnalysis = {};
+
+      for (
+        const [
+          timeframe,
+          candles
+        ] of Object.entries(
+          state.multiCandles || {}
+        )
+      ) {
+        const formatted =
+          (candles || [])
+            .map(candle => ({
+              timestamp:
+                candle.t,
+
+              open:
+                candle.o,
+
+              high:
+                candle.h,
+
+              low:
+                candle.l,
+
+              close:
+                candle.c,
+
+              volume:
+                candle.v,
+
+              confirmed:
+                candle.confirmed
+            }));
+
+        timeframeAnalysis[
+          timeframe
+        ] =
+          Ultimate.technical
+            .analyze(
+              formatted
+            );
+      }
+
+      const marketRegime =
+        Ultimate.marketRegime
+          .classifyMarket(
+            timeframeAnalysis
           );
       const volumeAnalysis =
         Ultimate.volume
