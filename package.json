@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "scripts": {
+  "start": "node server.js",
+  "test:ultimate": "node ultimate/self-test.js"
+}
   },
   "dependencies": {
     "express": "^5.1.0",
