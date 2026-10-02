@@ -2235,6 +2235,12 @@ function draw() {
     renderHistory();
     return;
   }
+    if (
+    activeView === "performance"
+  ) {
+    renderPerformance();
+    return;
+  }
   if (
     activeView === "search"
   ) {
