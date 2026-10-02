@@ -425,7 +425,84 @@ function recordSignal(s) {
   );
 }
 
+// =====================================
+// SİNYAL PERFORMANS TESTİ
+// =====================================
 
+const PERFORMANCE_HORIZONS = {
+  m5: 5 * 60 * 1000,
+  m15: 15 * 60 * 1000,
+  m30: 30 * 60 * 1000,
+  h1: 60 * 60 * 1000,
+  h4: 4 * 60 * 60 * 1000
+};
+
+function updateSignalPerformance() {
+  const now = Date.now();
+  let changed = false;
+
+  for (const row of signalHistory) {
+    if (
+      !row?.symbol ||
+      !row?.time ||
+      !row?.price
+    ) continue;
+
+    const s =
+      states.get(row.symbol);
+
+    const currentPrice =
+      Number(s?.price || 0);
+
+    if (!(currentPrice > 0)) continue;
+
+    row.performance ||= {};
+
+    for (
+      const [key, ms]
+      of Object.entries(
+        PERFORMANCE_HORIZONS
+      )
+    ) {
+      if (
+        row.performance[key] ||
+        now - Number(row.time) < ms
+      ) continue;
+
+      const changePct =
+        (
+          (
+            currentPrice -
+            Number(row.price)
+          ) /
+          Number(row.price)
+        ) * 100;
+
+      row.performance[key] = {
+        price: currentPrice,
+        changePct:
+          Number(
+            changePct.toFixed(3)
+          ),
+        checkedAt: now
+      };
+
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    writeJSON(
+      HISTORY_FILE,
+      signalHistory
+    );
+  }
+}
+
+setInterval(
+  updateSignalPerformance,
+  30 * 1000
+);
 // =====================================
 // PATLAMA ÖNCESİ MOTOR
 // =====================================
