@@ -1153,4 +1153,560 @@ export class TechnicalAnalysisEngine {
       } else if (
         bb.widthPct <= 6
       ) {
-        score += 
+                20;
+      }
+    }
+
+
+    if (
+      atrPct !== null
+    ) {
+      if (
+        atrPct <= 1
+      ) {
+        score += 40;
+
+      } else if (
+        atrPct <= 2
+      ) {
+        score += 25;
+
+      } else if (
+        atrPct <= 3
+      ) {
+        score += 10;
+      }
+    }
+
+
+    score =
+      Math.min(
+        100,
+        Math.max(
+          0,
+          score
+        )
+      );
+
+
+    return {
+      score,
+
+      bollingerWidthPct:
+        bb.widthPct,
+
+      atr,
+      atrPct,
+
+      compressed:
+        score >= 60
+    };
+  }
+
+
+  // ===================================
+  // BREAKOUT ANALİZİ
+  // ===================================
+
+  breakout(candles) {
+    if (
+      !Array.isArray(candles) ||
+      candles.length < 20
+    ) {
+      return {
+        breakout: false,
+        direction: "NONE",
+        strength: 0,
+        resistance: null,
+        support: null,
+        distancePct: null
+      };
+    }
+
+
+    const current =
+      candles.at(-1);
+
+    const previous =
+      candles.slice(
+        0,
+        -1
+      );
+
+
+    const sr =
+      this.supportResistance(
+        previous
+      );
+
+
+    const close =
+      this.number(
+        current.close
+      );
+
+
+    if (
+      close === null
+    ) {
+      return {
+        breakout: false,
+        direction: "NONE",
+        strength: 0,
+        resistance:
+          sr.resistance,
+        support:
+          sr.support,
+        distancePct: null
+      };
+    }
+
+
+    let breakout = false;
+    let direction = "NONE";
+    let strength = 0;
+
+
+    if (
+      sr.resistance !== null &&
+      close >
+        sr.resistance
+    ) {
+      breakout = true;
+      direction = "UP";
+
+      strength =
+        (
+          (
+            close -
+            sr.resistance
+          ) /
+          sr.resistance
+        ) * 100;
+    }
+
+
+    if (
+      sr.support !== null &&
+      close <
+        sr.support
+    ) {
+      breakout = true;
+      direction = "DOWN";
+
+      strength =
+        (
+          (
+            sr.support -
+            close
+          ) /
+          sr.support
+        ) * 100;
+    }
+
+
+    const distancePct =
+      sr.resistance &&
+      sr.resistance > 0
+        ? (
+            (
+              sr.resistance -
+              close
+            ) /
+            close
+          ) * 100
+        : null;
+
+
+    return {
+      breakout,
+      direction,
+      strength,
+
+      resistance:
+        sr.resistance,
+
+      support:
+        sr.support,
+
+      distancePct
+    };
+  }
+
+
+  // ===================================
+  // RETEST
+  // ===================================
+
+  retest(candles) {
+    if (
+      !Array.isArray(candles) ||
+      candles.length < 25
+    ) {
+      return {
+        detected: false,
+        level: null,
+        distancePct: null
+      };
+    }
+
+
+    const recent =
+      candles.slice(
+        -5
+      );
+
+
+    const historical =
+      candles.slice(
+        0,
+        -5
+      );
+
+
+    const sr =
+      this.supportResistance(
+        historical
+      );
+
+
+    const resistance =
+      sr.resistance;
+
+
+    if (
+      resistance === null ||
+      resistance <= 0
+    ) {
+      return {
+        detected: false,
+        level: null,
+        distancePct: null
+      };
+    }
+
+
+    const latest =
+      recent.at(-1);
+
+
+    const close =
+      this.number(
+        latest.close
+      );
+
+
+    const low =
+      this.number(
+        latest.low
+      );
+
+
+    if (
+      close === null ||
+      low === null
+    ) {
+      return {
+        detected: false,
+        level:
+          resistance,
+        distancePct: null
+      };
+    }
+
+
+    const distancePct =
+      (
+        (
+          close -
+          resistance
+        ) /
+        resistance
+      ) * 100;
+
+
+    const touched =
+      low <=
+        resistance *
+        1.005;
+
+
+    const held =
+      close >=
+        resistance;
+
+
+    return {
+      detected:
+        touched &&
+        held,
+
+      level:
+        resistance,
+
+      distancePct
+    };
+  }
+
+
+  // ===================================
+  // TREND GÜCÜ
+  // ===================================
+
+  trendStrength(candles) {
+    const closes =
+      this.closes(
+        candles
+      );
+
+
+    if (
+      closes.length < 20
+    ) {
+      return {
+        score: 0,
+        direction:
+          "UNKNOWN"
+      };
+    }
+
+
+    const ema9 =
+      this.ema(
+        closes,
+        9
+      );
+
+
+    const ema20 =
+      this.ema(
+        closes,
+        20
+      );
+
+
+    const ema50 =
+      this.ema(
+        closes,
+        50
+      );
+
+
+    const ema200 =
+      this.ema(
+        closes,
+        200
+      );
+
+
+    const adx =
+      this.adx(
+        candles
+      );
+
+
+    const structure =
+      this.marketStructure(
+        candles
+      );
+
+
+    let score = 50;
+
+
+    if (
+      ema9 !== null &&
+      ema20 !== null
+    ) {
+      score +=
+        ema9 > ema20
+          ? 10
+          : -10;
+    }
+
+
+    if (
+      ema20 !== null &&
+      ema50 !== null
+    ) {
+      score +=
+        ema20 > ema50
+          ? 10
+          : -10;
+    }
+
+
+    if (
+      ema50 !== null &&
+      ema200 !== null
+    ) {
+      score +=
+        ema50 > ema200
+          ? 10
+          : -10;
+    }
+
+
+    if (
+      structure.structure ===
+      "UPTREND"
+    ) {
+      score += 15;
+    }
+
+
+    if (
+      structure.structure ===
+      "DOWNTREND"
+    ) {
+      score -= 15;
+    }
+
+
+    if (
+      adx !== null &&
+      adx >= 25
+    ) {
+      if (score >= 50) {
+        score += 10;
+      } else {
+        score -= 10;
+      }
+    }
+
+
+    score =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          score
+        )
+      );
+
+
+    let direction =
+      "RANGE";
+
+
+    if (score >= 70) {
+      direction =
+        "UPTREND";
+
+    } else if (
+      score <= 30
+    ) {
+      direction =
+        "DOWNTREND";
+    }
+
+
+    return {
+      score,
+      direction,
+      adx,
+
+      ema9,
+      ema20,
+      ema50,
+      ema200,
+
+      structure
+    };
+  }
+
+
+  // ===================================
+  // TAM TEKNİK ANALİZ
+  // ===================================
+
+  analyze(
+    candles = []
+  ) {
+    if (
+      !Array.isArray(candles) ||
+      !candles.length
+    ) {
+      return {
+        ready: false,
+        reason:
+          "NO_CANDLES"
+      };
+    }
+
+
+    const closes =
+      this.closes(
+        candles
+      );
+
+
+    if (
+      closes.length < 20
+    ) {
+      return {
+        ready: false,
+        reason:
+          "INSUFFICIENT_CANDLES",
+        candleCount:
+          closes.length
+      };
+    }
+
+
+    const ema = {};
+
+
+    for (
+      const period of
+      this.config.emaPeriods
+    ) {
+      ema[
+        `ema${period}`
+      ] =
+        this.ema(
+          closes,
+          period
+        );
+    }
+
+
+    const rsi =
+      this.rsi(
+        closes
+      );
+
+
+    const macd =
+      this.macd(
+        closes
+      );
+
+
+    const bollinger =
+      this.bollinger(
+        closes
+      );
+
+
+    const atr =
+      this.atr(
+        candles
+      );
+
+
+    const vwap =
+      this.vwap(
+        candles
+      );
+
+
+    const adx =
+      this.adx(
+        candles
+      );
+
+
+    const supportResistance =
+      this.supportResistance(
+        candles
