@@ -428,7 +428,8 @@ function recordSignal(s) {
 // =====================================
 // SİNYAL PERFORMANS TESTİ
 // =====================================
-
+const PERFORMANCE_TEST_START =
+  Date.now();
 const PERFORMANCE_HORIZONS = {
   m5: 5 * 60 * 1000,
   m15: 15 * 60 * 1000,
@@ -442,6 +443,12 @@ function updateSignalPerformance() {
   let changed = false;
 
   for (const row of signalHistory) {
+        if (
+      Number(row.time) <
+      PERFORMANCE_TEST_START
+    ) {
+      continue;
+        }
     if (
       !row?.symbol ||
       !row?.time ||
@@ -2274,7 +2281,12 @@ app.get(
     for (const key of horizons) {
       const values =
         signalHistory
-          .map(
+  .filter(
+    row =>
+      Number(row.time) >=
+      PERFORMANCE_TEST_START
+  )
+  .map(
             row =>
               Number(
                 row.performance
@@ -2354,7 +2366,11 @@ app.get(
       ok: true,
 
       totalSignals:
-        signalHistory.length,
+  signalHistory.filter(
+    row =>
+      Number(row.time) >=
+      PERFORMANCE_TEST_START
+  ).length,
 
       summary,
 
