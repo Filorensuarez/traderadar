@@ -2361,7 +2361,22 @@ app.get(
           )
       };
     }
-
+    const testSignals =
+      signalHistory
+        .filter(
+          row =>
+            Number(row.time) >=
+            PERFORMANCE_TEST_START
+        )
+        .map(row => ({
+          symbol: row.symbol,
+          status: row.status,
+          signalPrice: row.price,
+          score: row.score,
+          time: row.time,
+          performance:
+            row.performance || {}
+        }));
     res.json({
       ok: true,
 
