@@ -1,0 +1,23 @@
+name: TradeRadar Ultimate Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ultimate-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v4
+
+      - name: Node kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Bagimliliklari kur
+        run: npm install
+
+      - name: Ultimate self-test
+        run: npm run test:ultimate
