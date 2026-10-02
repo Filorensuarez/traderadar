@@ -913,7 +913,45 @@ function calc(s) {
       "İZLENİYOR";
   }
 
+  const ultimateCandidate =
+    s.score >= 75 &&
+    (
+      s.status ===
+        "PATLAMA HAZIRLIĞI" ||
+      s.status ===
+        "GÜÇLÜ PATLAMA HAZIRLIĞI" ||
+      s.status ===
+        "KIRILIM TEYİDİ"
+    );
 
+  if (ultimateCandidate) {
+    const now =
+      Date.now();
+
+    const lastLoad =
+      Number(
+        s.lastUltimateCandleLoad ||
+        0
+      );
+
+    if (
+      now - lastLoad >
+      5 * 60 * 1000
+    ) {
+      s.lastUltimateCandleLoad =
+        now;
+
+      loadCandles([
+        s.symbol
+      ]).catch(error => {
+        console.error(
+          "Ultimate aday mum yükleme:",
+          s.symbol,
+          error.message
+        );
+      });
+    }
+  }
   s.metrics = {
     w5,
     w10,
