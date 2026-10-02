@@ -2278,6 +2278,39 @@ app.get(
       const windows =
         Ultimate.marketData
           .windows(symbol);
+            const state =
+        S(symbol);
+
+      const technicalCandles =
+        (state.candles || [])
+          .map(candle => ({
+            timestamp:
+              candle.t,
+
+            open:
+              candle.o,
+
+            high:
+              candle.h,
+
+            low:
+              candle.l,
+
+            close:
+              candle.c,
+
+            volume:
+              candle.v,
+
+            confirmed:
+              candle.confirmed
+          }));
+
+      const technicalAnalysis =
+        Ultimate.technical
+          .analyze(
+            technicalCandles
+          );
       const volumeAnalysis =
         Ultimate.volume
           .analyze({
