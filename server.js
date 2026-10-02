@@ -2411,7 +2411,7 @@ app.get(
 
             stopPrice:
               stopAnalysis
-                ?.stopPrice,
+                ?.stop,
 
             technical:
               technicalAnalysis,
