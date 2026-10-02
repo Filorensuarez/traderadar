@@ -2167,6 +2167,74 @@ app.get(
   }
 );
 // =====================================
+// TRADERADAR ULTIMATE - COIN VERİ TESTİ
+// =====================================
+
+app.get(
+  "/api/ultimate/coin/:symbol",
+  (req, res) => {
+    try {
+      const raw =
+        String(
+          req.params.symbol || ""
+        )
+          .trim()
+          .toUpperCase();
+
+      const symbol =
+        raw.includes("-")
+          ? raw
+          : `${raw}-USDT`;
+
+      const snapshot =
+        Ultimate.marketData
+          .snapshot(symbol);
+
+      const windows =
+        Ultimate.marketData
+          .windows(symbol);
+
+      if (!snapshot) {
+        return res
+          .status(404)
+          .json({
+            ok: false,
+            symbol,
+            error:
+              "ULTIMATE VERİSİ BULUNAMADI"
+          });
+      }
+
+      return res.json({
+        ok: true,
+
+        symbol,
+
+        systemHealthy:
+          Ultimate.systemHealth
+            .snapshot()
+            .healthy,
+
+        snapshot,
+
+        windows,
+
+        checkedAt:
+          Date.now()
+      });
+
+    } catch (error) {
+      return res
+        .status(500)
+        .json({
+          ok: false,
+          error:
+            error.message
+        });
+    }
+  }
+);
+// =====================================
 // SAĞLIK
 // =====================================
 
