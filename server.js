@@ -2578,8 +2578,13 @@ const server =
         }
 
 
+                const candleSymbols =
+          [
+            "BTC-USDT"
+          ];
+
         loadCandles(
-          symbols
+          candleSymbols
         );
 
 
