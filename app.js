@@ -1508,7 +1508,92 @@ async function searchCoin(value) {
     const h =
       data.history;
 
+    const u =
+      data.ultimateResult || null;
 
+    const ultimateSignal =
+      u?.signalAnalysis || {};
+
+    const ultimateEntry =
+      u?.entryAnalysis || {};
+
+    const ultimateStop =
+      u?.stopAnalysis || {};
+
+    const ultimateTarget =
+      u?.targetRiskAnalysis || {};
+
+    const ultimateRegime =
+      u?.marketRegime || {};
+
+    const ultimateRisk =
+      u?.riskFilters || {};
+
+    const ultimateScore =
+      Number(
+        ultimateSignal.score ??
+        ultimateSignal.totalScore ??
+        0
+      );
+
+    const ultimateStatus =
+      ultimateSignal.status ||
+      ultimateSignal.decision ||
+      ultimateSignal.signal ||
+      (
+        data.ultimateReady
+          ? "ANALİZ EDİLİYOR"
+          : "ULTIMATE HAZIRLANIYOR"
+      );
+
+    const entryIdeal =
+      ultimateEntry?.entry?.ideal ??
+      ultimateEntry?.ideal ??
+      "-";
+
+    const entryMin =
+      ultimateEntry?.entry?.minimum ??
+      ultimateEntry?.entry?.min ??
+      "-";
+
+    const entryMax =
+      ultimateEntry?.entry?.maximum ??
+      ultimateEntry?.entry?.max ??
+      "-";
+
+    const stopPrice =
+      ultimateStop?.stop ??
+      "-";
+
+    const target1 =
+      ultimateTarget?.targets?.target1 ??
+      ultimateTarget?.target1 ??
+      "-";
+
+    const target2 =
+      ultimateTarget?.targets?.target2 ??
+      ultimateTarget?.target2 ??
+      "-";
+
+    const target3 =
+      ultimateTarget?.targets?.target3 ??
+      ultimateTarget?.target3 ??
+      "-";
+
+    const netRR =
+      ultimateTarget?.netRR ??
+      ultimateTarget?.riskReward ??
+      "-";
+
+    const regimeText =
+      ultimateRegime?.regime ||
+      ultimateRegime?.status ||
+      "-";
+
+    const riskAllowed =
+      ultimateRisk?.tradingAllowed === true
+        ? "UYGUN"
+        : "UYGUN DEĞİL";
     const signalTime =
       h?.time
         ? new Date(
