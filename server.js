@@ -1252,11 +1252,19 @@ function connectOKX(
               });
 
           if (quality.valid) {
-            Ultimate.marketData
-              .addTick(
-                ultimateTick
-              );
-          }
+  Ultimate.marketData
+    .addTick(
+      ultimateTick
+    );
+
+  Ultimate.systemHealth
+    .marketTick(t);
+
+  Ultimate.systemHealth
+    .scannerUpdate(
+      states.size
+    );
+}
         } catch (error) {
           console.error(
             "Ultimate veri köprüsü:",
