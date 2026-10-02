@@ -1030,7 +1030,7 @@ async function loadCandles(
         await fetch(
           `${REST}/api/v5/market/candles?instId=${encodeURIComponent(
             symbol
-          )}&bar=15m&limit=8`
+          )}&bar=15m&limit=300`
         );
 
       if (!r.ok) continue;
