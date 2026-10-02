@@ -2254,7 +2254,115 @@ app.get(
   }
 );
 
+// =====================================
+// SİNYAL PERFORMANS ÖZETİ
+// =====================================
 
+app.get(
+  "/api/performance",
+  (req, res) => {
+    res.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+    const horizons =
+      ["m5", "m15", "m30", "h1", "h4"];
+
+    const summary = {};
+
+    for (const key of horizons) {
+      const values =
+        signalHistory
+          .map(
+            row =>
+              Number(
+                row.performance
+                  ?.[key]
+                  ?.changePct
+              )
+          )
+          .filter(
+            Number.isFinite
+          );
+
+      const positive =
+        values.filter(
+          value => value > 0
+        ).length;
+
+      const negative =
+        values.filter(
+          value => value < 0
+        ).length;
+
+      const average =
+        values.length
+          ? values.reduce(
+              (a, b) => a + b,
+              0
+            ) / values.length
+          : 0;
+
+      const best =
+        values.length
+          ? Math.max(...values)
+          : 0;
+
+      const worst =
+        values.length
+          ? Math.min(...values)
+          : 0;
+
+      summary[key] = {
+        tested:
+          values.length,
+
+        positive,
+
+        negative,
+
+        successRate:
+          values.length
+            ? Number(
+                (
+                  positive /
+                  values.length *
+                  100
+                ).toFixed(1)
+              )
+            : 0,
+
+        averagePct:
+          Number(
+            average.toFixed(3)
+          ),
+
+        bestPct:
+          Number(
+            best.toFixed(3)
+          ),
+
+        worstPct:
+          Number(
+            worst.toFixed(3)
+          )
+      };
+    }
+
+    res.json({
+      ok: true,
+
+      totalSignals:
+        signalHistory.length,
+
+      summary,
+
+      updatedAt:
+        Date.now()
+    });
+  }
+);
 app.get(
   "/api/movers",
   (req, res) => {
