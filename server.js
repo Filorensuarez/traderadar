@@ -429,7 +429,9 @@ function recordSignal(s) {
 // SİNYAL PERFORMANS TESTİ
 // =====================================
 const PERFORMANCE_TEST_START =
-  Date.now();
+  new Date(
+    "2026-10-02T21:47:32+03:00"
+  ).getTime();
 const PERFORMANCE_HORIZONS = {
   m5: 5 * 60 * 1000,
   m15: 15 * 60 * 1000,
