@@ -1101,7 +1101,15 @@ function connectOKX(
             instId
           })
         );
+      const bookArgs =
+        symbols.map(
+          instId => ({
+            channel:
+              "books5",
 
+            instId
+          })
+        );
 
       for (
         let i = 0;
