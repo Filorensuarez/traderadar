@@ -1946,7 +1946,7 @@ app.get(
 
 app.get(
   "/api/coin/:symbol",
-  (req, res) => {
+  async (req, res) => {
     res.set(
       "Cache-Control",
       "no-store"
@@ -2062,6 +2062,7 @@ app.get(
 
       history:
         lastHistory || null,
+            ultimateResult,
       ultimateReady:
         Array.isArray(
           s.multiCandles?.["1m"]
