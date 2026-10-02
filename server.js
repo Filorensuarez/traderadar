@@ -1,3 +1,7 @@
+import Ultimate, {
+  ultimateStatus,
+  ultimateCanGenerateSignal
+} from "./ultimate/index.js";
 import express from "express";
 import WebSocket, { WebSocketServer } from "ws";
 import fs from "fs";
