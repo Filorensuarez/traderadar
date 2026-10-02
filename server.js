@@ -2352,6 +2352,7 @@ app.get(
         snapshot,
 
         windows,
+                technicalAnalysis,
         volumeAnalysis,
 
         orderFlowAnalysis,
