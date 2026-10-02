@@ -1027,59 +1027,72 @@ async function getSymbols() {
 // 15 DK MUM VERİSİ
 // =====================================
 
-async function loadCandles(
-  symbols
-) {
-  for (
-    const symbol of symbols
-  ) {
-    try {
-      const r =
-        await fetch(
+async function loadCandles(symbols) {
+  const timeframes = {
+    "1m": "1m",
+    "3m": "3m",
+    "5m": "5m",
+    "15m": "15m",
+    "1h": "1H",
+    "4h": "4H"
+  };
+
+  for (const symbol of symbols) {
+    const state = S(symbol);
+
+    for (
+      const [timeframe, bar]
+      of Object.entries(timeframes)
+    ) {
+      try {
+        const r = await fetch(
           `${REST}/api/v5/market/candles?instId=${encodeURIComponent(
             symbol
-          )}&bar=15m&limit=300`
+          )}&bar=${bar}&limit=300`
         );
 
-      if (!r.ok) continue;
+        if (!r.ok) {
+          continue;
+        }
 
-      const j =
-        await r.json();
+        const j = await r.json();
 
-            S(symbol).candles =
-        (j.data || [])
-          .map(
-            x => ({
-              t:
-                Number(x[0]),
-
-              o:
-                Number(x[1]),
-
-              h:
-                Number(x[2]),
-
-              l:
-                Number(x[3]),
-
-              c:
-                Number(x[4]),
-
-              v:
-                Number(x[7] || 0),
-
+        const candles =
+          (j.data || [])
+            .map(x => ({
+              t: Number(x[0]),
+              o: Number(x[1]),
+              h: Number(x[2]),
+              l: Number(x[3]),
+              c: Number(x[4]),
+              v: Number(x[7] || 0),
               confirmed:
                 String(x[8]) === "1"
-            })
-          )
-          .reverse();
+            }))
+            .reverse();
 
-      await sleep(35);
+        state.multiCandles[
+          timeframe
+        ] = candles;
 
-    } catch {}
+        if (
+          timeframe === "15m"
+        ) {
+          state.candles =
+            candles;
+        }
+
+        await sleep(35);
+
+      } catch (error) {
+        console.error(
+          `Mum verisi ${symbol} ${timeframe}:`,
+          error.message
+        );
+      }
+    }
   }
 }
-
 
 // =====================================
 // OKX CANLI İŞLEM AKIŞI
