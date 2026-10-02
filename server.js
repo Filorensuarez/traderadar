@@ -1038,10 +1038,16 @@ async function loadCandles(
       const j =
         await r.json();
 
-      S(symbol).candles =
+            S(symbol).candles =
         (j.data || [])
           .map(
             x => ({
+              t:
+                Number(x[0]),
+
+              o:
+                Number(x[1]),
+
               h:
                 Number(x[2]),
 
@@ -1049,7 +1055,13 @@ async function loadCandles(
                 Number(x[3]),
 
               c:
-                Number(x[4])
+                Number(x[4]),
+
+              v:
+                Number(x[7] || 0),
+
+              confirmed:
+                String(x[8]) === "1"
             })
           )
           .reverse();
