@@ -1537,14 +1537,13 @@ async function searchCoin(value) {
   );
 
     const ultimateStatus =
-      ultimateSignal.status ||
-      ultimateSignal.decision ||
-      ultimateSignal.signal ||
-      (
-        data.ultimateReady
-          ? "ANALİZ EDİLİYOR"
-          : "ULTIMATE HAZIRLANIYOR"
-      );
+  ultimateSignal.stage ||
+  ultimateSignal.message ||
+  (
+    data.ultimateReady
+      ? "İZLE"
+      : "ULTIMATE HAZIRLANIYOR"
+  );
 
     const entryIdeal =
       ultimateEntry?.entry?.ideal ??
