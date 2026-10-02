@@ -2388,7 +2388,8 @@ app.get(
   ).length,
 
       summary,
-
+      signals:
+        testSignals,
       updatedAt:
         Date.now()
     });
