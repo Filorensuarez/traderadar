@@ -1306,6 +1306,18 @@ function connectOKX(
   ws.on(
     "close",
     () => {
+          try {
+      Ultimate.systemHealth
+        .websocketDisconnected();
+
+      Ultimate.systemHealth
+        .websocketReconnectAttempt();
+    } catch (error) {
+      console.error(
+        "Ultimate health close:",
+        error.message
+      );
+    }
       setTimeout(
         () =>
           connectOKX(
