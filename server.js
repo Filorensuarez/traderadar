@@ -2234,7 +2234,9 @@ app.get(
         snapshot,
 
         windows,
+        volumeAnalysis,
 
+        orderFlowAnalysis,
         checkedAt:
           Date.now()
       });
