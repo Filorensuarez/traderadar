@@ -2471,6 +2471,15 @@ app.get(
         volumeAnalysis,
 
         orderFlowAnalysis,
+        riskFilters,
+
+entryAnalysis,
+
+stopAnalysis,
+
+targetRiskAnalysis,
+
+signalAnalysis,
         checkedAt:
           Date.now()
       });
