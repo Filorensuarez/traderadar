@@ -2193,7 +2193,23 @@ app.get(
       const windows =
         Ultimate.marketData
           .windows(symbol);
+      const volumeAnalysis =
+        Ultimate.volume
+          .analyze({
+            windows,
+            historicalVolumes: []
+          });
 
+      const orderFlowAnalysis =
+        Ultimate.orderFlow
+          .analyze({
+            windows,
+
+            orderBook:
+              snapshot.orderBook || {},
+
+            previousCvdNet: 0
+          });
       if (!snapshot) {
         return res
           .status(404)
