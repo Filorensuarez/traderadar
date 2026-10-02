@@ -2338,7 +2338,122 @@ app.get(
               "ULTIMATE VERİSİ BULUNAMADI"
           });
       }
+      const health =
+        Ultimate.systemHealth
+          .snapshot();
 
+      const riskFilters =
+        Ultimate.riskFilters
+          .evaluate({
+            symbol,
+
+            market:
+              snapshot,
+
+            volume:
+              volumeAnalysis,
+
+            orderFlow:
+              orderFlowAnalysis,
+
+            technical:
+              technicalAnalysis,
+
+            notionalUsd:
+              1000,
+
+            candleClosed:
+              technicalCandles
+                .at(-1)
+                ?.confirmed === true,
+
+            higherTimeframeBullish:
+              false
+          });
+
+      const entryAnalysis =
+        Ultimate.entry
+          .calculate({
+            price:
+              snapshot.price,
+
+            technical:
+              technicalAnalysis,
+
+            market:
+              snapshot,
+
+            signalTime:
+              Date.now()
+          });
+
+      const stopAnalysis =
+        Ultimate.stop
+          .calculate({
+            entryPrice:
+              entryAnalysis
+                ?.entry
+                ?.ideal,
+
+            technical:
+              technicalAnalysis,
+
+            regime: {}
+          });
+
+      const targetRiskAnalysis =
+        Ultimate.targetRisk
+          .calculate({
+            entryPrice:
+              entryAnalysis
+                ?.entry
+                ?.ideal,
+
+            stopPrice:
+              stopAnalysis
+                ?.stopPrice,
+
+            technical:
+              technicalAnalysis,
+
+            slippagePct:
+              riskFilters
+                ?.slippage
+                ?.slippagePct
+          });
+
+      const signalAnalysis =
+        Ultimate.signal
+          .evaluate({
+            technical:
+              technicalAnalysis,
+
+            market:
+              snapshot,
+
+            volume:
+              volumeAnalysis,
+
+            orderFlow:
+              orderFlowAnalysis,
+
+            regime: {
+              ready: false,
+              score: 50,
+              status: "PENDING_MULTI_TIMEFRAME"
+            },
+
+            riskFilters,
+
+            riskReward:
+              targetRiskAnalysis,
+
+            dataReliable:
+              health.healthy === true,
+
+            systemHealthy:
+              health.healthy === true
+          });
       return res.json({
         ok: true,
 
