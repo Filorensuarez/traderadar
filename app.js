@@ -622,7 +622,10 @@ addTab(
   "Coin Sorgula",
   "search"
 );
-
+addTab(
+  "Performans Testi",
+  "performance"
+);
 if (
   C &&
   C.parentNode
