@@ -2326,7 +2326,11 @@ app.get(
             confirmed:
               candle.confirmed
           }));
-
+      const technicalAnalysis =
+        Ultimate.technical
+          .analyze(
+            technicalCandles
+          );
             const timeframeAnalysis = {};
 
       for (
