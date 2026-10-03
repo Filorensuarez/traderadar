@@ -2371,9 +2371,9 @@ async function updateMovers() {
 
           Number.isFinite(ret120),
 
-          volumeRatio > 0,
+          volumeUsable,
 
-          tradeX > 0,
+tradesUsable,
 
           buyRatio > 0,
 
