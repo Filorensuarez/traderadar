@@ -1738,6 +1738,46 @@ function connectOKX(
             trade.side ===
             "buy"
         });
+                const tradeValue =
+          price * size;
+
+        const largeThreshold =
+          Math.max(
+            10000,
+            Number(
+              s.metrics
+                ?.avgTradeValue ||
+              0
+            ) * 8
+          );
+
+        if (
+          tradeValue >=
+          largeThreshold
+        ) {
+          s.largeTrades.push({
+            t,
+            value:
+              tradeValue,
+
+            side:
+              trade.side,
+
+            price
+          });
+        }
+
+        const largeCut =
+          t -
+          5 * 60 * 1000;
+
+        while (
+          s.largeTrades.length &&
+          s.largeTrades[0].t <
+            largeCut
+        ) {
+          s.largeTrades.shift();
+        }
         // =================================
         // ULTIMATE CANLI VERİ KÖPRÜSÜ
         // =================================
