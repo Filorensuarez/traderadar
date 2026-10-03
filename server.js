@@ -2659,12 +2659,27 @@ app.get(
       };
     }
     const testSignals =
-      signalHistory
-        .filter(
-          row =>
-            Number(row.time) >=
-            PERFORMANCE_TEST_START
-        )
+  signalHistory
+    .filter(
+      row => {
+        if (
+          Number(row.time) <
+          PERFORMANCE_TEST_START
+        ) {
+          return false;
+        }
+
+        const currentState =
+          states.get(row.symbol);
+
+        return (
+          row.status ===
+            "KIRILIM TEYİDİ" &&
+          currentState?.status ===
+            "KIRILIM TEYİDİ"
+        );
+      }
+    )
         .map(row => ({
   symbol:
     row.symbol,
