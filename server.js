@@ -2596,7 +2596,13 @@ async function updateMovers() {
             bookBuyRatio,
             bookImbalance,
             spreadPct,
-
+            largeBuyVolume,
+            largeSellVolume,
+            largeBuyCount,
+            largeSellCount,
+            largeTotalVolume,
+            largeTradeImbalance,
+            largeTradeStatus,
             resistanceDistance,
             compression,
 
