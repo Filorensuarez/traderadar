@@ -2341,6 +2341,28 @@ async function updateMovers() {
           largeTradeStatus =
             "BÜYÜK İŞLEMLER DENGELİ";
         }
+                      const volumeReady =
+          m.volumeReady === true;
+
+        const liveVolume =
+          Number(
+            m.w120?.vol || 0
+          );
+
+        const liveTrades =
+          Number(
+            m.w120?.n || 0
+          );
+
+        const volumeUsable =
+          volumeReady
+            ? volumeRatio > 0
+            : liveVolume > 0;
+
+        const tradesUsable =
+          volumeReady
+            ? tradeX > 0
+            : liveTrades > 0;
         const dataChecks = [
           Number.isFinite(x.price) &&
             x.price > 0,
