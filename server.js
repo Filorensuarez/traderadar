@@ -2693,73 +2693,723 @@ tradesUsable,
         };
       }
 
+            // =====================================
+      // GELİŞMİŞ DÖNÜŞ MOTORU
+      // =====================================
+
       const range =
         Math.max(
-          x.high24 -
-          x.low24,
-
-          x.price *
-          0.001
+          x.high24 - x.low24,
+          x.price * 0.001
         );
 
+      const ret5 =
+        Number(m.w5?.ret || 0);
 
-      let score = 0;
+      const ret10 =
+        Number(m.w10?.ret || 0);
 
-      if (
-        momentum15 > 0
-      ) score += 25;
+      const ret30 =
+        Number(m.w30?.ret || 0);
 
-      if (
+      const ret60 =
+        Number(m.w60?.ret || 0);
+
+      const ret120 =
+        Number(m.w120?.ret || 0);
+
+      const volAccel =
         Number(
-          m.volumeAcceleration ||
-          0
-        ) >= 1.2
-      ) score += 25;
+          m.volumeAcceleration || 0
+        );
+
+      const tradeX =
+        Number(
+          m.tradeX || 0
+        );
+
+      const tradeAccel =
+        Number(
+          m.tradeAcceleration || 0
+        );
+
+      const buyRatio =
+        Number(
+          m.w30?.buyRatio || 0
+        );
+
+      const sellRatio =
+        Number(
+          m.w30?.sellRatio || 0
+        );
+
+      const trendScore =
+        Number(
+          m.trendScore || 0
+        );
+
+      // =====================================
+      // ORDER BOOK
+      // =====================================
+
+      const orderBook =
+        s?.orderBook || {};
+
+      const bidDepth =
+        Number(
+          orderBook.bidDepth || 0
+        );
+
+      const askDepth =
+        Number(
+          orderBook.askDepth || 0
+        );
+
+      const totalDepth =
+        bidDepth + askDepth;
+
+      const bookBuyRatio =
+        totalDepth > 0
+          ? bidDepth /
+            totalDepth *
+            100
+          : 0;
+
+      const bookImbalance =
+        totalDepth > 0
+          ? (
+              bidDepth -
+              askDepth
+            ) /
+            totalDepth *
+            100
+          : 0;
+
+      const spreadPct =
+        Number(
+          orderBook.spreadPct || 0
+        );
+
+      // =====================================
+      // BÜYÜK İŞLEM AKIŞI
+      // =====================================
+
+      const largeTrades =
+        Array.isArray(
+          s?.largeTrades
+        )
+          ? s.largeTrades
+          : [];
+
+      let largeBuyVolume = 0;
+      let largeSellVolume = 0;
+
+      let largeBuyCount = 0;
+      let largeSellCount = 0;
+
+      for (
+        const item of largeTrades
+      ) {
+        const value =
+          Number(
+            item.value || 0
+          );
+
+        if (
+          item.side === "buy"
+        ) {
+          largeBuyVolume +=
+            value;
+
+          largeBuyCount += 1;
+
+        } else if (
+          item.side === "sell"
+        ) {
+          largeSellVolume +=
+            value;
+
+          largeSellCount += 1;
+        }
+      }
+
+      const largeTotalVolume =
+        largeBuyVolume +
+        largeSellVolume;
+
+      const largeTradeImbalance =
+        largeTotalVolume > 0
+          ? (
+              largeBuyVolume -
+              largeSellVolume
+            ) /
+            largeTotalVolume *
+            100
+          : 0;
+
+      let largeTradeStatus =
+        "BÜYÜK İŞLEM YOK";
 
       if (
+        largeTotalVolume > 0 &&
+        largeTradeImbalance >= 25
+      ) {
+        largeTradeStatus =
+          "BÜYÜK ALIM AKIŞI";
+
+      } else if (
+        largeTotalVolume > 0 &&
+        largeTradeImbalance <= -25
+      ) {
+        largeTradeStatus =
+          "BÜYÜK SATIŞ AKIŞI";
+
+      } else if (
+        largeTotalVolume > 0
+      ) {
+        largeTradeStatus =
+          "BÜYÜK İŞLEMLER DENGELİ";
+      }
+
+      // =====================================
+      // VERİ KALİTESİ
+      // =====================================
+
+      const liveVolume =
         Number(
-          m.w30?.buyRatio ||
-          0
-        ) >= 55
-      ) score += 25;
+          m.w120?.vol || 0
+        );
+
+      const liveTrades =
+        Number(
+          m.w120?.n || 0
+        );
+
+      const dataChecks = [
+        Number.isFinite(x.price) &&
+          x.price > 0,
+
+        Number.isFinite(ret5),
+
+        Number.isFinite(ret30),
+
+        Number.isFinite(ret120),
+
+        liveVolume > 0 ||
+          volumeRatio > 0,
+
+        liveTrades > 0 ||
+          tradeX > 0,
+
+        buyRatio > 0,
+
+        totalDepth > 0
+      ];
+
+      const dataQuality =
+        Math.round(
+          dataChecks
+            .filter(Boolean)
+            .length /
+          dataChecks.length *
+          100
+        );
+
+      // =====================================
+      // 1. SATIŞ TÜKENMESİ
+      // =====================================
+
+      let exhaustionScore = 0;
+
+      const exhaustionReasons = [];
+
+      // Uzun periyot hâlâ negatifken
+      // çok kısa periyot toparlanıyorsa
+      // satış ivmesi kırılıyor olabilir.
 
       if (
-        Number(
-          m.trendScore ||
-          0
-        ) >= 55
-      ) score += 25;
+        ret120 < 0 &&
+        ret30 > ret120
+      ) {
+        exhaustionScore += 20;
 
+        exhaustionReasons.push(
+          "Düşüş ivmesi yavaşlıyor"
+        );
+      }
 
-      score =
+      if (
+        ret30 < 0 &&
+        ret10 > ret30
+      ) {
+        exhaustionScore += 15;
+      }
+
+      if (
+        ret5 > ret10
+      ) {
+        exhaustionScore += 10;
+      }
+
+      if (
+        sellRatio < 55
+      ) {
+        exhaustionScore += 10;
+
+        exhaustionReasons.push(
+          "Satıcı üstünlüğü azalıyor"
+        );
+      }
+
+      if (
+        buyRatio >= 50
+      ) {
+        exhaustionScore += 10;
+      }
+
+      if (
+        largeTotalVolume > 0 &&
+        largeTradeImbalance > -20
+      ) {
+        exhaustionScore += 10;
+
+        exhaustionReasons.push(
+          "Büyük satış baskısı zayıflıyor"
+        );
+      }
+
+      if (
+        totalDepth > 0 &&
+        bookImbalance > -15
+      ) {
+        exhaustionScore += 10;
+
+        exhaustionReasons.push(
+          "Order book satış baskısı azalıyor"
+        );
+      }
+
+      if (
+        x.price <=
+        x.low24 +
+        range * 0.15
+      ) {
+        exhaustionScore += 15;
+
+        exhaustionReasons.push(
+          "24 saatlik destek bölgesinde"
+        );
+      }
+
+      exhaustionScore =
         Math.min(
           100,
-          score
+          exhaustionScore
         );
 
+      // =====================================
+      // 2. ERKEN DÖNÜŞ
+      // =====================================
+
+      let earlyScore = 0;
+
+      const earlyReasons = [];
+      const earlyWarnings = [];
+
+      // İlk patlamayı kaçırmamak için
+      // 5 ve 10 saniye daha yüksek ağırlık.
+
+      if (ret5 > 0) {
+        earlyScore += 15;
+
+        earlyReasons.push(
+          "5 sn momentum pozitife döndü"
+        );
+      }
+
+      if (ret10 > 0) {
+        earlyScore += 15;
+
+        earlyReasons.push(
+          "10 sn momentum pozitif"
+        );
+      }
+
+      if (
+        ret30 > ret60
+      ) {
+        earlyScore += 10;
+
+        earlyReasons.push(
+          "30 sn momentum toparlanıyor"
+        );
+      }
+
+      if (
+        ret5 > ret10 &&
+        ret10 > ret30
+      ) {
+        earlyScore += 10;
+
+        earlyReasons.push(
+          "Mikro fiyat ivmesi hızlanıyor"
+        );
+      }
+
+      if (
+        buyRatio >= 55
+      ) {
+        earlyScore += 10;
+
+        earlyReasons.push(
+          "Alıcı baskısı oluşuyor"
+        );
+      }
+
+      if (
+        buyRatio >= 62
+      ) {
+        earlyScore += 5;
+      }
+
+      if (
+        volAccel >= 1.15
+      ) {
+        earlyScore += 10;
+
+        earlyReasons.push(
+          "Hacim ivmesi yükseliyor"
+        );
+      }
+
+      if (
+        tradeAccel >= 1.15
+      ) {
+        earlyScore += 10;
+
+        earlyReasons.push(
+          "İşlem akışı hızlanıyor"
+        );
+      }
+
+      if (
+        largeTradeImbalance >= 25
+      ) {
+        earlyScore += 10;
+
+        earlyReasons.push(
+          "Büyük işlemler alım ağırlıklı"
+        );
+      }
+
+      if (
+        totalDepth > 0 &&
+        bookImbalance >= 10
+      ) {
+        earlyScore += 10;
+
+        earlyReasons.push(
+          "Order book alıcıya dönüyor"
+        );
+      }
+
+      // Güçlü negatif işaretler
+
+      if (
+        sellRatio >= 65
+      ) {
+        earlyScore -= 20;
+
+        earlyWarnings.push(
+          "Satıcı baskısı devam ediyor"
+        );
+      }
+
+      if (
+        largeTradeImbalance <= -35
+      ) {
+        earlyScore -= 20;
+
+        earlyWarnings.push(
+          "Büyük satış akışı devam ediyor"
+        );
+      }
+
+      if (
+        totalDepth > 0 &&
+        bookImbalance <= -25
+      ) {
+        earlyScore -= 15;
+
+        earlyWarnings.push(
+          "Order book satış ağırlıklı"
+        );
+      }
+
+      if (
+        ret5 < 0 &&
+        ret10 < 0 &&
+        ret30 < 0
+      ) {
+        earlyScore -= 20;
+
+        earlyWarnings.push(
+          "Mikro momentum hâlâ negatif"
+        );
+      }
+
+      earlyScore =
+        Math.round(
+          Math.max(
+            0,
+            Math.min(
+              100,
+              earlyScore
+            )
+          )
+        );
+
+      // =====================================
+      // 3. DÖNÜŞ TEYİDİ
+      // =====================================
+
+      let confirmationScore = 0;
+
+      const confirmationReasons = [];
+
+      if (
+        ret10 > 0 &&
+        ret30 > 0
+      ) {
+        confirmationScore += 15;
+
+        confirmationReasons.push(
+          "10-30 sn momentum pozitif"
+        );
+      }
+
+      if (
+        ret30 > 0 &&
+        ret60 > 0
+      ) {
+        confirmationScore += 15;
+
+        confirmationReasons.push(
+          "30-60 sn dönüş korunuyor"
+        );
+      }
+
+      if (
+        ret120 > 0
+      ) {
+        confirmationScore += 10;
+      }
+
+      if (
+        buyRatio >= 60
+      ) {
+        confirmationScore += 15;
+
+        confirmationReasons.push(
+          "Alıcı üstünlüğü teyitli"
+        );
+      }
+
+      if (
+        volAccel >= 1.20
+      ) {
+        confirmationScore += 10;
+      }
+
+      if (
+        tradeAccel >= 1.20
+      ) {
+        confirmationScore += 10;
+      }
+
+      if (
+        trendScore >= 55
+      ) {
+        confirmationScore += 10;
+
+        confirmationReasons.push(
+          "Trend yapısı toparlanıyor"
+        );
+      }
+
+      if (
+        largeTradeImbalance >= 25
+      ) {
+        confirmationScore += 10;
+      }
+
+      if (
+        totalDepth > 0 &&
+        bookImbalance >= 10
+      ) {
+        confirmationScore += 10;
+      }
+
+      if (
+        largeTradeImbalance <= -35
+      ) {
+        confirmationScore -= 20;
+      }
+
+      if (
+        sellRatio >= 65
+      ) {
+        confirmationScore -= 15;
+      }
+
+      confirmationScore =
+        Math.round(
+          Math.max(
+            0,
+            Math.min(
+              100,
+              confirmationScore
+            )
+          )
+        );
+
+      // =====================================
+      // 4. DEVAM GÜCÜ
+      // =====================================
+
+      let continuationScore = 0;
+
+      if (
+        ret30 > 0 &&
+        ret60 > 0 &&
+        ret120 > 0
+      ) {
+        continuationScore += 25;
+      }
+
+      if (
+        volumeRatio >= 1.3
+      ) {
+        continuationScore += 15;
+      }
+
+      if (
+        volAccel >= 1.2
+      ) {
+        continuationScore += 15;
+      }
+
+      if (
+        tradeAccel >= 1.2
+      ) {
+        continuationScore += 15;
+      }
+
+      if (
+        buyRatio >= 60
+      ) {
+        continuationScore += 15;
+      }
+
+      if (
+        bookImbalance >= 10
+      ) {
+        continuationScore += 10;
+      }
+
+      if (
+        largeTradeImbalance >= 25
+      ) {
+        continuationScore += 5;
+      }
+
+      continuationScore =
+        Math.min(
+          100,
+          continuationScore
+        );
+
+      // =====================================
+      // SAHTE TEPKİ RİSKİ
+      // =====================================
+
+      const fakeBounceRisk =
+        (
+          ret5 > 0 ||
+          ret10 > 0
+        ) &&
+        (
+          sellRatio >= 65 ||
+          largeTradeImbalance <= -35 ||
+          (
+            totalDepth > 0 &&
+            bookImbalance <= -25
+          )
+        );
+
+      // =====================================
+      // SON KARAR
+      // =====================================
 
       let text =
         "DÜŞÜŞ DEVAM EDİYOR";
 
       if (
-        score >= 75
+        dataQuality < 60
+      ) {
+        text =
+          "VERİ YETERSİZ — KARAR YOK";
+
+      } else if (
+        fakeBounceRisk
+      ) {
+        text =
+          "TEPKİ VAR — SAHTE DÖNÜŞ RİSKİ";
+
+      } else if (
+        confirmationScore >= 80 &&
+        earlyScore >= 70 &&
+        buyRatio >= 60
+      ) {
+        text =
+          "GÜÇLÜ DÖNÜŞ TEYİDİ";
+
+      } else if (
+        confirmationScore >= 65 &&
+        earlyScore >= 60
       ) {
         text =
           "DÖNÜŞ TEYİDİ";
 
       } else if (
-        score >= 50
+        earlyScore >= 70 &&
+        exhaustionScore >= 55
       ) {
         text =
-          "TEPKİ İHTİMALİ ARTIYOR";
+          "ERKEN DÖNÜŞ — GÜÇLÜ";
 
       } else if (
-        score >= 25
+        earlyScore >= 55
       ) {
         text =
-          "DÖNÜŞ TEYİDİ BEKLENİYOR";
+          "ERKEN DÖNÜŞ UYARISI";
+
+      } else if (
+        exhaustionScore >= 60
+      ) {
+        text =
+          "SATIŞ TÜKENİYOR";
+
+      } else if (
+        exhaustionScore >= 40
+      ) {
+        text =
+          "SATIŞ BASKISI AZALIYOR";
       }
 
+      // =====================================
+      // SONUÇ
+      // =====================================
 
       return {
         ...x,
@@ -2769,24 +3419,79 @@ tradesUsable,
         volumeRatio,
 
         reversalScore:
-          score,
+          confirmationScore,
 
         reversalText:
           text,
 
+        exhaustionScore,
+
+        earlyReversalScore:
+          earlyScore,
+
+        confirmationScore,
+
+        reversalContinuationScore:
+          continuationScore,
+
+        decisionQuality:
+          dataQuality,
+
+        fakeBounceRisk,
+
         supportLow:
           Math.max(
             0,
-
             x.low24 -
-            range *
-            0.02
+            range * 0.02
           ),
 
         supportHigh:
           x.low24 +
-          range *
-          0.08
+          range * 0.08,
+
+        reversalAnalysis: {
+          ret5,
+          ret10,
+          ret30,
+          ret60,
+          ret120,
+
+          volumeRatio,
+          volAccel,
+
+          tradeX,
+          tradeAccel,
+
+          buyRatio,
+          sellRatio,
+
+          trendScore,
+
+          bidDepth,
+          askDepth,
+
+          bookBuyRatio,
+          bookImbalance,
+
+          spreadPct,
+
+          largeBuyVolume,
+          largeSellVolume,
+
+          largeBuyCount,
+          largeSellCount,
+
+          largeTotalVolume,
+          largeTradeImbalance,
+
+          largeTradeStatus,
+
+          exhaustionReasons,
+          earlyReasons,
+          earlyWarnings,
+          confirmationReasons
+        }
       };
     }
 
