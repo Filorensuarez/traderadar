@@ -242,10 +242,11 @@ function S(symbol) {
       price: 0,
       first: 0,
       trades: [],
-      candles: [],
-              multiCandles: {
-                      largeTrades: [],
-          "1m": [],
+largeTrades: [],
+candles: [],
+
+multiCandles: {
+  "1m": [],
           "3m": [],
           "5m": [],
           "15m": [],
