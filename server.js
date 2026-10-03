@@ -360,7 +360,14 @@ function recordSignal(s) {
   lastSignal.set(key, now);
 
   const m = s.metrics || {};
+  const u =
+    s.latestUltimate || null;
 
+  const ultimateFresh =
+    u &&
+    Date.now() -
+      Number(u.updatedAt || 0) <=
+      10 * 60 * 1000;
   const row = {
     time: now,
     symbol: s.symbol,
