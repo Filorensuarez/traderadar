@@ -339,10 +339,11 @@ function updatePeak(s) {
 
 function recordSignal(s) {
   const allowed = [
-    "PATLAMA HAZIRLIĞI",
-    "GÜÇLÜ PATLAMA HAZIRLIĞI",
-    "KIRILIM TEYİDİ"
-  ];
+  "ERKEN ADAY",
+  "PATLAMA HAZIRLIĞI",
+  "GÜÇLÜ PATLAMA HAZIRLIĞI",
+  "KIRILIM TEYİDİ"
+];
 
   if (!allowed.includes(s.status)) return;
 
@@ -1614,8 +1615,8 @@ function priority(status) {
 
   if (
     status ===
-    "BİRİKİM TESPİT EDİLDİ"
-  ) return 4;
+    "ERKEN ADAY"
+  ) return 3;
 
   if (
     status ===
