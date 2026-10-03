@@ -2930,6 +2930,22 @@ app.get(
             systemHealthy:
               health.healthy === true
           });
+            state.latestUltimate = {
+        updatedAt:
+          Date.now(),
+
+        marketRegime,
+
+        riskFilters,
+
+        entryAnalysis,
+
+        stopAnalysis,
+
+        targetRiskAnalysis,
+
+        signalAnalysis
+      };
       return res.json({
         ok: true,
 
