@@ -2407,7 +2407,45 @@ async function updateMovers() {
             "Satıcı baskısı yüksek"
           );
         }
+        // BÜYÜK İŞLEM AKIŞI
+        if (
+          largeTradeImbalance >= 40 &&
+          largeBuyCount >= 2
+        ) {
+          score += 15;
 
+          reasons.push(
+            "Büyük alım akışı güçlü"
+          );
+
+        } else if (
+          largeTradeImbalance >= 25
+        ) {
+          score += 8;
+
+          reasons.push(
+            "Büyük alımlar ağırlıklı"
+          );
+
+        } else if (
+          largeTradeImbalance <= -40 &&
+          largeSellCount >= 2
+        ) {
+          score -= 20;
+
+          warnings.push(
+            "Büyük satış akışı güçlü"
+          );
+
+        } else if (
+          largeTradeImbalance <= -25
+        ) {
+          score -= 10;
+
+          warnings.push(
+            "Büyük satışlar ağırlıklı"
+          );
+        }
         // ORDER BOOK
         if (totalDepth > 0) {
           if (bookBuyRatio >= 60) {
