@@ -2877,7 +2877,7 @@ const dataChecks = [
           : 0;
 
       let largeTradeStatus =
-        "BÜYÜK İŞLEM YOK";
+        "VERİ BEKLENİYOR";
 
       if (
         largeTotalVolume > 0 &&
