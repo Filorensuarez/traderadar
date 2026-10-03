@@ -1663,6 +1663,65 @@ function connectOKX(
                 asks,
                 timestamp
               );
+                        const state =
+              S(symbol);
+
+            const bidDepth =
+              bids.reduce(
+                (sum, level) =>
+                  sum +
+                  Number(level[0] || 0) *
+                  Number(level[1] || 0),
+                0
+              );
+
+            const askDepth =
+              asks.reduce(
+                (sum, level) =>
+                  sum +
+                  Number(level[0] || 0) *
+                  Number(level[1] || 0),
+                0
+              );
+
+            const bestBid =
+              Number(
+                bids?.[0]?.[0] || 0
+              );
+
+            const bestAsk =
+              Number(
+                asks?.[0]?.[0] || 0
+              );
+
+            const mid =
+              bestBid > 0 &&
+              bestAsk > 0
+                ? (
+                    bestBid +
+                    bestAsk
+                  ) / 2
+                : 0;
+
+            const spreadPct =
+              mid > 0
+                ? (
+                    (
+                      bestAsk -
+                      bestBid
+                    ) /
+                    mid
+                  ) * 100
+                : 0;
+
+            state.orderBook = {
+              bidDepth,
+              askDepth,
+              bestBid,
+              bestAsk,
+              spreadPct,
+              timestamp
+            };
           }
         } catch (error) {
           console.error(
