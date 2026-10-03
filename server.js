@@ -2207,7 +2207,81 @@ async function updateMovers() {
           Number(
             orderBook.spreadPct || 0
           );
+        const largeTrades =
+          Array.isArray(
+            s?.largeTrades
+          )
+            ? s.largeTrades
+            : [];
 
+        let largeBuyVolume = 0;
+        let largeSellVolume = 0;
+        let largeBuyCount = 0;
+        let largeSellCount = 0;
+
+        for (
+          const item of largeTrades
+        ) {
+          const value =
+            Number(
+              item.value || 0
+            );
+
+          if (
+            item.side === "buy"
+          ) {
+            largeBuyVolume +=
+              value;
+
+            largeBuyCount += 1;
+
+          } else if (
+            item.side === "sell"
+          ) {
+            largeSellVolume +=
+              value;
+
+            largeSellCount += 1;
+          }
+        }
+
+        const largeTotalVolume =
+          largeBuyVolume +
+          largeSellVolume;
+
+        const largeTradeImbalance =
+          largeTotalVolume > 0
+            ? (
+                largeBuyVolume -
+                largeSellVolume
+              ) /
+              largeTotalVolume *
+              100
+            : 0;
+
+        let largeTradeStatus =
+          "BÜYÜK İŞLEM YOK";
+
+        if (
+          largeTotalVolume > 0 &&
+          largeTradeImbalance >= 25
+        ) {
+          largeTradeStatus =
+            "BÜYÜK ALIM AKIŞI";
+
+        } else if (
+          largeTotalVolume > 0 &&
+          largeTradeImbalance <= -25
+        ) {
+          largeTradeStatus =
+            "BÜYÜK SATIŞ AKIŞI";
+
+        } else if (
+          largeTotalVolume > 0
+        ) {
+          largeTradeStatus =
+            "BÜYÜK İŞLEMLER DENGELİ";
+        }
         const dataChecks = [
           Number.isFinite(x.price) &&
             x.price > 0,
