@@ -2200,9 +2200,27 @@ async function renderPerformance() {
         `)
         .join("");
     
-    const signalCards =
+    const uniqueSignals =
+  [
+    ...new Map(
       (data.signals || [])
-        .map(s => {
+        .sort(
+          (a, b) =>
+            Number(b.time || 0) -
+            Number(a.time || 0)
+        )
+        .map(
+          s => [
+            s.symbol,
+            s
+          ]
+        )
+    ).values()
+  ];
+
+const signalCards =
+  uniqueSignals
+    .map(s => {
           const p5 =
             s.performance?.m5;
 
