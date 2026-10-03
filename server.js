@@ -920,7 +920,34 @@ function calc(s) {
 
     w30.buyRatio >= 55;
 
+  const earlyCandidate =
+    !late &&
 
+    s.score >= 58 &&
+
+    // Hacim henüz patlamamış olsa bile
+    // hızlanmaya başlamış olmalı
+    volX >= 0.85 &&
+
+    tradeX >= 0.70 &&
+
+    // Hacim veya işlem akışından
+    // en az biri belirgin hızlanmalı
+    (
+      volAccel >= 1.08 ||
+      tradeAccel >= 1.10 ||
+      microVol >= 1.08 ||
+      microTrade >= 1.08
+    ) &&
+
+    // Satıcıların belirgin üstünlüğü olmasın
+    w30.buyRatio >= 52 &&
+
+    // Hareket henüz fazla ilerlememiş olsun
+    w120.ret < 2.0 &&
+
+    // Kısa vadede sert aşağı gitmesin
+    w30.ret > -0.75;
   const preparation =
     !late &&
     s.score >= 75 &&
