@@ -1062,7 +1062,68 @@ function moverCard(
             )}x
           </b>
         </div>
+        ${
+          up
+            ? `
+              <div class="m">
+                <span>Karar güveni</span>
+                <b>
+                  ${f(
+                    quality,
+                    0
+                  )}/100
+                </b>
+              </div>
 
+              <div class="m">
+                <span>Alıcı baskısı</span>
+                <b>
+                  %${f(
+                    buyRatio,
+                    1
+                  )}
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Order Book</span>
+                <b>
+                  %${f(
+                    bookImbalance,
+                    1
+                  )}
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Büyük işlem akışı</span>
+                <b>
+                  ${largeFlow}
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Büyük alım</span>
+                <b>
+                  ${f(
+                    analysis.largeBuyVolume,
+                    0
+                  )} USDT
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Büyük satış</span>
+                <b>
+                  ${f(
+                    analysis.largeSellVolume,
+                    0
+                  )} USDT
+                </b>
+              </div>
+            `
+            : ""
+        }
         ${
           !up
             ? `
