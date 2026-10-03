@@ -467,7 +467,56 @@ function updateSignalPerformance() {
     if (!(currentPrice > 0)) continue;
 
     row.performance ||= {};
+    const liveChangePct =
+      (
+        (
+          currentPrice -
+          Number(row.price)
+        ) /
+        Number(row.price)
+      ) * 100;
 
+    if (
+      !Number.isFinite(
+        Number(row.mfePct)
+      ) ||
+      liveChangePct >
+        Number(row.mfePct)
+    ) {
+      row.mfePct =
+        Number(
+          liveChangePct.toFixed(3)
+        );
+
+      row.mfePrice =
+        currentPrice;
+
+      row.mfeAt =
+        now;
+
+      changed = true;
+    }
+
+    if (
+      !Number.isFinite(
+        Number(row.maePct)
+      ) ||
+      liveChangePct <
+        Number(row.maePct)
+    ) {
+      row.maePct =
+        Number(
+          liveChangePct.toFixed(3)
+        );
+
+      row.maePrice =
+        currentPrice;
+
+      row.maeAt =
+        now;
+
+      changed = true;
+    }
     for (
       const [key, ms]
       of Object.entries(
