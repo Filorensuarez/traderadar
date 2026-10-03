@@ -2260,7 +2260,52 @@ const signalCards =
                   <span>Sinyal fiyatı</span>
                   <b>${s.signalPrice}</b>
                 </div>
+<div class="m">
+  <span>Maks. yükseliş (MFE)</span>
+  <b>
+    ${s.mfePct !== null
+      ? `%${f(s.mfePct, 3)}`
+      : "BEKLENİYOR"}
+  </b>
+</div>
 
+<div class="m">
+  <span>Maks. düşüş (MAE)</span>
+  <b>
+    ${s.maePct !== null
+      ? `%${f(s.maePct, 3)}`
+      : "BEKLENİYOR"}
+  </b>
+</div>
+
+<div class="m">
+  <span>İlk sonuç</span>
+  <b>
+    ${
+      s.tradeResult?.outcome ===
+      "TARGET_FIRST"
+        ? "HEDEF ÖNCE"
+        : s.tradeResult?.outcome ===
+          "STOP_FIRST"
+          ? "STOP ÖNCE"
+          : "BEKLENİYOR"
+    }
+  </b>
+</div>
+
+<div class="m">
+  <span>Net R/R</span>
+  <b>
+    ${
+      s.ultimate?.netRR
+        ? f(
+            s.ultimate.netRR,
+            2
+          )
+        : "-"
+    }
+  </b>
+</div>
                 <div class="m">
                   <span>5 dk</span>
                   <b>
