@@ -404,7 +404,89 @@ function recordSignal(s) {
       Number(m.w120?.ret || 0),
 
     resistance:
-      Number(m.resistanceDistance || 0)
+  Number(m.resistanceDistance || 0),
+
+ultimate:
+  ultimateFresh
+    ? {
+        score:
+          Number(
+            u.signalAnalysis
+              ?.technicalScore || 0
+          ),
+
+        stage:
+          u.signalAnalysis
+            ?.stage || null,
+
+        actionable:
+          u.signalAnalysis
+            ?.actionable === true,
+
+        regime:
+          u.marketRegime
+            ?.regime || null,
+
+        tradingAllowed:
+          u.riskFilters
+            ?.tradingAllowed === true,
+
+        entry:
+          Number(
+            u.entryAnalysis
+              ?.entry
+              ?.ideal || 0
+          ),
+
+        entryLow:
+          Number(
+            u.entryAnalysis
+              ?.entry
+              ?.low || 0
+          ),
+
+        entryHigh:
+          Number(
+            u.entryAnalysis
+              ?.entry
+              ?.high || 0
+          ),
+
+        stop:
+          Number(
+            u.stopAnalysis
+              ?.stop || 0
+          ),
+
+        target1:
+          Number(
+            u.targetRiskAnalysis
+              ?.targets
+              ?.target1 || 0
+          ),
+
+        target2:
+          Number(
+            u.targetRiskAnalysis
+              ?.targets
+              ?.target2 || 0
+          ),
+
+        target3:
+          Number(
+            u.targetRiskAnalysis
+              ?.targets
+              ?.target3 || 0
+          ),
+
+        netRR:
+          Number(
+            u.targetRiskAnalysis
+              ?.riskReward
+              ?.netRR || 0
+          )
+      }
+    : null
   };
 
   signalHistory.unshift(row);
