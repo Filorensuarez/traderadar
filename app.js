@@ -1038,17 +1038,7 @@ function moverCard(
             )}/100
           </b>
         </div>
-<div class="m">
-  <span>
-    Hacim
-  </span>
 
-  <b>
-    ${f(
-      x.volumeRatio
-    )}x
-  </b>
-</div>
                 <div class="m">
           <span>
             Momentum
