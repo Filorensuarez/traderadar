@@ -1124,6 +1124,43 @@ function moverCard(
             `
             : ""
         }
+                ${
+          up &&
+          (
+            reasons.length ||
+            warnings.length
+          )
+            ? `
+              <div
+                class="card"
+                style="margin-top:8px"
+              >
+                ${
+                  reasons.length
+                    ? `
+                      <small>
+                        Destekleyen:
+                        ${reasons.join(" • ")}
+                      </small>
+                    `
+                    : ""
+                }
+
+                ${
+                  warnings.length
+                    ? `
+                      <br>
+                      <small>
+                        Riskler:
+                        ${warnings.join(" • ")}
+                      </small>
+                    `
+                    : ""
+                }
+              </div>
+            `
+            : ""
+        }
         ${
           !up
             ? `
