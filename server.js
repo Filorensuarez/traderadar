@@ -965,7 +965,7 @@ function calc(s) {
       w30,
       w60,
       w120,
-
+      volumeReady: ready,
       volX: 0,
       tradeX: 0,
 
@@ -1341,7 +1341,7 @@ function calc(s) {
     w30,
     w60,
     w120,
-
+    volumeReady: ready,
     volX:
       Number(
         volX.toFixed(2)
