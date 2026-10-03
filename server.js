@@ -606,6 +606,131 @@ function updateSignalPerformance() {
 
       changed = true;
     }
+        // =================================
+    // ULTIMATE HEDEF / STOP TAKİBİ
+    // =================================
+
+    const u =
+      row.ultimate;
+
+    if (
+      u &&
+      Number(u.stop) > 0 &&
+      Number(u.target1) > 0
+    ) {
+      row.tradeResult ||= {
+        firstHit: null,
+        firstHitAt: null,
+
+        stopHit: false,
+        stopHitAt: null,
+
+        target1Hit: false,
+        target1HitAt: null,
+
+        target2Hit: false,
+        target2HitAt: null,
+
+        target3Hit: false,
+        target3HitAt: null
+      };
+
+      const result =
+        row.tradeResult;
+
+      // STOP
+      if (
+        !result.stopHit &&
+        currentPrice <=
+          Number(u.stop)
+      ) {
+        result.stopHit = true;
+        result.stopHitAt = now;
+
+        if (!result.firstHit) {
+          result.firstHit = "STOP";
+          result.firstHitAt = now;
+        }
+
+        changed = true;
+      }
+
+      // HEDEF 1
+      if (
+        !result.target1Hit &&
+        currentPrice >=
+          Number(u.target1)
+      ) {
+        result.target1Hit = true;
+        result.target1HitAt = now;
+
+        if (!result.firstHit) {
+          result.firstHit = "TARGET_1";
+          result.firstHitAt = now;
+        }
+
+        changed = true;
+      }
+
+      // HEDEF 2
+      if (
+        Number(u.target2) > 0 &&
+        !result.target2Hit &&
+        currentPrice >=
+          Number(u.target2)
+      ) {
+        result.target2Hit = true;
+        result.target2HitAt = now;
+
+        if (!result.firstHit) {
+          result.firstHit = "TARGET_2";
+          result.firstHitAt = now;
+        }
+
+        changed = true;
+      }
+
+      // HEDEF 3
+      if (
+        Number(u.target3) > 0 &&
+        !result.target3Hit &&
+        currentPrice >=
+          Number(u.target3)
+      ) {
+        result.target3Hit = true;
+        result.target3HitAt = now;
+
+        if (!result.firstHit) {
+          result.firstHit = "TARGET_3";
+          result.firstHitAt = now;
+        }
+
+        changed = true;
+      }
+
+      // SONUÇ SINIFLANDIRMASI
+      if (
+        result.firstHit === "STOP"
+      ) {
+        result.outcome =
+          "STOP_FIRST";
+
+      } else if (
+        result.firstHit ===
+          "TARGET_1" ||
+        result.firstHit ===
+          "TARGET_2" ||
+        result.firstHit ===
+          "TARGET_3"
+      ) {
+        result.outcome =
+          "TARGET_FIRST";
+
+      } else {
+        result.outcome =
+          "OPEN";
+      }
+    }
     for (
       const [key, ms]
       of Object.entries(
