@@ -946,7 +946,41 @@ function moverCard(
     up
       ? x.continuationText
       : x.reversalText;
+  const analysis =
+    x.analysis || {};
 
+  const reasons =
+    Array.isArray(
+      analysis.reasons
+    )
+      ? analysis.reasons
+      : [];
+
+  const warnings =
+    Array.isArray(
+      analysis.warnings
+    )
+      ? analysis.warnings
+      : [];
+
+  const quality =
+    Number(
+      x.decisionQuality || 0
+    );
+
+  const largeFlow =
+    analysis.largeTradeStatus ||
+    "BÜYÜK İŞLEM YOK";
+
+  const buyRatio =
+    Number(
+      analysis.buyRatio || 0
+    );
+
+  const bookImbalance =
+    Number(
+      analysis.bookImbalance || 0
+    );
   return `
     <article class="card">
 
@@ -1004,7 +1038,17 @@ function moverCard(
             )}/100
           </b>
         </div>
+<div class="m">
+  <span>
+    Hacim
+  </span>
 
+  <b>
+    ${f(
+      x.volumeRatio
+    )}x
+  </b>
+</div>
                 <div class="m">
           <span>
             Momentum
