@@ -948,7 +948,28 @@ function moverCard(
       : x.reversalText;
   const analysis =
     x.analysis || {};
+  const reversal =
+    x.reversalAnalysis || {};
 
+  const exhaustionScore =
+    Number(
+      x.exhaustionScore || 0
+    );
+
+  const earlyReversalScore =
+    Number(
+      x.earlyReversalScore || 0
+    );
+
+  const confirmationScore =
+    Number(
+      x.confirmationScore || 0
+    );
+
+  const reversalContinuationScore =
+    Number(
+      x.reversalContinuationScore || 0
+    );
   const reasons =
     Array.isArray(
       analysis.reasons
@@ -1062,6 +1083,111 @@ function moverCard(
             )}x
           </b>
         </div>
+                ${
+          !up
+            ? `
+              <div class="m">
+                <span>Satış tükenmesi</span>
+                <b>
+                  ${f(
+                    exhaustionScore,
+                    0
+                  )}/100
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Erken dönüş</span>
+                <b>
+                  ${f(
+                    earlyReversalScore,
+                    0
+                  )}/100
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Dönüş teyidi</span>
+                <b>
+                  ${f(
+                    confirmationScore,
+                    0
+                  )}/100
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Devam gücü</span>
+                <b>
+                  ${f(
+                    reversalContinuationScore,
+                    0
+                  )}/100
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Alıcı baskısı</span>
+                <b>
+                  %${f(
+                    reversal.buyRatio,
+                    1
+                  )}
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Order Book</span>
+                <b>
+                  %${f(
+                    reversal.bookImbalance,
+                    1
+                  )}
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Büyük işlem akışı</span>
+                <b>
+                  ${
+                    reversal.largeTradeStatus ||
+                    "BÜYÜK İŞLEM YOK"
+                  }
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Büyük alım</span>
+                <b>
+                  ${f(
+                    reversal.largeBuyVolume,
+                    0
+                  )} USDT
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Büyük satış</span>
+                <b>
+                  ${f(
+                    reversal.largeSellVolume,
+                    0
+                  )} USDT
+                </b>
+              </div>
+
+              <div class="m">
+                <span>Veri kalitesi</span>
+                <b>
+                  ${f(
+                    quality,
+                    0
+                  )}/100
+                </b>
+              </div>
+            `
+            : ""
+        }
         ${
           up
             ? `
