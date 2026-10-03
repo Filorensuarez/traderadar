@@ -2363,8 +2363,6 @@ async function updateMovers() {
           volumeReady
             ? tradeX > 0
             : liveTrades > 0;
-        const volumeReady =
-  m.volumeReady === true;
 
 const volumeDataReady =
   volumeReady &&
