@@ -1394,16 +1394,19 @@ const effectiveTradeX =
     w30,
     w60,
     w120,
-    volumeReady: ready,
-    volX:
-      Number(
-        volX.toFixed(2)
-      ),
+    volumeReady:
+  ready ||
+  effectiveVolumeX > 0,
 
-    tradeX:
-      Number(
-        tradeX.toFixed(2)
-      ),
+volX:
+  Number(
+    effectiveVolumeX.toFixed(2)
+  ),
+
+tradeX:
+  Number(
+    effectiveTradeX.toFixed(2)
+  ),
 
     volumeAcceleration:
       Number(
