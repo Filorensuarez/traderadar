@@ -2363,22 +2363,51 @@ async function updateMovers() {
           volumeReady
             ? tradeX > 0
             : liveTrades > 0;
-        const dataChecks = [
-          Number.isFinite(x.price) &&
-            x.price > 0,
+        const volumeReady =
+  m.volumeReady === true;
 
-          Number.isFinite(ret30),
+const volumeDataReady =
+  volumeReady &&
+  Number.isFinite(volumeRatio) &&
+  volumeRatio > 0;
 
-          Number.isFinite(ret120),
+const tradeDataReady =
+  liveTrades > 0 &&
+  Number.isFinite(tradeX) &&
+  tradeX > 0;
 
-          volumeUsable,
+const flowDataReady =
+  liveTrades >= 5 &&
+  buyRatio > 0 &&
+  sellRatio > 0;
 
-tradesUsable,
+const orderBookReady =
+  totalDepth > 0;
 
-          buyRatio > 0,
+const largeTradeDataReady =
+  Array.isArray(s?.largeTrades) &&
+  s.largeTrades.length > 0;
 
-          totalDepth > 0
-        ];
+const dataChecks = [
+  Number.isFinite(x.price) &&
+    x.price > 0,
+
+  Number.isFinite(ret5),
+
+  Number.isFinite(ret30),
+
+  Number.isFinite(ret120),
+
+  volumeDataReady,
+
+  tradeDataReady,
+
+  flowDataReady,
+
+  orderBookReady,
+
+  largeTradeDataReady
+];
 
         const dataQuality =
           Math.round(
