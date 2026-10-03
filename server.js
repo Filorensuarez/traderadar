@@ -1840,21 +1840,7 @@ function connectOKX(
             trade.side ===
             "buy"
         });
-                const tradeValue =
-          price * size;
-
-        const largeThreshold =
-          Math.max(
-            10000,
-            Number(
-              s.metrics
-                ?.avgTradeValue ||
-              0
-            ) * 8
-          );
-
-        if (
-          tradeValue >=
+                
           // =====================================
 // DİNAMİK BÜYÜK İŞLEM MOTORU
 // =====================================
