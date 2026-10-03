@@ -1018,13 +1018,17 @@ function calc(s) {
       "PATLAMA HAZIRLIĞI";
 
   } else if (accumulation) {
-    s.status =
-      "BİRİKİM TESPİT EDİLDİ";
+  s.status =
+    "BİRİKİM TESPİT EDİLDİ";
 
-  } else {
-    s.status =
-      "İZLENİYOR";
-  }
+} else if (earlyCandidate) {
+  s.status =
+    "ERKEN ADAY";
+
+} else {
+  s.status =
+    "İZLENİYOR";
+}
 
   const ultimateCandidate =
     s.score >= 75 &&
