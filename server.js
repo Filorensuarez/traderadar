@@ -2067,77 +2067,343 @@ async function updateMovers() {
         );
 
 
-      if (up) {
-        let score = 0;
-
-        if (
-          x.change24 > 0
-        ) score += 15;
-
-        if (
-          momentum15 > 0
-        ) score += 15;
-
-        if (
-          momentum1h > 0
-        ) score += 15;
-
-        if (
-          volumeRatio >= 1.3
-        ) score += 20;
-
-        if (
+            if (up) {
+        const volAccel =
           Number(
-            m.volumeAcceleration ||
-            0
-          ) >= 1.2
-        ) score += 20;
-
-        if (
-          Number(
-            m.w30?.buyRatio ||
-            0
-          ) >= 60
-        ) score += 15;
-
-
-        score =
-          Math.min(
-            100,
-            score
+            m.volumeAcceleration || 0
           );
 
+        const tradeX =
+          Number(
+            m.tradeX || 0
+          );
 
-        let text =
-          "DEVAM GÜCÜ ZAYIF";
+        const tradeAccel =
+          Number(
+            m.tradeAcceleration || 0
+          );
+
+        const buyRatio =
+          Number(
+            m.w30?.buyRatio || 0
+          );
+
+        const sellRatio =
+          Number(
+            m.w30?.sellRatio || 0
+          );
+
+        const ret5 =
+          Number(
+            m.w5?.ret || 0
+          );
+
+        const ret10 =
+          Number(
+            m.w10?.ret || 0
+          );
+
+        const ret30 =
+          Number(
+            m.w30?.ret || 0
+          );
+
+        const ret60 =
+          Number(
+            m.w60?.ret || 0
+          );
+
+        const ret120 =
+          Number(
+            m.w120?.ret || 0
+          );
+
+        const resistanceDistance =
+          Number(
+            m.resistanceDistance ?? 99
+          );
+
+        const compression =
+          Number(
+            m.compression || 0
+          );
+
+        const orderBook =
+          s?.orderBook || {};
+
+        const bidDepth =
+          Number(
+            orderBook.bidDepth || 0
+          );
+
+        const askDepth =
+          Number(
+            orderBook.askDepth || 0
+          );
+
+        const totalDepth =
+          bidDepth + askDepth;
+
+        const bookBuyRatio =
+          totalDepth > 0
+            ? bidDepth /
+              totalDepth *
+              100
+            : 0;
+
+        const bookImbalance =
+          totalDepth > 0
+            ? (
+                bidDepth -
+                askDepth
+              ) /
+              totalDepth *
+              100
+            : 0;
+
+        const spreadPct =
+          Number(
+            orderBook.spreadPct || 0
+          );
+
+        const dataChecks = [
+          Number.isFinite(x.price) &&
+            x.price > 0,
+
+          Number.isFinite(ret30),
+
+          Number.isFinite(ret120),
+
+          volumeRatio > 0,
+
+          tradeX > 0,
+
+          buyRatio > 0,
+
+          totalDepth > 0
+        ];
+
+        const dataQuality =
+          Math.round(
+            dataChecks.filter(Boolean)
+              .length /
+            dataChecks.length *
+            100
+          );
+
+        let score = 0;
+        const reasons = [];
+        const warnings = [];
+
+        // FİYAT VE MOMENTUM
+        if (
+          ret30 > 0 &&
+          ret60 > 0 &&
+          ret120 > 0
+        ) {
+          score += 15;
+          reasons.push(
+            "Kısa vadeli momentum pozitif"
+          );
+        } else if (
+          ret120 < 0
+        ) {
+          score -= 10;
+          warnings.push(
+            "120 sn momentum negatif"
+          );
+        }
 
         if (
-          score >= 75
+          ret5 > 0 &&
+          ret10 > 0
         ) {
+          score += 5;
+        }
+
+        // HACİM
+        if (volumeRatio >= 2) {
+          score += 15;
+          reasons.push(
+            "Hacim çok güçlü"
+          );
+        } else if (
+          volumeRatio >= 1.3
+        ) {
+          score += 10;
+          reasons.push(
+            "Hacim teyidi var"
+          );
+        } else {
+          warnings.push(
+            "Hacim teyidi zayıf"
+          );
+        }
+
+        if (volAccel >= 1.4) {
+          score += 10;
+          reasons.push(
+            "Hacim ivmesi güçlü"
+          );
+        } else if (
+          volAccel >= 1.15
+        ) {
+          score += 5;
+        }
+
+        // İŞLEM AKIŞI
+        if (tradeX >= 1.5) {
+          score += 10;
+          reasons.push(
+            "İşlem akışı güçlü"
+          );
+        } else if (
+          tradeX >= 1.1
+        ) {
+          score += 5;
+        }
+
+        if (tradeAccel >= 1.3) {
+          score += 10;
+          reasons.push(
+            "İşlem ivmesi artıyor"
+          );
+        }
+
+        // ALICI / SATICI
+        if (buyRatio >= 70) {
+          score += 15;
+          reasons.push(
+            "Güçlü alıcı baskısı"
+          );
+        } else if (
+          buyRatio >= 60
+        ) {
+          score += 10;
+          reasons.push(
+            "Alıcılar üstün"
+          );
+        } else if (
+          sellRatio >= 60
+        ) {
+          score -= 15;
+          warnings.push(
+            "Satıcı baskısı yüksek"
+          );
+        }
+
+        // ORDER BOOK
+        if (totalDepth > 0) {
+          if (bookBuyRatio >= 60) {
+            score += 10;
+            reasons.push(
+              "Emir defteri alıcı ağırlıklı"
+            );
+          }
+
+          if (bookImbalance <= -20) {
+            score -= 10;
+            warnings.push(
+              "Satış derinliği yüksek"
+            );
+          }
+        }
+
+        // DİRENÇ
+        if (
+          resistanceDistance >= -0.3 &&
+          resistanceDistance <= 2
+        ) {
+          score += 5;
+          reasons.push(
+            "Dirence yakın"
+          );
+        }
+
+        // SIKIŞMA
+        if (compression >= 60) {
+          score += 5;
+          reasons.push(
+            "Volatilite sıkışması var"
+          );
+        }
+
+        // AŞIRI UZAMA CEZASI
+        if (x.change24 >= 40) {
+          score -= 30;
+          warnings.push(
+            "24 saatlik hareket aşırı uzamış"
+          );
+        } else if (
+          x.change24 >= 20
+        ) {
+          score -= 15;
+          warnings.push(
+            "Hareket belirgin şekilde uzamış"
+          );
+        }
+
+        if (ret120 >= 3) {
+          score -= 15;
+          warnings.push(
+            "Son 2 dakikada hızlı yükselmiş"
+          );
+        }
+
+        score =
+          Math.round(
+            Math.max(
+              0,
+              Math.min(100, score)
+            )
+          );
+
+        let text =
+          "TEYİT ZAYIF";
+
+        if (dataQuality < 70) {
           text =
-            "MOMENTUM GÜÇLÜ";
+            "VERİ YETERSİZ — KARAR YOK";
 
         } else if (
-          score >= 55
+          x.change24 >= 40
+        ) {
+          text =
+            "AŞIRI UZAMIŞ — RİSK YÜKSEK";
+
+        } else if (
+          score >= 80 &&
+          buyRatio >= 65 &&
+          volumeRatio >= 1.3 &&
+          tradeX >= 1.1 &&
+          ret120 > 0
+        ) {
+          text =
+            "GÜÇLÜ YÜKSELİŞ TEYİDİ";
+
+        } else if (
+          score >= 65
         ) {
           text =
             "YÜKSELİŞ KORUNUYOR";
 
         } else if (
-          score >= 35
+          score >= 45
         ) {
           text =
-            "TEYİT BEKLENİYOR";
-        }
+            "YÜKSELİŞ VAR — TEYİT ZAYIF";
 
-
-        if (
-          x.change24 >= 40
+        } else if (
+          sellRatio >= 60 ||
+          bookImbalance <= -20
         ) {
           text =
-            "AŞIRI UZAMIŞ — RİSK YÜKSEK";
-        }
+            "SATIŞ BASKISI — DÖNÜŞ RİSKİ";
 
+        } else {
+          text =
+            "DEVAM GÜCÜ ZAYIF";
+        }
 
         return {
           ...x,
@@ -2150,10 +2416,41 @@ async function updateMovers() {
             score,
 
           continuationText:
-            text
+            text,
+
+          decisionQuality:
+            dataQuality,
+
+          analysis: {
+            ret5,
+            ret10,
+            ret30,
+            ret60,
+            ret120,
+
+            volumeRatio,
+            volAccel,
+
+            tradeX,
+            tradeAccel,
+
+            buyRatio,
+            sellRatio,
+
+            bidDepth,
+            askDepth,
+            bookBuyRatio,
+            bookImbalance,
+            spreadPct,
+
+            resistanceDistance,
+            compression,
+
+            reasons,
+            warnings
+          }
         };
       }
-
 
       const range =
         Math.max(
