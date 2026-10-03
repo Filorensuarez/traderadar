@@ -2666,14 +2666,36 @@ app.get(
             PERFORMANCE_TEST_START
         )
         .map(row => ({
-          symbol: row.symbol,
-          status: row.status,
-          signalPrice: row.price,
-          score: row.score,
-          time: row.time,
-          performance:
-            row.performance || {}
-        }));
+  symbol:
+    row.symbol,
+
+  status:
+    row.status,
+
+  signalPrice:
+    row.price,
+
+  score:
+    row.score,
+
+  time:
+    row.time,
+
+  performance:
+    row.performance || {},
+
+  mfePct:
+    row.mfePct ?? null,
+
+  maePct:
+    row.maePct ?? null,
+
+  ultimate:
+    row.ultimate || null,
+
+  tradeResult:
+    row.tradeResult || null
+}));
     res.json({
       ok: true,
 
