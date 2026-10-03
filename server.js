@@ -244,6 +244,7 @@ function S(symbol) {
       trades: [],
       candles: [],
               multiCandles: {
+                      largeTrades: [],
           "1m": [],
           "3m": [],
           "5m": [],
