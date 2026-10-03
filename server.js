@@ -1002,14 +1002,25 @@ const effectiveTradeX =
     s.status = "VERİ TOPLANIYOR";
 
     s.metrics = {
-      w5,
-      w10,
-      w30,
-      w60,
-      w120,
-      volumeReady: ready,
-      volX: 0,
-      tradeX: 0,
+  w5,
+  w10,
+  w30,
+  w60,
+  w120,
+
+  volumeReady:
+    ready ||
+    effectiveVolumeX > 0,
+
+  volX:
+    Number(
+      effectiveVolumeX.toFixed(2)
+    ),
+
+  tradeX:
+    Number(
+      effectiveTradeX.toFixed(2)
+    ),
 
       volumeAcceleration: volAccel,
       tradeAcceleration: tradeAccel,
