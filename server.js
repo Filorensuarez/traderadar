@@ -2715,11 +2715,7 @@ app.get(
       ok: true,
 
       totalSignals:
-  signalHistory.filter(
-    row =>
-      Number(row.time) >=
-      PERFORMANCE_TEST_START
-  ).length,
+  testSignals.length,
 
       summary,
       signals:
