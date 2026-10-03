@@ -850,7 +850,49 @@ function calc(s) {
     ready && bn
       ? Math.min(99, w120.n / bn)
       : 0;
+// =====================================
+// ERKEN MİKRO HACİM / İŞLEM REFERANSI
+// =====================================
 
+const previous90Vol =
+  Math.max(
+    0,
+    w120.vol - w30.vol
+  );
+
+const previous90Trades =
+  Math.max(
+    0,
+    w120.n - w30.n
+  );
+
+const microVolumeX =
+  previous90Vol > 0
+    ? Math.min(
+        99,
+        w30.vol /
+        (previous90Vol / 3)
+      )
+    : 0;
+
+const microTradeX =
+  previous90Trades > 0
+    ? Math.min(
+        99,
+        w30.n /
+        (previous90Trades / 3)
+      )
+    : 0;
+
+const effectiveVolumeX =
+  ready && volX > 0
+    ? volX
+    : microVolumeX;
+
+const effectiveTradeX =
+  ready && tradeX > 0
+    ? tradeX
+    : microTradeX;
   const volAccel =
     w120.vol
       ? w30.vol / (w120.vol / 4)
@@ -1813,30 +1855,97 @@ function connectOKX(
 
         if (
           tradeValue >=
-          largeThreshold
-        ) {
-          s.largeTrades.push({
-            t,
-            value:
-              tradeValue,
+          // =====================================
+// DİNAMİK BÜYÜK İŞLEM MOTORU
+// =====================================
 
-            side:
-              trade.side,
+const tradeValue =
+  price * size;
 
-            price
-          });
-        }
+// Son 2 dakikadaki normal işlem
+// büyüklüğünü dinamik referans olarak kullan.
+const recentTrades =
+  s.trades.filter(
+    item =>
+      item.t >=
+      t - 2 * 60 * 1000
+  );
 
-        const largeCut =
-          t -
-          5 * 60 * 1000;
+const tradeValues =
+  recentTrades
+    .map(
+      item =>
+        Number(item.q || 0)
+    )
+    .filter(
+      value =>
+        Number.isFinite(value) &&
+        value > 0
+    );
 
-        while (
-          s.largeTrades.length &&
-          s.largeTrades[0].t <
-            largeCut
-        ) {
-          s.largeTrades.shift();
+const avgTradeValue =
+  tradeValues.length
+    ? tradeValues.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) /
+      tradeValues.length
+    : 0;
+
+// Sabit 10.000 USDT yerine
+// coin'in kendi işlem yapısına göre
+// dinamik büyük işlem eşiği.
+const dynamicLargeThreshold =
+  avgTradeValue > 0
+    ? Math.max(
+        1000,
+        avgTradeValue * 5
+      )
+    : 5000;
+
+// Çok düşük likiditeli coinlerde
+// sıradan küçük işlemlerin "büyük"
+// sayılmasını engelle.
+const largeThreshold =
+  Math.min(
+    25000,
+    dynamicLargeThreshold
+  );
+
+if (
+  tradeValue >=
+  largeThreshold
+) {
+  s.largeTrades.push({
+    t,
+
+    value:
+      tradeValue,
+
+    side:
+      trade.side,
+
+    price,
+
+    threshold:
+      largeThreshold
+  });
+}
+
+// Son 5 dakikalık büyük
+// işlemleri hafızada tut.
+const largeCut =
+  t -
+  5 * 60 * 1000;
+
+while (
+  s.largeTrades.length &&
+  s.largeTrades[0].t <
+    largeCut
+) {
+  s.largeTrades.shift();
+}
         }
         // =================================
         // ULTIMATE CANLI VERİ KÖPRÜSÜ
