@@ -464,7 +464,79 @@ async function getSymbols() {
         item.instId
     );
 }
+/* =========================
+   BYBIT COİN LİSTESİ
+========================= */
 
+async function getBybitSymbols() {
+
+  const result =
+    await getBybitJSON(
+      `${BYBIT}/v5/market/tickers?category=spot`
+    );
+
+  const list =
+    Array.isArray(result.list)
+      ? result.list
+      : [];
+
+  const excluded =
+    new Set([
+      "USDC",
+      "USDT",
+      "DAI",
+      "EUR",
+      "USD"
+    ]);
+
+  return list
+    .filter(item => {
+
+      const symbol =
+        String(
+          item.symbol || ""
+        );
+
+      if (
+        !symbol.endsWith("USDT")
+      ) {
+        return false;
+      }
+
+      const base =
+        symbol.slice(0, -4);
+
+      if (
+        excluded.has(base)
+      ) {
+        return false;
+      }
+
+      const turnover =
+        Number(
+          item.turnover24h
+        );
+
+      return (
+        Number.isFinite(turnover) &&
+        turnover >= 200_000
+      );
+    })
+
+    .sort(
+      (a, b) =>
+        Number(b.turnover24h) -
+        Number(a.turnover24h)
+    )
+
+    .map(item => ({
+      symbol:
+        item.symbol,
+
+      source:
+        "BYBIT"
+    }));
+}
 
 /* =========================
    OKX GÜNLÜK MUMLAR
