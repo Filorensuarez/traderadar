@@ -415,7 +415,7 @@ async function getSymbols() {
           volumeUsd
         ) &&
         volumeUsd >=
-          1_000_000
+          200_000
       );
     })
 
