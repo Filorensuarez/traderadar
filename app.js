@@ -5,9 +5,8 @@ const refreshButton = document.querySelector("#refreshButton");
 const okxButton =
   document.querySelector("#okxButton");
 
-const bybitButton =
-  document.querySelector("#bybitButton");
-
+const kucoinButton =
+  document.querySelector("#kucoinButton");
 let selectedExchange =
   "okx";
 
