@@ -2,7 +2,17 @@ const cards = document.querySelector("#cards");
 const statusEl = document.querySelector("#status");
 const updatedEl = document.querySelector("#updated");
 const refreshButton = document.querySelector("#refreshButton");
+const okxButton =
+  document.querySelector("#okxButton");
 
+const bybitButton =
+  document.querySelector("#bybitButton");
+
+let selectedExchange =
+  "okx";
+
+let lastData =
+  null;
 const dailySection = document.querySelector("#daily");
 const longSection = document.querySelector("#long");
 
