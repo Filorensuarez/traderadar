@@ -69,7 +69,7 @@ function selectExchange(exchange) {
     exchange === "okx"
   );
 
-  bybitButton.classList.toggle(
+  KucoinButton.classList.toggle(
     "active",
     exchange === "bybit"
   );
@@ -91,11 +91,11 @@ okxButton.addEventListener(
 );
 
 
-bybitButton.addEventListener(
+KucoinButton.addEventListener(
   "click",
   () =>
     selectExchange(
-      "bybit"
+      "kucoin"
     )
 );
 /* =========================
@@ -370,8 +370,8 @@ function renderExchange(data) {
     data;
 
   const exchangeData =
-    selectedExchange === "bybit"
-      ? data.bybit
+    selectedExchange === "kucoin"
+      ? data.kucoin
       : data.okx;
 
 
@@ -402,8 +402,8 @@ function renderExchange(data) {
 
 
   const exchangeName =
-    selectedExchange === "bybit"
-      ? "BYBIT"
+    selectedExchange === "kucoin"
+      ? "KUCOIN"
       : "OKX";
 
 
