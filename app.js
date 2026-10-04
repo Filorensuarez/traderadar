@@ -71,7 +71,7 @@ function selectExchange(exchange) {
 
   KucoinButton.classList.toggle(
     "active",
-    exchange === "bybit"
+    exchange === "kucoin"
   );
 
   if (lastData) {
@@ -91,7 +91,7 @@ okxButton.addEventListener(
 );
 
 
-KucoinButton.addEventListener(
+kucoinButton.addEventListener(
   "click",
   () =>
     selectExchange(
