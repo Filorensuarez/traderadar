@@ -2,62 +2,104 @@ import express from "express";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BINANCE = "https://api.binance.com";
+
+const OKX =
+  "https://www.okx.com";
 
 app.use(express.static("."));
 
+let scanning = false;
+
 let cache = {
   ok: true,
-  source: "Binance",
+  source: "OKX",
   updatedAt: 0,
   scanned: 0,
-  rows: []
+  rows: [],
+  error: null
 };
-
-let scanning = false;
 
 
 /* =========================
-   YARDIMCILAR
+   HTTP
 ========================= */
 
 async function getJSON(url) {
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(15000)
-  });
+
+  const response =
+    await fetch(url, {
+      signal:
+        AbortSignal.timeout(15000)
+    });
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    throw new Error(
+      `OKX HTTP ${response.status}`
+    );
   }
 
-  return response.json();
+  const json =
+    await response.json();
+
+  if (
+    String(json.code) !== "0"
+  ) {
+    throw new Error(
+      json.msg ||
+      "OKX veri hatası"
+    );
+  }
+
+  return json.data;
 }
 
 
-function average(values) {
-  if (!values.length) return null;
+/* =========================
+   MATEMATİK
+========================= */
 
-  return values.reduce(
-    (sum, value) => sum + value,
-    0
-  ) / values.length;
+function average(values) {
+
+  if (!values.length) {
+    return null;
+  }
+
+  return (
+    values.reduce(
+      (sum, value) =>
+        sum + value,
+      0
+    ) /
+    values.length
+  );
 }
 
 
 function ema(values, period) {
-  if (values.length < period) return null;
 
-  const k = 2 / (period + 1);
+  if (
+    values.length < period
+  ) {
+    return null;
+  }
 
-  let result = average(
-    values.slice(0, period)
-  );
+  const k =
+    2 / (period + 1);
+
+  let result =
+    average(
+      values.slice(
+        0,
+        period
+      )
+    );
 
   for (
     let i = period;
     i < values.length;
     i++
   ) {
+
     result =
       values[i] * k +
       result * (1 - k);
@@ -71,61 +113,94 @@ function ema(values, period) {
    RSI
 ========================= */
 
-function rsi(closes, period = 14) {
-  if (closes.length <= period) {
+function rsi(
+  closes,
+  period = 14
+) {
+
+  if (
+    closes.length <= period
+  ) {
     return null;
   }
 
   let gains = 0;
   let losses = 0;
 
-  for (let i = 1; i <= period; i++) {
+  for (
+    let i = 1;
+    i <= period;
+    i++
+  ) {
+
     const change =
-      closes[i] - closes[i - 1];
+      closes[i] -
+      closes[i - 1];
 
     if (change >= 0) {
       gains += change;
     } else {
-      losses += Math.abs(change);
+      losses +=
+        Math.abs(change);
     }
   }
 
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
+  let avgGain =
+    gains / period;
+
+  let avgLoss =
+    losses / period;
 
   for (
     let i = period + 1;
     i < closes.length;
     i++
   ) {
+
     const change =
-      closes[i] - closes[i - 1];
+      closes[i] -
+      closes[i - 1];
 
     const gain =
-      Math.max(change, 0);
+      Math.max(
+        change,
+        0
+      );
 
     const loss =
-      Math.max(-change, 0);
+      Math.max(
+        -change,
+        0
+      );
 
     avgGain =
       (
-        avgGain * (period - 1) +
+        avgGain *
+        (period - 1) +
         gain
-      ) / period;
+      ) /
+      period;
 
     avgLoss =
       (
-        avgLoss * (period - 1) +
+        avgLoss *
+        (period - 1) +
         loss
-      ) / period;
+      ) /
+      period;
   }
 
-  if (avgLoss === 0) return 100;
+  if (avgLoss === 0) {
+    return 100;
+  }
 
   const rs =
     avgGain / avgLoss;
 
-  return 100 - 100 / (1 + rs);
+  return (
+    100 -
+    100 / (1 + rs)
+  );
 }
 
 
@@ -134,7 +209,10 @@ function rsi(closes, period = 14) {
 ========================= */
 
 function macd(closes) {
-  if (closes.length < 40) {
+
+  if (
+    closes.length < 40
+  ) {
     return {
       value: null,
       signal: null,
@@ -143,32 +221,28 @@ function macd(closes) {
     };
   }
 
-  const macdValues = [];
+  const values = [];
 
   for (
     let i = 26;
     i <= closes.length;
     i++
   ) {
+
     const part =
       closes.slice(0, i);
 
-    const fast =
-      ema(part, 12);
-
-    const slow =
-      ema(part, 26);
-
-    macdValues.push(
-      fast - slow
+    values.push(
+      ema(part, 12) -
+      ema(part, 26)
     );
   }
 
   const value =
-    macdValues.at(-1);
+    values.at(-1);
 
   const signal =
-    ema(macdValues, 9);
+    ema(values, 9);
 
   const histogram =
     value - signal;
@@ -189,8 +263,14 @@ function macd(closes) {
    ATR
 ========================= */
 
-function atr(candles, period = 14) {
-  if (candles.length <= period) {
+function atr(
+  candles,
+  period = 14
+) {
+
+  if (
+    candles.length <= period
+  ) {
     return null;
   }
 
@@ -201,19 +281,27 @@ function atr(candles, period = 14) {
     i < candles.length;
     i++
   ) {
-    const now = candles[i];
-    const prev = candles[i - 1];
+
+    const current =
+      candles[i];
+
+    const previous =
+      candles[i - 1];
 
     ranges.push(
       Math.max(
-        now.high - now.low,
+
+        current.high -
+        current.low,
 
         Math.abs(
-          now.high - prev.close
+          current.high -
+          previous.close
         ),
 
         Math.abs(
-          now.low - prev.close
+          current.low -
+          previous.close
         )
       )
     );
@@ -230,10 +318,13 @@ function atr(candles, period = 14) {
 ========================= */
 
 function bollinger(closes) {
+
   const values =
     closes.slice(-20);
 
-  if (values.length < 20) {
+  if (
+    values.length < 20
+  ) {
     return null;
   }
 
@@ -244,18 +335,151 @@ function bollinger(closes) {
     average(
       values.map(
         value =>
-          (value - middle) ** 2
+          (
+            value -
+            middle
+          ) ** 2
       )
     );
 
-  const sd =
+  const deviation =
     Math.sqrt(variance);
 
   return {
     middle,
-    upper: middle + 2 * sd,
-    lower: middle - 2 * sd
+
+    upper:
+      middle +
+      deviation * 2,
+
+    lower:
+      middle -
+      deviation * 2
   };
+}
+
+
+/* =========================
+   OKX COİN LİSTESİ
+========================= */
+
+async function getSymbols() {
+
+  const tickers =
+    await getJSON(
+      `${OKX}/api/v5/market/tickers?instType=SPOT`
+    );
+
+  const excluded =
+    new Set([
+      "USDC",
+      "USDT",
+      "DAI",
+      "EUR",
+      "USD"
+    ]);
+
+  return tickers
+    .filter(item => {
+
+      const symbol =
+        String(
+          item.instId || ""
+        );
+
+      if (
+        !symbol.endsWith(
+          "-USDT"
+        )
+      ) {
+        return false;
+      }
+
+      const base =
+        symbol.replace(
+          "-USDT",
+          ""
+        );
+
+      if (
+        excluded.has(base)
+      ) {
+        return false;
+      }
+
+      const volumeUsd =
+        Number(item.volCcy24h);
+
+      return (
+        Number.isFinite(
+          volumeUsd
+        ) &&
+        volumeUsd >=
+          5_000_000
+      );
+    })
+
+    .sort(
+      (a, b) =>
+        Number(
+          b.volCcy24h
+        ) -
+        Number(
+          a.volCcy24h
+        )
+    )
+
+    .slice(0, 80)
+
+    .map(
+      item =>
+        item.instId
+    );
+}
+
+
+/* =========================
+   OKX GÜNLÜK MUMLAR
+========================= */
+
+async function getCandles(symbol) {
+
+  const data =
+    await getJSON(
+      `${OKX}/api/v5/market/history-candles` +
+      `?instId=${encodeURIComponent(symbol)}` +
+      `&bar=1Dutc` +
+      `&limit=230`
+    );
+
+  /*
+    OKX yeni mumu önce gönderir.
+    Teknik analiz için eski -> yeni
+    sırasına çeviriyoruz.
+  */
+
+  return data
+    .map(row => ({
+      time:
+        Number(row[0]),
+
+      open:
+        Number(row[1]),
+
+      high:
+        Number(row[2]),
+
+      low:
+        Number(row[3]),
+
+      close:
+        Number(row[4]),
+
+      volume:
+        Number(row[5])
+    }))
+
+    .reverse();
 }
 
 
@@ -263,25 +487,29 @@ function bollinger(closes) {
    COİN ANALİZİ
 ========================= */
 
-function analyze(symbol, raw) {
-  const candles =
-    raw.map(row => ({
-      open: Number(row[1]),
-      high: Number(row[2]),
-      low: Number(row[3]),
-      close: Number(row[4]),
-      volume: Number(row[5])
-    }));
+function analyze(
+  symbol,
+  candles
+) {
 
-  if (candles.length < 205) {
+  if (
+    !Array.isArray(candles) ||
+    candles.length < 205
+  ) {
     return null;
   }
 
   const closes =
-    candles.map(x => x.close);
+    candles.map(
+      candle =>
+        candle.close
+    );
 
   const volumes =
-    candles.map(x => x.volume);
+    candles.map(
+      candle =>
+        candle.volume
+    );
 
   const current =
     candles.at(-1);
@@ -313,33 +541,100 @@ function analyze(symbol, raw) {
   const BB =
     bollinger(closes);
 
+
+  /* =========================
+     HACİM
+  ========================= */
+
+  const previousVolumes =
+    volumes.slice(
+      -21,
+      -1
+    );
+
   const avgVolume =
     average(
-      volumes.slice(-21, -1)
+      previousVolumes
     );
 
   const volumeRatio =
     avgVolume > 0
-      ? current.volume / avgVolume
-      : 0;
+      ?
+        current.volume /
+        avgVolume
+      :
+        0;
+
+
+  /* =========================
+     DİRENÇ
+  ========================= */
+
+  const previous20 =
+    candles.slice(
+      -21,
+      -1
+    );
 
   const resistance =
     Math.max(
-      ...candles
-        .slice(-21, -1)
-        .map(x => x.high)
+      ...previous20.map(
+        candle =>
+          candle.high
+      )
+    );
+
+  const support =
+    Math.min(
+      ...previous20.map(
+        candle =>
+          candle.low
+      )
     );
 
   const resistanceDistance =
     (
-      (price - resistance) /
+      (
+        price -
+        resistance
+      ) /
       resistance
-    ) * 100;
+    ) *
+    100;
+
+
+  /* =========================
+     ATR %
+  ========================= */
 
   const atrPct =
-    ATR
-      ? (ATR / price) * 100
-      : 0;
+    ATR && price
+      ?
+        (
+          ATR /
+          price
+        ) *
+        100
+      :
+        0;
+
+
+  /* =========================
+     3 GÜNLÜK HAREKET
+  ========================= */
+
+  const price3DaysAgo =
+    closes.at(-4);
+
+  const change3 =
+    (
+      (
+        price -
+        price3DaysAgo
+      ) /
+      price3DaysAgo
+    ) *
+    100;
 
 
   /* =========================
@@ -347,6 +642,7 @@ function analyze(symbol, raw) {
   ========================= */
 
   let score = 0;
+
   const reasons = [];
 
   function add(
@@ -354,12 +650,18 @@ function analyze(symbol, raw) {
     points,
     text
   ) {
-    if (!condition) return;
+
+    if (!condition) {
+      return;
+    }
 
     score += points;
+
     reasons.push(text);
   }
 
+
+  /* TREND */
 
   add(
     price > ema20,
@@ -385,6 +687,9 @@ function analyze(symbol, raw) {
     "Fiyat EMA200 üzerinde"
   );
 
+
+  /* RSI */
+
   add(
     RSI >= 52 &&
     RSI <= 68,
@@ -392,31 +697,49 @@ function analyze(symbol, raw) {
     "RSI yükselişi destekliyor"
   );
 
+
+  /* MACD */
+
   add(
     MACD.bullish,
     14,
     "MACD pozitif"
   );
 
+
+  /* HACİM */
+
   add(
     volumeRatio >= 1.30,
     14,
-    "Hacim artışı var"
+    "Hacim ortalamanın üzerinde"
   );
 
+
+  /* DİRENÇ */
+
   add(
-    resistanceDistance >= -1.5 &&
-    resistanceDistance <= 2,
+    resistanceDistance >=
+      -1.5 &&
+    resistanceDistance <=
+      2,
     10,
-    "Direnç bölgesinde"
+    "20 günlük dirence yakın"
   );
+
+
+  /* BOLLINGER */
 
   add(
     BB &&
-    price > BB.middle,
+    price >
+      BB.middle,
     6,
     "Bollinger orta bandı üzerinde"
   );
+
+
+  /* MUM */
 
   add(
     current.close >
@@ -424,7 +747,7 @@ function analyze(symbol, raw) {
     current.close >
       previous.close,
     6,
-    "Son mum pozitif"
+    "Son günlük mum pozitif"
   );
 
 
@@ -432,24 +755,22 @@ function analyze(symbol, raw) {
      RİSK CEZALARI
   ========================= */
 
-  const price3DaysAgo =
-    closes.at(-4);
+  if (
+    change3 > 15
+  ) {
 
-  const change3 =
-    (
-      (price - price3DaysAgo) /
-      price3DaysAgo
-    ) * 100;
-
-  if (change3 > 15) {
     score -= 10;
 
     reasons.push(
-      "3 günlük hareket fazla uzamış"
+      "Son 3 günlük hareket fazla uzamış"
     );
   }
 
-  if (RSI > 75) {
+
+  if (
+    RSI > 75
+  ) {
+
     score -= 10;
 
     reasons.push(
@@ -457,48 +778,76 @@ function analyze(symbol, raw) {
     );
   }
 
+
   score =
     Math.max(
       0,
-      Math.min(100, score)
+      Math.min(
+        100,
+        score
+      )
     );
 
 
   /* =========================
-     ZORUNLU TEYİT
+     TREND DURUMU
+  ========================= */
+
+  const trend =
+    (
+      price > ema20 &&
+      ema20 > ema50 &&
+      price > ema200
+    )
+      ?
+        "bullish"
+      :
+        "neutral";
+
+
+  /* =========================
+     ZORUNLU YÜKSELİŞ TEYİDİ
   ========================= */
 
   const confirmed =
-    price > ema20 &&
-    price > ema50 &&
-    RSI >= 50 &&
-    RSI < 75 &&
-    MACD.bullish &&
-    volumeRatio >= 1.15 &&
-    score >= 75;
+    (
+      price > ema20 &&
+
+      price > ema50 &&
+
+      RSI >= 50 &&
+
+      RSI < 75 &&
+
+      MACD.bullish &&
+
+      volumeRatio >= 1.15 &&
+
+      score >= 75
+    );
 
 
   return {
+
     symbol:
       symbol.replace(
-        "USDT",
+        "-USDT",
         "/USDT"
       ),
 
     price,
+
     score,
 
-    trend:
-      price > ema20 &&
-      ema20 > ema50 &&
-      price > ema200
-        ? "bullish"
-        : "neutral",
+    trend,
 
-    rsi: RSI,
+    rsi:
+      RSI,
 
     ema20,
+
     ema50,
+
     ema200,
 
     macd:
@@ -515,129 +864,87 @@ function analyze(symbol, raw) {
 
     volumeRatio,
 
-    atr: ATR,
+    atr:
+      ATR,
+
     atrPct,
 
+    support,
+
     resistance,
+
     resistanceDistance,
 
     bollingerMiddle:
-      BB?.middle ?? null,
+      BB?.middle ??
+      null,
 
     bollingerUpper:
-      BB?.upper ?? null,
+      BB?.upper ??
+      null,
 
     bollingerLower:
-      BB?.lower ?? null,
+      BB?.lower ??
+      null,
 
     change3,
 
     confirmed,
+
     reasons
   };
 }
 
 
 /* =========================
-   COİN LİSTESİ
-========================= */
-
-async function getSymbols() {
-  const tickers =
-    await getJSON(
-      `${BINANCE}/api/v3/ticker/24hr`
-    );
-
-  const excluded =
-    new Set([
-      "USDC",
-      "FDUSD",
-      "TUSD",
-      "USDP",
-      "DAI",
-      "EUR",
-      "TRY"
-    ]);
-
-  return tickers
-    .filter(item => {
-      const symbol =
-        String(item.symbol);
-
-      if (
-        !symbol.endsWith("USDT")
-      ) {
-        return false;
-      }
-
-      const base =
-        symbol.slice(0, -4);
-
-      if (excluded.has(base)) {
-        return false;
-      }
-
-      return (
-        Number(item.quoteVolume) >=
-        5_000_000
-      );
-    })
-    .sort(
-      (a, b) =>
-        Number(b.quoteVolume) -
-        Number(a.quoteVolume)
-    )
-    .slice(0, 80)
-    .map(item => item.symbol);
-}
-
-
-/* =========================
-   MUM VERİSİ
-========================= */
-
-async function getCandles(symbol) {
-  return getJSON(
-    `${BINANCE}/api/v3/klines` +
-    `?symbol=${encodeURIComponent(symbol)}` +
-    `&interval=1d` +
-    `&limit=230`
-  );
-}
-
-
-/* =========================
-   ANA TARAMA
+   PİYASA TARAMASI
 ========================= */
 
 async function scanMarket() {
-  if (scanning) return;
+
+  if (scanning) {
+    return;
+  }
 
   scanning = true;
 
+  console.log(
+    "OKX günlük tarama başladı."
+  );
+
   try {
+
     const symbols =
       await getSymbols();
 
-    const results = [];
+    const results =
+      [];
 
-    const batchSize = 8;
+    /*
+      İstekleri küçük gruplara
+      ayırıyoruz.
+    */
+
+    const batchSize = 5;
 
     for (
       let i = 0;
       i < symbols.length;
       i += batchSize
     ) {
+
       const batch =
         symbols.slice(
           i,
           i + batchSize
         );
 
-      const promises =
-        batch.map(
-          async symbol => {
-            try {
+      const responses =
+        await Promise.allSettled(
+
+          batch.map(
+            async symbol => {
+
               const candles =
                 await getCandles(
                   symbol
@@ -647,47 +954,66 @@ async function scanMarket() {
                 symbol,
                 candles
               );
-            } catch (error) {
-              console.error(
-                symbol,
-                error.message
-              );
-
-              return null;
             }
-          }
+          )
         );
 
-      const batchResults =
-        await Promise.all(
-          promises
-        );
 
       for (
-        const result
-        of batchResults
+        const response
+        of responses
       ) {
+
+        if (
+          response.status !==
+          "fulfilled"
+        ) {
+          continue;
+        }
+
+        const result =
+          response.value;
+
         if (
           result &&
           result.confirmed
         ) {
+
           results.push(
             result
           );
         }
       }
+
+
+      /*
+        OKX rate-limit yükünü
+        azaltmak için kısa bekleme.
+      */
+
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            150
+          )
+      );
     }
+
 
     results.sort(
       (a, b) =>
-        b.score - a.score
+        b.score -
+        a.score
     );
 
+
     cache = {
+
       ok: true,
 
       source:
-        "Binance",
+        "OKX",
 
       updatedAt:
         Date.now(),
@@ -696,21 +1022,27 @@ async function scanMarket() {
         symbols.length,
 
       rows:
-        results.slice(0, 20),
+        results.slice(
+          0,
+          20
+        ),
 
       error:
         null
     };
 
+
     console.log(
-      `Tarama tamamlandı: ${symbols.length} coin / ${results.length} teyit`
+      `OKX tarama tamamlandı: ${symbols.length} coin / ${results.length} teyit`
     );
 
   } catch (error) {
+
     console.error(
-      "Tarama hatası:",
+      "OKX tarama hatası:",
       error.message
     );
+
 
     cache = {
       ...cache,
@@ -722,44 +1054,66 @@ async function scanMarket() {
     };
 
   } finally {
+
     scanning = false;
   }
 }
 
 
 /* =========================
-   API
+   GÜNLÜK TEYİT API
 ========================= */
 
 app.get(
   "/api/daily-confirmations",
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
 
     res.set(
       "Cache-Control",
       "no-store"
     );
 
+
     if (
       !cache.updatedAt ||
-      Date.now() -
-        cache.updatedAt >
-        5 * 60 * 1000
+      (
+        Date.now() -
+        cache.updatedAt
+      ) >
+      5 * 60 * 1000
     ) {
+
       await scanMarket();
     }
 
-    res.json(cache);
+
+    res.json(
+      cache
+    );
   }
 );
 
 
+/* =========================
+   SAĞLIK KONTROLÜ
+========================= */
+
 app.get(
   "/health",
-  (req, res) => {
+  (
+    req,
+    res
+  ) => {
 
     res.json({
+
       ok: true,
+
+      source:
+        cache.source,
 
       scannerRunning:
         scanning,
@@ -773,15 +1127,18 @@ app.get(
       confirmations:
         cache.rows.length,
 
-      source:
-        cache.source
+      dataOk:
+        cache.ok,
+
+      error:
+        cache.error
     });
   }
 );
 
 
 /* =========================
-   SUNUCUYU BAŞLAT
+   SUNUCU
 ========================= */
 
 app.listen(
@@ -789,7 +1146,7 @@ app.listen(
   () => {
 
     console.log(
-      `TradeRadar çalışıyor: ${PORT}`
+      `TradeRadar OKX çalışıyor: ${PORT}`
     );
 
     scanMarket();
@@ -798,7 +1155,7 @@ app.listen(
 
 
 /* =========================
-   5 DAKİKADA BİR TARA
+   OTOMATİK TARAMA
 ========================= */
 
 setInterval(
