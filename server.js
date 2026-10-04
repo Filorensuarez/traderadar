@@ -468,16 +468,20 @@ async function getSymbols() {
    BYBIT COİN LİSTESİ
 ========================= */
 
-async function getBybitSymbols() {
+/* =========================
+   KUCOIN COİN LİSTESİ
+========================= */
 
-  const result =
-    await getBybitJSON(
-      `${BYBIT}/v5/market/tickers?category=spot`
+async function getKucoinSymbols() {
+
+  const data =
+    await getKucoinJSON(
+      `${KUCOIN}/api/v1/market/allTickers`
     );
 
-  const list =
-    Array.isArray(result.list)
-      ? result.list
+  const tickers =
+    Array.isArray(data?.ticker)
+      ? data.ticker
       : [];
 
   const excluded =
@@ -489,7 +493,7 @@ async function getBybitSymbols() {
       "USD"
     ]);
 
-  return list
+  return tickers
     .filter(item => {
 
       const symbol =
@@ -498,13 +502,16 @@ async function getBybitSymbols() {
         );
 
       if (
-        !symbol.endsWith("USDT")
+        !symbol.endsWith("-USDT")
       ) {
         return false;
       }
 
       const base =
-        symbol.slice(0, -4);
+        symbol.replace(
+          "-USDT",
+          ""
+        );
 
       if (
         excluded.has(base)
@@ -512,21 +519,27 @@ async function getBybitSymbols() {
         return false;
       }
 
-      const turnover =
+      /*
+        KuCoin volValue:
+        24 saatlik işlem hacminin
+        USDT karşılığıdır.
+      */
+
+      const volumeUsd =
         Number(
-          item.turnover24h
+          item.volValue
         );
 
       return (
-        Number.isFinite(turnover) &&
-        turnover >= 200_000
+        Number.isFinite(volumeUsd) &&
+        volumeUsd >= 200_000
       );
     })
 
     .sort(
       (a, b) =>
-        Number(b.turnover24h) -
-        Number(a.turnover24h)
+        Number(b.volValue) -
+        Number(a.volValue)
     )
 
     .map(item => ({
@@ -534,7 +547,7 @@ async function getBybitSymbols() {
         item.symbol,
 
       source:
-        "BYBIT"
+        "KUCOIN"
     }));
 }
 
