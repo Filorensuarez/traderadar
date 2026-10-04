@@ -1804,33 +1804,50 @@ s.activityPower =
         "YÜKSELİŞ GÜÇLENİYOR";
 
     } else if (
-      explosionPreparation
-    ) {
-      newStatus =
-        "PATLAMA HAZIRLIĞI";
+  explosionPreparation
+) {
+  newStatus =
+    "PATLAMA HAZIRLIĞI";
 
-    } else {
-      newStatus =
-        "YÜKSELİŞ KORUNUYOR";
-    }
+} else if (
+  buyConfirmation
+) {
+  newStatus =
+    "ALIM TEYİDİ";
 
+} else {
+  newStatus =
+    "YÜKSELİŞ KORUNUYOR";
+}
   } else if (
-    explosionPreparation
-  ) {
-    newStatus =
-      "PATLAMA HAZIRLIĞI";
+  explosionPreparation
+) {
+  newStatus =
+    "PATLAMA HAZIRLIĞI";
 
-  } else if (
-    riseStarting
-  ) {
-    newStatus =
-      "YÜKSELİŞ BAŞLIYOR";
+} else if (
+  buyConfirmation
+) {
+  newStatus =
+    "ALIM TEYİDİ";
 
-  } else if (
-    activityStarting
-  ) {
-    newStatus =
-      "HAREKETLENME BAŞLADI";
+} else if (
+  riseStarting
+) {
+  newStatus =
+    "YÜKSELİŞ BAŞLADI";
+
+} else if (
+  absorptionRisk
+) {
+  newStatus =
+    "ALIM ABSORBE EDİLİYOR";
+
+} else if (
+  activityStarting
+) {
+  newStatus =
+    "ÖNCÜ HAREKET";
   }
 
   // Trend bittiyse hafızayı temizle.
