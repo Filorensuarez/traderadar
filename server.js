@@ -1094,347 +1094,524 @@ const effectiveTradeX =
         ) * 100
       : 0;
 
-  // ==========================================
-  // FİYAT İVMESİ
-  // ==========================================
+  
+// ==========================================
+// TRADERADAR V2 - YÜKSELİŞ BAŞLANGIÇ MOTORU
+// ==========================================
 
-  let priceAccelerationScore = 0;
+// ------------------------------------------
+// 1. FİYAT İVMESİ
+// ------------------------------------------
 
-  if (r5 > 0.03)
-    priceAccelerationScore += 12;
+let priceAccelerationScore = 0;
 
-  if (r10 > 0.08)
-    priceAccelerationScore += 12;
+if (r5 > 0.02) priceAccelerationScore += 10;
+if (r10 > 0.05) priceAccelerationScore += 12;
+if (r30 > 0.10) priceAccelerationScore += 12;
 
-  if (r30 > 0.15)
-    priceAccelerationScore += 12;
+if (
+  r5 > 0 &&
+  r10 > 0 &&
+  r30 > 0
+) {
+  priceAccelerationScore += 15;
+}
 
-  if (
-    r5 > 0 &&
-    r10 > 0 &&
-    r30 > 0
-  ) {
-    priceAccelerationScore += 15;
-  }
+// Kısa dönem hızlanması
+if (
+  r5 >= r10 * 0.30 &&
+  r10 >= r30 * 0.30 &&
+  r10 > 0.04
+) {
+  priceAccelerationScore += 15;
+}
 
-  if (
-    r5 > r10 / 2 &&
-    r10 > r30 / 3
-  ) {
-    priceAccelerationScore += 12;
-  }
+// 30 saniyelik hareket,
+// 60 saniyelik hareketin önemli
+// bölümünü yeni oluşturuyorsa ivme vardır.
+if (
+  r30 > 0 &&
+  r60 > 0 &&
+  r30 >= r60 * 0.45
+) {
+  priceAccelerationScore += 12;
+}
 
-  if (
-    r30 > r60 / 2
-  ) {
-    priceAccelerationScore += 10;
-  }
+if (
+  r60 > 0 &&
+  r120 > 0
+) {
+  priceAccelerationScore += 8;
+}
 
-  if (
-    r60 > 0 &&
-    r120 > 0
-  ) {
-    priceAccelerationScore += 10;
-  }
+if (
+  r10 >= 0.10 &&
+  r30 >= 0.20
+) {
+  priceAccelerationScore += 10;
+}
 
-  priceAccelerationScore =
-    Math.min(
-      100,
-      priceAccelerationScore
-    );
+priceAccelerationScore =
+  Math.min(
+    100,
+    priceAccelerationScore
+  );
 
-  // ==========================================
-  // MİKRO HACİM
-  // ==========================================
 
-  let volumeStartScore = 0;
+// ------------------------------------------
+// 2. MİKRO HACİM
+// ------------------------------------------
 
-  if (eVol >= 1.05)
-    volumeStartScore += 15;
+let volumeStartScore = 0;
 
-  if (eVol >= 1.20)
-    volumeStartScore += 15;
+if (eVol >= 1.05) volumeStartScore += 10;
+if (eVol >= 1.20) volumeStartScore += 10;
+if (eVol >= 1.50) volumeStartScore += 12;
+if (eVol >= 2.00) volumeStartScore += 10;
 
-  if (eVol >= 1.50)
-    volumeStartScore += 15;
+if (volAccel >= 1.05) volumeStartScore += 10;
+if (volAccel >= 1.20) volumeStartScore += 12;
+if (volAccel >= 1.50) volumeStartScore += 10;
 
-  if (volAccel >= 1.05)
-    volumeStartScore += 15;
+if (microVol >= 1.10) volumeStartScore += 12;
+if (microVol >= 1.40) volumeStartScore += 14;
 
-  if (volAccel >= 1.20)
-    volumeStartScore += 15;
+volumeStartScore =
+  Math.min(
+    100,
+    volumeStartScore
+  );
 
-  if (microVol >= 1.10)
-    volumeStartScore += 15;
 
-  if (microVol >= 1.40)
-    volumeStartScore += 10;
+// ------------------------------------------
+// 3. İŞLEM FREKANSI
+// ------------------------------------------
 
-  volumeStartScore =
-    Math.min(
-      100,
-      volumeStartScore
-    );
+let tradeStartScore = 0;
 
-  // ==========================================
-  // İŞLEM HIZI
-  // ==========================================
+if (eTrade >= 1.05) tradeStartScore += 10;
+if (eTrade >= 1.20) tradeStartScore += 10;
+if (eTrade >= 1.50) tradeStartScore += 12;
+if (eTrade >= 2.00) tradeStartScore += 10;
 
-  let tradeStartScore = 0;
+if (tradeAccel >= 1.05) tradeStartScore += 10;
+if (tradeAccel >= 1.20) tradeStartScore += 12;
+if (tradeAccel >= 1.50) tradeStartScore += 10;
 
-  if (eTrade >= 1.05)
-    tradeStartScore += 15;
+if (microTrade >= 1.10) tradeStartScore += 12;
+if (microTrade >= 1.40) tradeStartScore += 14;
 
-  if (eTrade >= 1.20)
-    tradeStartScore += 15;
+tradeStartScore =
+  Math.min(
+    100,
+    tradeStartScore
+  );
 
-  if (eTrade >= 1.50)
-    tradeStartScore += 15;
 
-  if (tradeAccel >= 1.05)
-    tradeStartScore += 15;
+// ------------------------------------------
+// 4. ALICI AKIŞI
+// ------------------------------------------
 
-  if (tradeAccel >= 1.20)
-    tradeStartScore += 15;
+let buyerScore = 0;
 
-  if (microTrade >= 1.10)
-    tradeStartScore += 15;
+if (buy5 >= 52) buyerScore += 8;
+if (buy10 >= 55) buyerScore += 10;
+if (buy30 >= 55) buyerScore += 10;
 
-  if (microTrade >= 1.40)
-    tradeStartScore += 10;
+if (buy10 >= 60) buyerScore += 12;
+if (buy30 >= 60) buyerScore += 12;
 
-  tradeStartScore =
-    Math.min(
-      100,
-      tradeStartScore
-    );
+if (buy10 >= 65) buyerScore += 10;
+if (buy30 >= 65) buyerScore += 10;
 
-  // ==========================================
-  // ALICI AKIŞI
-  // ==========================================
+// Alıcı baskısı kısa vadede güçleniyor.
+if (
+  buy5 >= buy10 &&
+  buy10 >= buy30 &&
+  buy5 >= 55
+) {
+  buyerScore += 15;
+}
 
-  let buyerScore = 0;
+if (buyStrength >= 60)
+  buyerScore += 8;
 
-  if (buy5 >= 52)
-    buyerScore += 10;
+if (buyStrength >= 70)
+  buyerScore += 10;
 
-  if (buy10 >= 55)
-    buyerScore += 15;
+buyerScore =
+  Math.min(
+    100,
+    buyerScore
+  );
 
-  if (buy30 >= 55)
-    buyerScore += 15;
 
-  if (buy30 >= 60)
-    buyerScore += 15;
+// ------------------------------------------
+// 5. ORDER BOOK
+// ------------------------------------------
 
-  if (buy30 >= 65)
-    buyerScore += 10;
+let bookScore = 50;
 
-  if (
-    buy5 >= buy10 &&
-    buy10 >= buy30
-  ) {
-    buyerScore += 15;
-  }
-
-  if (
-    buyStrength >= 60
-  ) {
-    buyerScore += 10;
-  }
-
-  if (
-    buyStrength >= 70
-  ) {
-    buyerScore += 10;
-  }
-
-  buyerScore =
-    Math.min(
-      100,
-      buyerScore
-    );
-
-  // ==========================================
-  // ORDER BOOK PUANI
-  // ==========================================
-
-  let bookScore = 50;
-
-  if (totalDepth > 0) {
-    bookScore =
-      Math.max(
-        0,
-        Math.min(
-          100,
-          50 +
-          bookImbalance * 1.2
-        )
-      );
-  }
-
-  // ==========================================
-  // BÜYÜK İŞLEM PUANI
-  // ==========================================
-
-  let largeScore = 50;
-
-  if (largeTotal > 0) {
-    largeScore =
-      Math.max(
-        0,
-        Math.min(
-          100,
-          50 +
-          largeImbalance
-        )
-      );
-  }
-
-  // ==========================================
-  // YÜKSELİŞ BAŞLANGIÇ PUANI
-  // ==========================================
-
-  let startScore =
-    priceAccelerationScore * 0.30 +
-    volumeStartScore * 0.20 +
-    tradeStartScore * 0.18 +
-    buyerScore * 0.17 +
-    bookScore * 0.10 +
-    largeScore * 0.05;
-
-  // Çok erken güçlü mikro hareket bonusu
-  if (
-    r5 > 0.05 &&
-    r10 > 0.10 &&
-    (
-      microVol >= 1.15 ||
-      microTrade >= 1.15
-    )
-  ) {
-    startScore += 8;
-  }
-
-  // Alıcı + fiyat birlikte hızlanıyor
-  if (
-    buy10 >= 60 &&
-    r10 > 0.08 &&
-    r30 > 0.12
-  ) {
-    startScore += 6;
-  }
-
-  // Order book güçlü destek
-  if (
-    bookImbalance >= 15
-  ) {
-    startScore += 4;
-  }
-
-  // Büyük alım desteği
-  if (
-    largeImbalance >= 25
-  ) {
-    startScore += 4;
-  }
-
-  // Negatif mikro yapı cezaları
-  if (
-    r5 < -0.15 &&
-    r10 < -0.15
-  ) {
-    startScore -= 20;
-  }
-
-  if (
-    buy30 < 40
-  ) {
-    startScore -= 15;
-  }
-
-  if (
-    bookImbalance <= -35
-  ) {
-    startScore -= 10;
-  }
-
-  if (
-    largeImbalance <= -40
-  ) {
-    startScore -= 10;
-  }
-
-  startScore =
-    Math.round(
-      Math.max(
-        0,
-        Math.min(
-          100,
-          startScore
-        )
+if (totalDepth > 0) {
+  bookScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        50 +
+        bookImbalance * 1.2
       )
     );
+}
 
-  // ==========================================
-  // HAREKET BAŞLATMA KOŞULLARI
-  // ==========================================
 
-  const enoughMicroData =
-    w30.n >= 3 &&
-    w30.vol > 0;
+// ------------------------------------------
+// 6. BÜYÜK İŞLEM AKIŞI
+// ------------------------------------------
 
-  const activityStarting =
-    enoughMicroData &&
-    (
-      r5 > 0.02 ||
-      r10 > 0.05 ||
-      r30 > 0.10
-    ) &&
-    (
-      eVol >= 1.05 ||
-      eTrade >= 1.05 ||
-      volAccel >= 1.05 ||
-      tradeAccel >= 1.05 ||
-      microVol >= 1.08 ||
-      microTrade >= 1.08
+let largeScore = 50;
+
+if (largeTotal > 0) {
+  largeScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        50 +
+        largeImbalance
+      )
     );
+}
 
-  const riseStarting =
-    enoughMicroData &&
-    startScore >= 55 &&
-    r10 > 0 &&
-    r30 > -0.10 &&
-    buy30 >= 50 &&
-    (
-      priceAccelerationScore >= 35 ||
+
+// ------------------------------------------
+// 7. FİYAT ETKİNLİĞİ
+// DYM ile WLFI ayrımının kritik bölümü.
+// ------------------------------------------
+
+// Aktivite ne kadar yükseliyor?
+const activityPower =
+  Math.max(
+    1,
+    Math.min(
+      20,
       (
-        r5 > 0.05 &&
-        r10 > 0.08
+        Math.max(
+          1,
+          volAccel,
+          microVol
+        ) +
+        Math.max(
+          1,
+          tradeAccel,
+          microTrade
+        )
+      ) / 2
+    )
+  );
+
+// Aktivitenin fiyat üzerindeki
+// gerçek etkisini ölç.
+const priceResponse =
+  Math.max(
+    0,
+    r10 * 0.35 +
+    r30 * 0.40 +
+    r60 * 0.25
+  );
+
+const priceEfficiency =
+  activityPower > 0
+    ? priceResponse /
+      Math.sqrt(activityPower)
+    : 0;
+
+let priceEfficiencyScore = 0;
+
+if (priceEfficiency >= 0.02)
+  priceEfficiencyScore += 20;
+
+if (priceEfficiency >= 0.04)
+  priceEfficiencyScore += 20;
+
+if (priceEfficiency >= 0.07)
+  priceEfficiencyScore += 20;
+
+if (priceEfficiency >= 0.10)
+  priceEfficiencyScore += 20;
+
+if (priceEfficiency >= 0.15)
+  priceEfficiencyScore += 20;
+
+
+// ------------------------------------------
+// 8. ABSORPSİYON TESPİTİ
+// Çok alış/hacim var fakat fiyat gitmiyor.
+// ------------------------------------------
+
+const veryHighActivity =
+  (
+    eVol >= 2 ||
+    volAccel >= 2 ||
+    microVol >= 2
+  ) &&
+  (
+    eTrade >= 2 ||
+    tradeAccel >= 2 ||
+    microTrade >= 2
+  );
+
+const strongBuying =
+  buy10 >= 65 ||
+  buy30 >= 65 ||
+  buyStrength >= 65;
+
+const weakPriceReaction =
+  r10 < 0.08 &&
+  r30 < 0.15 &&
+  r60 < 0.20;
+
+const absorptionRisk =
+  veryHighActivity &&
+  strongBuying &&
+  weakPriceReaction;
+
+
+// ------------------------------------------
+// 9. GERÇEK FİYAT KIRILIMI
+// ------------------------------------------
+
+const microBreakout =
+  r5 > 0 &&
+  r10 > 0.05 &&
+  r30 > 0.10 &&
+  (
+    r30 >= r60 * 0.40 ||
+    r60 <= 0
+  );
+
+const acceleratingBreakout =
+  r5 >= 0.04 &&
+  r10 >= 0.10 &&
+  r30 >= 0.20;
+
+
+// ------------------------------------------
+// 10. YÜKSELİŞ BAŞLANGIÇ PUANI
+// ------------------------------------------
+
+let startScore =
+  priceAccelerationScore * 0.30 +
+  priceEfficiencyScore * 0.18 +
+  volumeStartScore * 0.15 +
+  tradeStartScore * 0.14 +
+  buyerScore * 0.13 +
+  bookScore * 0.07 +
+  largeScore * 0.03;
+
+
+// Fiyat + aktivite aynı anda hızlanıyor.
+if (
+  microBreakout &&
+  (
+    volAccel >= 1.15 ||
+    microVol >= 1.15
+  ) &&
+  (
+    tradeAccel >= 1.10 ||
+    microTrade >= 1.10
+  )
+) {
+  startScore += 10;
+}
+
+
+// Güçlü erken kırılım.
+if (
+  acceleratingBreakout &&
+  buy10 >= 58
+) {
+  startScore += 8;
+}
+
+
+// Order book desteği.
+if (
+  totalDepth > 0 &&
+  bookImbalance >= 15
+) {
+  startScore += 4;
+}
+
+
+// Büyük alım desteği.
+if (
+  largeTotal > 0 &&
+  largeImbalance >= 25
+) {
+  startScore += 4;
+}
+
+
+// ------------------------------------------
+// 11. CEZALAR
+// ------------------------------------------
+
+if (
+  r5 < -0.10 &&
+  r10 < -0.10
+) {
+  startScore -= 20;
+}
+
+if (buy30 < 40) {
+  startScore -= 15;
+}
+
+if (
+  totalDepth > 0 &&
+  bookImbalance <= -35
+) {
+  startScore -= 10;
+}
+
+if (
+  largeTotal > 0 &&
+  largeImbalance <= -40
+) {
+  startScore -= 10;
+}
+
+
+// En kritik ceza:
+// Çok güçlü alış/hacim var ama fiyat gitmiyor.
+if (absorptionRisk) {
+  startScore -= 25;
+}
+
+
+// Hacim uçuk fakat fiyat tepkisi çok zayıf.
+if (
+  activityPower >= 3 &&
+  priceEfficiency < 0.03
+) {
+  startScore -= 15;
+}
+
+
+startScore =
+  Math.round(
+    Math.max(
+      0,
+      Math.min(
+        100,
+        startScore
       )
-    );
+    )
+  );
 
-  const explosionPreparation =
-    startScore >= 68 &&
-    r10 > 0.05 &&
-    r30 > 0.10 &&
-    buy30 >= 55 &&
-    (
-      eVol >= 1.15 ||
-      volAccel >= 1.15 ||
-      microVol >= 1.15
-    ) &&
-    (
-      eTrade >= 1.10 ||
-      tradeAccel >= 1.10 ||
-      microTrade >= 1.10
-    );
 
-  const strengthening =
-    startScore >= 72 &&
-    r30 > 0.20 &&
-    r60 > 0.25 &&
-    buy30 >= 58;
+// ==========================================
+// 12. KARAR MOTORU
+// ==========================================
 
+const enoughMicroData =
+  w30.n >= 3 &&
+  w30.vol > 0;
+
+
+// AŞAMA 1
+// Fiyat henüz ciddi yükselmeden
+// aktivite değişiyor.
+const activityStarting =
+  enoughMicroData &&
+  !absorptionRisk &&
+  (
+    volAccel >= 1.15 ||
+    tradeAccel >= 1.15 ||
+    microVol >= 1.20 ||
+    microTrade >= 1.20
+  ) &&
+  buy30 >= 50;
+
+
+// AŞAMA 2
+// Gerçek fiyat tepkisi başladı.
+const riseStarting =
+  enoughMicroData &&
+  !absorptionRisk &&
+  startScore >= 55 &&
+  buy30 >= 52 &&
+  (
+    microBreakout ||
+    acceleratingBreakout
+  ) &&
+  priceEfficiencyScore >= 20;
+
+
+// AŞAMA 3
+// Alım akışı artık fiyata
+// belirgin biçimde dönüşüyor.
+const buyConfirmation =
+  enoughMicroData &&
+  !absorptionRisk &&
+  startScore >= 65 &&
+  r10 >= 0.08 &&
+  r30 >= 0.18 &&
+  buy30 >= 58 &&
+  priceEfficiencyScore >= 40 &&
+  (
+    volAccel >= 1.15 ||
+    microVol >= 1.20
+  ) &&
+  (
+    tradeAccel >= 1.10 ||
+    microTrade >= 1.15
+  );
+
+
+// AŞAMA 4
+// Patlama hazırlığı.
+const explosionPreparation =
+  buyConfirmation &&
+  startScore >= 72 &&
+  r30 >= 0.25 &&
+  (
+    r60 >= 0.30 ||
+    acceleratingBreakout
+  );
+
+
+// AŞAMA 5
+// Yükseliş güçleniyor.
+const strengthening =
+  !absorptionRisk &&
+  startScore >= 75 &&
+  r30 >= 0.30 &&
+  r60 >= 0.40 &&
+  buy30 >= 58;
+
+
+// UI ve sonraki karar motorunda
+// kullanılacak ek ölçümler.
+s.priceEfficiency =
+  Number(
+    priceEfficiency.toFixed(4)
+  );
+
+s.priceEfficiencyScore =
+  priceEfficiencyScore;
+
+s.absorptionRisk =
+  absorptionRisk;
+
+s.buyConfirmation =
+  buyConfirmation;
+
+s.activityPower =
+  Number(
+    activityPower.toFixed(2)
+  );
   // ==========================================
   // TREND HAFIZASI
   // ==========================================
