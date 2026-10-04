@@ -1114,23 +1114,115 @@ async function scanMarket() {
   scanning = true;
 
   console.log(
-    "OKX günlük tarama başladı."
+    "OKX + Bybit taraması başladı."
   );
 
   try {
 
+    /* =========================
+       COİN LİSTELERİNİ AL
+    ========================= */
+
+    const [
+      okxSymbols,
+      bybitSymbols
+    ] =
+      await Promise.all([
+        getSymbols(),
+        getBybitSymbols()
+      ]);
+
+
+    /* =========================
+       TEKİL COİN HARİTASI
+    ========================= */
+
+    const coinMap =
+      new Map();
+
+
+    /*
+      Öncelik OKX.
+
+      OKX'te bulunan coin önce
+      eklenir.
+    */
+
+    for (
+      const okxSymbol
+      of okxSymbols
+    ) {
+
+      const base =
+        okxSymbol.replace(
+          "-USDT",
+          ""
+        );
+
+      coinMap.set(
+        base,
+        {
+          base,
+          source: "OKX",
+          symbol: okxSymbol
+        }
+      );
+    }
+
+
+    /*
+      Bybit'te olup OKX'te
+      bulunmayan coinleri ekle.
+    */
+
+    for (
+      const item
+      of bybitSymbols
+    ) {
+
+      const base =
+        item.symbol.slice(
+          0,
+          -4
+        );
+
+      if (
+        !coinMap.has(base)
+      ) {
+
+        coinMap.set(
+          base,
+          {
+            base,
+            source: "BYBIT",
+            symbol: item.symbol
+          }
+        );
+      }
+    }
+
+
     const symbols =
-      await getSymbols();
+      Array.from(
+        coinMap.values()
+      );
+
+
+    console.log(
+      `OKX: ${okxSymbols.length} | Bybit: ${bybitSymbols.length} | Tekil: ${symbols.length}`
+    );
+
 
     const results =
       [];
 
-    /*
-      İstekleri küçük gruplara
-      ayırıyoruz.
-    */
+
+    /* =========================
+       KÜÇÜK GRUPLARLA TARA
+    ========================= */
 
     const batchSize = 5;
+
 
     for (
       let i = 0;
@@ -1144,21 +1236,61 @@ async function scanMarket() {
           i + batchSize
         );
 
+
       const responses =
         await Promise.allSettled(
 
           batch.map(
-            async symbol => {
+            async item => {
 
-              const candles =
-                await getCandles(
-                  symbol
+              let candles;
+
+
+              if (
+                item.source ===
+                "BYBIT"
+              ) {
+
+                candles =
+                  await getBybitCandles(
+                    item.symbol
+                  );
+
+              } else {
+
+                candles =
+                  await getCandles(
+                    item.symbol
+                  );
+              }
+
+
+              const displaySymbol =
+                `${item.base}/USDT`;
+
+
+              const result =
+                analyze(
+                  displaySymbol,
+                  candles
                 );
 
-              return analyze(
-                symbol,
-                candles
-              );
+
+              if (!result) {
+                return null;
+              }
+
+
+              /*
+                Sonucun hangi borsadan
+                geldiğini kaydet.
+              */
+
+              result.source =
+                item.source;
+
+
+              return result;
             }
           )
         );
@@ -1176,29 +1308,31 @@ async function scanMarket() {
           continue;
         }
 
+
         const result =
           response.value;
 
+
         if (
-  result &&
-  (
-    result.confirmed ||
-    result.candidate
-  )
-) {
+          result &&
+          (
+            result.confirmed ||
+            result.candidate
+          )
+        ) {
 
-    results.push(
-    result
-  );
-}
+          results.push(
+            result
+          );
+        }
+      }
 
-}
 
+      /*
+        API'lere aşırı yük
+        bindirmemek için bekle.
+      */
 
-/*
-  OKX rate-limit yükünü
-  azaltmak için kısa bekleme.
-*/
       await new Promise(
         resolve =>
           setTimeout(
@@ -1209,37 +1343,51 @@ async function scanMarket() {
     }
 
 
+    /* =========================
+       SIRALAMA
+    ========================= */
+
     results.sort(
-  (a, b) => {
+      (a, b) => {
 
-    if (
-      a.confirmed &&
-      !b.confirmed
-    ) {
-      return -1;
-    }
+        /*
+          Tam teyitler önce.
+        */
 
-    if (
-      b.confirmed &&
-      !a.confirmed
-    ) {
-      return 1;
-    }
+        if (
+          a.confirmed &&
+          !b.confirmed
+        ) {
+          return -1;
+        }
 
-    return (
-      b.score -
-      a.score
+
+        if (
+          b.confirmed &&
+          !a.confirmed
+        ) {
+          return 1;
+        }
+
+
+        return (
+          b.score -
+          a.score
+        );
+      }
     );
-  }
-);
 
+
+    /* =========================
+       CACHE
+    ========================= */
 
     cache = {
 
       ok: true,
 
       source:
-        "OKX",
+        "OKX + BYBIT",
 
       updatedAt:
         Date.now(),
@@ -1247,11 +1395,17 @@ async function scanMarket() {
       scanned:
         symbols.length,
 
+      okxCount:
+        okxSymbols.length,
+
+      bybitCount:
+        bybitSymbols.length,
+
       rows:
-  results.slice(
-    0,
-    30
-  ),
+        results.slice(
+          0,
+          30
+        ),
 
       error:
         null
@@ -1259,13 +1413,14 @@ async function scanMarket() {
 
 
     console.log(
-      `OKX tarama tamamlandı: ${symbols.length} coin / ${results.length} teyit`
+      `Çoklu borsa taraması tamamlandı: ${symbols.length} tekil coin / ${results.length} sinyal`
     );
+
 
   } catch (error) {
 
     console.error(
-      "OKX tarama hatası:",
+      "Çoklu borsa tarama hatası:",
       error.message
     );
 
@@ -1279,12 +1434,12 @@ async function scanMarket() {
         error.message
     };
 
+
   } finally {
 
     scanning = false;
   }
 }
-
 
 /* =========================
    GÜNLÜK TEYİT API
