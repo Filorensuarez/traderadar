@@ -69,7 +69,7 @@ function selectExchange(exchange) {
     exchange === "okx"
   );
 
-  KucoinButton.classList.toggle(
+  kucoinButton.classList.toggle(
     "active",
     exchange === "kucoin"
   );
