@@ -397,3 +397,19 @@ footer {
       repeat(3, 1fr);
   }
 }
+/* YÜKSELİŞ TEYİDİ */
+
+.confirmation.confirmed {
+  background: rgba(49, 211, 145, 0.12);
+  border-color: rgba(49, 211, 145, 0.45);
+  color: #31d391;
+}
+
+
+/* YÜKSELİŞ ADAYI */
+
+.confirmation.candidate {
+  background: rgba(255, 184, 77, 0.12);
+  border-color: rgba(255, 184, 77, 0.45);
+  color: #ffb84d;
+}
