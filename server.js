@@ -581,7 +581,54 @@ async function getCandles(symbol) {
 
     .reverse();
 }
+/* =========================
+   BYBIT GÜNLÜK MUMLAR
+========================= */
 
+async function getBybitCandles(symbol) {
+
+  const result =
+    await getBybitJSON(
+      `${BYBIT}/v5/market/kline` +
+      `?category=spot` +
+      `&symbol=${encodeURIComponent(symbol)}` +
+      `&interval=D` +
+      `&limit=230`
+    );
+
+  const list =
+    Array.isArray(result.list)
+      ? result.list
+      : [];
+
+  /*
+    Bybit yeni mumu önce gönderir.
+    Analiz için eski -> yeni
+    sırasına çeviriyoruz.
+  */
+
+  return list
+    .map(row => ({
+      time:
+        Number(row[0]),
+
+      open:
+        Number(row[1]),
+
+      high:
+        Number(row[2]),
+
+      low:
+        Number(row[3]),
+
+      close:
+        Number(row[4]),
+
+      volume:
+        Number(row[5])
+    }))
+    .reverse();
+}
 
 /* =========================
    COİN ANALİZİ
