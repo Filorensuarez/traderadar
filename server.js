@@ -1828,9 +1828,9 @@ const effectiveTradeX =
       ),
 
     gainFromStart:
-      Number(
-        gainFromStart.toFixed(2)
-      ),
+  Number(
+    fromStart.toFixed(2)
+  ),
 
     pullbackFromPeak:
       Number(
