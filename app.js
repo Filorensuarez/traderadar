@@ -365,48 +365,101 @@ function coinCard(row) {
    SONUÇLARI GÖSTER
 ========================= */
 
-function render(data) {
+function renderExchange(data) {
+
+  lastData =
+    data;
+
+  const exchangeData =
+    selectedExchange === "bybit"
+      ? data.bybit
+      : data.okx;
+
+
+  if (!exchangeData) {
+
+    statusEl.textContent =
+      "Veri bekleniyor";
+
+    updatedEl.textContent =
+      "Borsa verisi henüz hazır değil.";
+
+    cards.innerHTML = `
+      <div class="empty-card">
+        Veri bekleniyor...
+      </div>
+    `;
+
+    return;
+  }
+
 
   const rows =
     Array.isArray(
-      data.rows
+      exchangeData.rows
     )
-      ? data.rows
+      ? exchangeData.rows
       : [];
 
 
-  if (data.ok) {
+  const exchangeName =
+    selectedExchange === "bybit"
+      ? "BYBIT"
+      : "OKX";
+
+
+  if (exchangeData.ok) {
 
     statusEl.textContent =
-      "Tarama aktif";
+      `${exchangeName} tarama aktif`;
 
   } else {
 
     statusEl.textContent =
-      "Veri bağlantısı sorunu";
+      `${exchangeName} bağlantı sorunu`;
   }
 
 
-  const confirmedCount =
-  rows.filter(
-    row => row.confirmed
-  ).length;
+  updatedEl.textContent =
+    `Son tarama: ${
+      timeText(data.updatedAt)
+    } | ${exchangeName} | Taranan: ${
+      Number(
+        exchangeData.scanned || 0
+      )
+    } coin | Teyit: ${
+      Number(
+        exchangeData.confirmed || 0
+      )
+    } | Aday: ${
+      Number(
+        exchangeData.candidates || 0
+      )
+    }`;
 
-const candidateCount =
-  rows.filter(
-    row => row.candidate
-  ).length;
 
-updatedEl.textContent =
-  `Son tarama: ${
-    timeText(data.updatedAt)
-  } | Taranan: ${
-    Number(data.scanned || 0)
-  } coin | Teyit: ${
-    confirmedCount
-  } | Aday: ${
-    candidateCount
-  }`;
+  if (exchangeData.error) {
+
+    cards.innerHTML = `
+      <div class="empty-card">
+
+        ${exchangeName}
+        bağlantı sorunu.
+
+        <br><br>
+
+        ${exchangeData.error}
+
+        <br><br>
+
+        Diğer borsanın taraması
+        bundan etkilenmez.
+
+      </div>
+    `;
+
+    return;
+  }
 
 
   if (!rows.length) {
@@ -414,9 +467,10 @@ updatedEl.textContent =
     cards.innerHTML = `
       <div class="empty-card">
 
-        Şu anda gerekli teknik
-        koşulları birlikte sağlayan
-        coin bulunamadı.
+        ${exchangeName} üzerinde
+        şu anda gerekli teknik
+        koşulları sağlayan coin
+        bulunamadı.
 
         <br><br>
 
@@ -435,8 +489,6 @@ updatedEl.textContent =
       .map(coinCard)
       .join("");
 }
-
-
 /* =========================
    SUNUCUDAN VERİ AL
 ========================= */
