@@ -1849,7 +1849,8 @@ const effectiveTradeX =
         resistanceDistance.toFixed(2)
       ),
 
-          Boolean(breakout),
+          breakoutConfirmed:
+  Boolean(breakout),
 
     earlyPriceScore:
       Math.round(startScore),
