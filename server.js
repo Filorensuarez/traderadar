@@ -1040,17 +1040,18 @@ async function scanMarket() {
   )
 ) {
 
-  results.push(
+    results.push(
     result
   );
 }
 
+}
 
-      /*
-        OKX rate-limit yükünü
-        azaltmak için kısa bekleme.
-      */
 
+/*
+  OKX rate-limit yükünü
+  azaltmak için kısa bekleme.
+*/
       await new Promise(
         resolve =>
           setTimeout(
