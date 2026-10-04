@@ -1834,7 +1834,7 @@ const effectiveTradeX =
 
     pullbackFromPeak:
       Number(
-        pullbackFromPeak.toFixed(2)
+        fromPeak.toFixed(2)
       ),
 
     ready:
