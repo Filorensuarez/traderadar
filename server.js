@@ -5,8 +5,8 @@ const PORT = process.env.PORT || 3000;
 
 const OKX =
   "https://www.okx.com";
-const BYBIT =
-  "https://api.bybit.com";
+const KUCOIN =
+  "https://api.kucoin.com";
 
 app.use(express.static("."));
 
