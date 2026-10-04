@@ -810,21 +810,74 @@ function analyze(
   ========================= */
 
   const confirmed =
+  const extended =
+  (
+    change3 >= 12 ||
+    RSI >= 74
+  );
+
+
+const confirmed =
+  (
+    !extended &&
+
+    price > ema20 &&
+
+    price > ema50 &&
+
+    RSI >= 50 &&
+
+    RSI < 74 &&
+
+    MACD.bullish &&
+
+    volumeRatio >= 1.15 &&
+
+    score >= 75
+  );
+
+
+const candidate =
+  (
+    !extended &&
+    !confirmed &&
+
+    price > ema20 &&
+
+    RSI >= 47 &&
+    RSI < 70 &&
+
     (
-      price > ema20 &&
+      MACD.bullish ||
+      MACD.histogram > 0
+    ) &&
 
-      price > ema50 &&
+    volumeRatio >= 0.90 &&
 
-      RSI >= 50 &&
+    score >= 55
+  );
 
-      RSI < 75 &&
 
-      MACD.bullish &&
+let signalType =
+  "IZLEME";
 
-      volumeRatio >= 1.15 &&
 
-      score >= 75
-    );
+if (candidate) {
+  signalType =
+    "YÜKSELİŞ ADAYI";
+}
+
+
+if (confirmed) {
+  signalType =
+    "YÜKSELİŞ TEYİDİ";
+}
+
+
+if (extended) {
+  signalType =
+    "HAREKET İLERLEMİŞ";
+}
 
 
   return {
@@ -891,7 +944,13 @@ function analyze(
 
     confirmed,
 
-    reasons
+candidate,
+
+extended,
+
+signalType,
+
+reasons
   };
 }
 
@@ -975,15 +1034,17 @@ async function scanMarket() {
           response.value;
 
         if (
-          result &&
-          result.confirmed
-        ) {
+  result &&
+  (
+    result.confirmed ||
+    result.candidate
+  )
+) {
 
-          results.push(
-            result
-          );
-        }
-      }
+  results.push(
+    result
+  );
+}
 
 
       /*
@@ -1002,10 +1063,28 @@ async function scanMarket() {
 
 
     results.sort(
-      (a, b) =>
-        b.score -
-        a.score
+  (a, b) => {
+
+    if (
+      a.confirmed &&
+      !b.confirmed
+    ) {
+      return -1;
+    }
+
+    if (
+      b.confirmed &&
+      !a.confirmed
+    ) {
+      return 1;
+    }
+
+    return (
+      b.score -
+      a.score
     );
+  }
+);
 
 
     cache = {
@@ -1022,10 +1101,10 @@ async function scanMarket() {
         symbols.length,
 
       rows:
-        results.slice(
-          0,
-          20
-        ),
+  results.slice(
+    0,
+    30
+  ),
 
       error:
         null
