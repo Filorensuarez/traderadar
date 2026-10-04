@@ -1849,9 +1849,57 @@ const effectiveTradeX =
         resistanceDistance.toFixed(2)
       ),
 
-    breakoutConfirmed:
-     
+          Boolean(breakout),
 
+    earlyPriceScore:
+      Math.round(startScore),
+
+    preparationScore:
+      Math.round(s.score),
+
+    startScore:
+      Math.round(startScore),
+
+    continuationScore:
+      Math.round(continuationScore),
+
+    trendActive:
+      Boolean(s.trendActive),
+
+    trendStartPrice:
+      Number(
+        s.trendStartPrice || 0
+      ),
+
+    trendPeakPrice:
+      Number(
+        s.trendPeakPrice || 0
+      ),
+
+    trendStartTime:
+      Number(
+        s.trendStartTime || 0
+      ),
+
+    gainFromStart:
+      Number(
+        gainFromStart.toFixed(2)
+      ),
+
+    pullbackFromPeak:
+      Number(
+        pullbackFromPeak.toFixed(2)
+      ),
+
+    ready:
+      enoughMicroData,
+
+    peak5m:
+      s.peak5m
+  };
+
+  recordSignal(s);
+}
 // =====================================
 // TÜM AKTİF USDT PARİTELERİ
 // =====================================
