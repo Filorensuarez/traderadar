@@ -996,61 +996,6 @@ const effectiveTradeX =
       s.price > resistance;
   }
 
-
-  if (!ready) {
-    s.score = 0;
-    s.status = "VERİ TOPLANIYOR";
-
-    s.metrics = {
-  w5,
-  w10,
-  w30,
-  w60,
-  w120,
-
-  volumeReady:
-    ready ||
-    effectiveVolumeX > 0,
-
-  volX:
-    Number(
-      effectiveVolumeX.toFixed(2)
-    ),
-
-  tradeX:
-    Number(
-      effectiveTradeX.toFixed(2)
-    ),
-
-      volumeAcceleration: volAccel,
-      tradeAcceleration: tradeAccel,
-
-      microVolumeAcceleration:
-        microVol,
-
-      microTradeAcceleration:
-        microTrade,
-
-      buyStrength,
-      compression,
-      trendScore: trend,
-      resistanceDistance,
-
-      ready: false,
-
-      warmupRemaining:
-        Math.max(
-          0,
-          CFG.warmup - age
-        ),
-
-      peak5m: 0
-    };
-
-    return;
-  }
-
-
     // ==========================================
   // TRADERADAR YENİ YÜKSELİŞ BAŞLANGIÇ MOTORU
   // ==========================================
