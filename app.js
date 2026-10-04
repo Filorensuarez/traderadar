@@ -60,7 +60,45 @@ longButton.addEventListener(
   () => openView("long")
 );
 
+function selectExchange(exchange) {
 
+  selectedExchange =
+    exchange;
+
+  okxButton.classList.toggle(
+    "active",
+    exchange === "okx"
+  );
+
+  bybitButton.classList.toggle(
+    "active",
+    exchange === "bybit"
+  );
+
+  if (lastData) {
+    renderExchange(
+      lastData
+    );
+  }
+}
+
+
+okxButton.addEventListener(
+  "click",
+  () =>
+    selectExchange(
+      "okx"
+    )
+);
+
+
+bybitButton.addEventListener(
+  "click",
+  () =>
+    selectExchange(
+      "bybit"
+    )
+);
 /* =========================
    SAYI GÖSTERİMİ
 ========================= */
