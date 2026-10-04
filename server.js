@@ -1123,14 +1123,27 @@ async function scanMarket() {
        COİN LİSTELERİNİ AL
     ========================= */
 
-    const [
-      okxSymbols,
-      bybitSymbols
-    ] =
-      await Promise.all([
-        getSymbols(),
-        getBybitSymbols()
-      ]);
+    const okxSymbols =
+  await getSymbols();
+
+let bybitSymbols = [];
+let bybitError = null;
+
+try {
+
+  bybitSymbols =
+    await getBybitSymbols();
+
+} catch (error) {
+
+  bybitError =
+    error.message;
+
+  console.error(
+    "Bybit bağlantı hatası:",
+    error.message
+  );
+}
 
 
     /* =========================
