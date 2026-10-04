@@ -1395,7 +1395,11 @@ function renderHistory() {
   if (!C) return;
 
   const list =
-    history();
+  history().filter(
+    h =>
+      h.status ===
+      "ALIM TEYİDİ"
+  );
 
   if (!list.length) {
     C.innerHTML = `
