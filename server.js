@@ -54,7 +54,7 @@ async function getJSON(url) {
 
   return json.data;
 }
-async function getBybitJSON(url) {
+async function getKucoinJSON(url) {
 
   const response =
     await fetch(url, {
@@ -64,7 +64,7 @@ async function getBybitJSON(url) {
 
   if (!response.ok) {
     throw new Error(
-      `Bybit HTTP ${response.status}`
+      `KuCoin HTTP ${response.status}`
     );
   }
 
@@ -72,17 +72,17 @@ async function getBybitJSON(url) {
     await response.json();
 
   if (
-    Number(json.retCode) !== 0
+    String(json.code) !== "200000"
   ) {
     throw new Error(
-      json.retMsg ||
-      "Bybit veri hatası"
+      json.msg ||
+      "KuCoin veri hatası"
     );
   }
 
-  return json.result;
+  return json.data;
 }
-
+  
 /* =========================
    MATEMATİK
 ========================= */
