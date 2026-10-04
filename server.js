@@ -823,7 +823,7 @@ const confirmed =
     price > ema20 &&
 
     price > ema50 &&
-
+price > ema200 &&
     RSI >= 50 &&
 
     RSI < 74 &&
