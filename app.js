@@ -321,6 +321,13 @@ function saveHistory(list) {
 
 
 function addHistory(x) {
+
+  if (
+    x.status !== "ALIM TEYİDİ"
+  ) {
+    return;
+  }
+
   const list = history();
   const now = Date.now();
 
@@ -615,7 +622,7 @@ addTab(
 );
 
 addTab(
-  "Sinyal Geçmişi",
+  "Alım Teyidi",
   "history"
 );
 addTab(
@@ -1395,13 +1402,13 @@ function renderHistory() {
       <article class="card">
 
         <div class="sym">
-          Henüz yeni sinyal yok
+          Henüz alım teyidi yok
         </div>
 
         <p>
-          Patlama hazırlığı veya
-          kırılım teyidi oluştuğunda
-          burada görünecek.
+          ALIM TEYİDİ verilen coinler
+burada otomatik olarak
+kaydedilecek.
         </p>
 
       </article>
