@@ -1244,7 +1244,118 @@ async function scanMarket() {
         error.message
       );
     }
+/* =========================
+   KUCOIN
+========================= */
 
+let kucoinSymbols = [];
+let kucoinResults = [];
+let kucoinError = null;
+
+try {
+
+  kucoinSymbols =
+    await getKucoinSymbols();
+
+  const batchSize = 5;
+
+  for (
+    let i = 0;
+    i < kucoinSymbols.length;
+    i += batchSize
+  ) {
+
+    const batch =
+      kucoinSymbols.slice(
+        i,
+        i + batchSize
+      );
+
+    const responses =
+      await Promise.allSettled(
+
+        batch.map(
+          async item => {
+
+            const candles =
+              await getKucoinCandles(
+                item.symbol
+              );
+
+            const base =
+              item.symbol.replace(
+                "-USDT",
+                ""
+              );
+
+            const result =
+              analyze(
+                `${base}/USDT`,
+                candles
+              );
+
+            if (!result) {
+              return null;
+            }
+
+            result.source =
+              "KUCOIN";
+
+            return result;
+          }
+        )
+      );
+
+
+    for (
+      const response
+      of responses
+    ) {
+
+      if (
+        response.status !==
+        "fulfilled"
+      ) {
+        continue;
+      }
+
+      const result =
+        response.value;
+
+      if (
+        result &&
+        (
+          result.confirmed ||
+          result.candidate
+        )
+      ) {
+
+        kucoinResults.push(
+          result
+        );
+      }
+    }
+
+
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          150
+        )
+    );
+  }
+
+} catch (error) {
+
+  kucoinError =
+    error.message;
+
+  console.error(
+    "KuCoin tarama hatası:",
+    error.message
+  );
+}
     /* =========================
        SIRALAMA
     ========================= */
