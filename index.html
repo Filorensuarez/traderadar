@@ -1,1 +1,179 @@
-<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TradeRadar</title><link rel="stylesheet" href="/style.css"></head><body><header><div><h1>TradeRadar</h1><p>2 Dakikalık Patlama Radarı</p></div><span id="conn">Bağlanıyor…</span></header><section class="info"><div><b>Canlı tarama</b><small>TRY pariteleri</small></div><div><b>5–120 sn</b><small>Mikro ivme</small></div><div><b>Son 8 mum</b><small>15 dk sıkışma</small></div></section><main><div class="title"><h2>Erken Uyarı Listesi</h2><span id="time"></span></div><div id="cards"></div></main><script src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <title>TradeRadar</title>
+
+  <link
+    rel="stylesheet"
+    href="./style.css"
+  >
+</head>
+
+<body>
+
+  <header class="topbar">
+    <div>
+      <h1>TradeRadar</h1>
+      <p class="subtitle">
+        Teknik Yükseliş Tarama Sistemi
+      </p>
+    </div>
+
+    <div
+      id="status"
+      class="status"
+    >
+      Bağlanıyor...
+    </div>
+  </header>
+
+
+  <nav class="tabs">
+
+    <button
+      id="dailyButton"
+      class="tab active"
+      data-view="daily"
+      type="button"
+    >
+      Günlük Yükseliş Teyidi
+    </button>
+
+    <button
+      id="longButton"
+      class="tab"
+      data-view="long"
+      type="button"
+    >
+      Uzun Vadeli Yükseliş
+    </button>
+
+  </nav>
+
+
+  <main class="container">
+
+    <!-- =========================
+         1. BÖLÜM
+         GÜNLÜK YÜKSELİŞ TEYİDİ
+    ========================== -->
+
+    <section id="daily">
+
+      <div class="section-head">
+
+        <div>
+          <h2>
+            Günlük Yükseliş Teyidi
+          </h2>
+
+          <p class="description">
+            Teknik göstergelerin birlikte
+            yükseliş başlangıcını desteklediği
+            coinler burada listelenir.
+          </p>
+        </div>
+
+        <button
+          id="refreshButton"
+          class="refresh-button"
+          type="button"
+        >
+          Yenile
+        </button>
+
+      </div>
+
+
+      <div class="info-box">
+
+        <span>
+          Sistem;
+          EMA 20/50/200,
+          RSI,
+          MACD,
+          hacim,
+          Bollinger Bantları,
+          ATR ve
+          destek/direnç yapısını
+          birlikte değerlendirir.
+        </span>
+
+      </div>
+
+
+      <div
+        id="updated"
+        class="updated"
+      >
+        Veriler bekleniyor...
+      </div>
+
+
+      <div
+        id="cards"
+        class="coin-grid"
+      >
+
+        <div class="empty-card">
+          Piyasa taranıyor...
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =========================
+         2. BÖLÜM
+         UZUN VADELİ YÜKSELİŞ
+    ========================== -->
+
+    <section
+      id="long"
+      hidden
+    >
+
+      <h2>
+        Uzun Vadeli Yükseliş
+      </h2>
+
+      <div class="coming-soon">
+
+        <h3>
+          Hazırlanıyor
+        </h3>
+
+        <p>
+          Bu bölümde uzun vadeli
+          yükseliş potansiyeli bulunan
+          coinler ayrıca analiz edilecek.
+        </p>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <footer>
+
+    TradeRadar teknik analiz aracıdır.
+    Gösterilen sonuçlar kesin kazanç
+    veya yatırım garantisi değildir.
+
+  </footer>
+
+
+  <script src="./app.js"></script>
+
+</body>
+</html>
