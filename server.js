@@ -1051,319 +1051,715 @@ const effectiveTradeX =
   }
 
 
-  // ===================================
-  // PUANLAMA
-  // ===================================
+    // ==========================================
+  // TRADERADAR YENİ YÜKSELİŞ BAŞLANGIÇ MOTORU
+  // ==========================================
 
-  const moved =
-    Math.max(
-      w60.ret,
-      w120.ret
-    );
+  const eVol =
+    Number(effectiveVolumeX || 0);
 
-  let early = 20;
+  const eTrade =
+    Number(effectiveTradeX || 0);
 
-  if (moved <= 0.5) early = 100;
-  else if (moved <= 1) early = 95;
-  else if (moved <= 2) early = 80;
-  else if (moved <= 3) early = 55;
+  const r5 =
+    Number(w5.ret || 0);
 
+  const r10 =
+    Number(w10.ret || 0);
 
-  const volumeScore =
-    Math.min(
-      100,
+  const r30 =
+    Number(w30.ret || 0);
 
-      volX * 18 +
+  const r60 =
+    Number(w60.ret || 0);
 
-      Math.max(
-        0,
-        volAccel - 1
-      ) * 35 +
+  const r120 =
+    Number(w120.ret || 0);
 
-      Math.max(
-        0,
-        microVol - 1
-      ) * 20
-    );
+  const buy5 =
+    Number(w5.buyRatio || 50);
 
+  const buy10 =
+    Number(w10.buyRatio || 50);
 
-  const tradeScore =
-    Math.min(
-      100,
+  const buy30 =
+    Number(w30.buyRatio || 50);
 
-      tradeX * 18 +
+  // ==========================================
+  // ORDER BOOK
+  // ==========================================
 
-      Math.max(
-        0,
-        tradeAccel - 1
-      ) * 35 +
+  const book =
+    s.orderBook || {};
 
-      Math.max(
-        0,
-        microTrade - 1
-      ) * 20
-    );
+  const bidDepth =
+    Number(book.bidDepth || 0);
 
+  const askDepth =
+    Number(book.askDepth || 0);
 
-  const flowScore =
-    Math.min(
-      100,
+  const totalDepth =
+    bidDepth + askDepth;
 
-      buyStrength +
+  const bookImbalance =
+    totalDepth > 0
+      ? (
+          (bidDepth - askDepth) /
+          totalDepth
+        ) * 100
+      : 0;
 
-      Math.max(
-        0,
-        buyShift
-      ) * 1.2
-    );
+  // ==========================================
+  // BÜYÜK İŞLEM AKIŞI
+  // ==========================================
 
+  const recentLarge =
+    Array.isArray(s.largeTrades)
+      ? s.largeTrades.filter(
+          x =>
+            Number(x.t || 0) >=
+            now - 120000
+        )
+      : [];
 
-  const momentum =
-    Math.max(
-      0,
-      Math.min(
-        100,
+  let largeBuy = 0;
+  let largeSell = 0;
 
-        50 +
-        w5.ret * 90 +
-        w10.ret * 65 +
-        w30.ret * 30
-      )
-    );
+  for (const item of recentLarge) {
+    const value =
+      Number(item.value || 0);
 
+    if (item.side === "buy") {
+      largeBuy += value;
+    } else if (
+      item.side === "sell"
+    ) {
+      largeSell += value;
+    }
+  }
 
-  let resistanceScore = 0;
+  const largeTotal =
+    largeBuy + largeSell;
+
+  const largeImbalance =
+    largeTotal > 0
+      ? (
+          (largeBuy - largeSell) /
+          largeTotal
+        ) * 100
+      : 0;
+
+  // ==========================================
+  // FİYAT İVMESİ
+  // ==========================================
+
+  let priceAccelerationScore = 0;
+
+  if (r5 > 0.03)
+    priceAccelerationScore += 12;
+
+  if (r10 > 0.08)
+    priceAccelerationScore += 12;
+
+  if (r30 > 0.15)
+    priceAccelerationScore += 12;
 
   if (
-    resistanceDistance >= 0 &&
-    resistanceDistance <= 2
+    r5 > 0 &&
+    r10 > 0 &&
+    r30 > 0
   ) {
-    resistanceScore =
-      100 -
-      resistanceDistance * 30;
-
-  } else if (
-    resistanceDistance < 0 &&
-    resistanceDistance > -1
-  ) {
-    resistanceScore = 100;
+    priceAccelerationScore += 15;
   }
-
-
-  let score =
-    volumeScore * 0.24 +
-    tradeScore * 0.18 +
-    flowScore * 0.18 +
-    momentum * 0.10 +
-    compression * 0.09 +
-    trend * 0.08 +
-    resistanceScore * 0.07 +
-    early * 0.06;
-
 
   if (
-    volAccel < 1.05 &&
-    volX < 1.3
+    r5 > r10 / 2 &&
+    r10 > r30 / 3
   ) {
-    score =
-      Math.min(score, 67);
+    priceAccelerationScore += 12;
   }
 
-
-  if (w30.buyRatio < 55) {
-    score =
-      Math.min(score, 66);
+  if (
+    r30 > r60 / 2
+  ) {
+    priceAccelerationScore += 10;
   }
 
-
-  const late =
-    w120.ret >= 5 ||
-    w60.ret >= 4;
-
-
-  if (late) {
-    score =
-      Math.min(score, 55);
+  if (
+    r60 > 0 &&
+    r120 > 0
+  ) {
+    priceAccelerationScore += 10;
   }
 
+  priceAccelerationScore =
+    Math.min(
+      100,
+      priceAccelerationScore
+    );
 
-  const breakOK =
-    breakout &&
-    w30.buyRatio >= 58 &&
+  // ==========================================
+  // MİKRO HACİM
+  // ==========================================
+
+  let volumeStartScore = 0;
+
+  if (eVol >= 1.05)
+    volumeStartScore += 15;
+
+  if (eVol >= 1.20)
+    volumeStartScore += 15;
+
+  if (eVol >= 1.50)
+    volumeStartScore += 15;
+
+  if (volAccel >= 1.05)
+    volumeStartScore += 15;
+
+  if (volAccel >= 1.20)
+    volumeStartScore += 15;
+
+  if (microVol >= 1.10)
+    volumeStartScore += 15;
+
+  if (microVol >= 1.40)
+    volumeStartScore += 10;
+
+  volumeStartScore =
+    Math.min(
+      100,
+      volumeStartScore
+    );
+
+  // ==========================================
+  // İŞLEM HIZI
+  // ==========================================
+
+  let tradeStartScore = 0;
+
+  if (eTrade >= 1.05)
+    tradeStartScore += 15;
+
+  if (eTrade >= 1.20)
+    tradeStartScore += 15;
+
+  if (eTrade >= 1.50)
+    tradeStartScore += 15;
+
+  if (tradeAccel >= 1.05)
+    tradeStartScore += 15;
+
+  if (tradeAccel >= 1.20)
+    tradeStartScore += 15;
+
+  if (microTrade >= 1.10)
+    tradeStartScore += 15;
+
+  if (microTrade >= 1.40)
+    tradeStartScore += 10;
+
+  tradeStartScore =
+    Math.min(
+      100,
+      tradeStartScore
+    );
+
+  // ==========================================
+  // ALICI AKIŞI
+  // ==========================================
+
+  let buyerScore = 0;
+
+  if (buy5 >= 52)
+    buyerScore += 10;
+
+  if (buy10 >= 55)
+    buyerScore += 15;
+
+  if (buy30 >= 55)
+    buyerScore += 15;
+
+  if (buy30 >= 60)
+    buyerScore += 15;
+
+  if (buy30 >= 65)
+    buyerScore += 10;
+
+  if (
+    buy5 >= buy10 &&
+    buy10 >= buy30
+  ) {
+    buyerScore += 15;
+  }
+
+  if (
+    buyStrength >= 60
+  ) {
+    buyerScore += 10;
+  }
+
+  if (
+    buyStrength >= 70
+  ) {
+    buyerScore += 10;
+  }
+
+  buyerScore =
+    Math.min(
+      100,
+      buyerScore
+    );
+
+  // ==========================================
+  // ORDER BOOK PUANI
+  // ==========================================
+
+  let bookScore = 50;
+
+  if (totalDepth > 0) {
+    bookScore =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          50 +
+          bookImbalance * 1.2
+        )
+      );
+  }
+
+  // ==========================================
+  // BÜYÜK İŞLEM PUANI
+  // ==========================================
+
+  let largeScore = 50;
+
+  if (largeTotal > 0) {
+    largeScore =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          50 +
+          largeImbalance
+        )
+      );
+  }
+
+  // ==========================================
+  // YÜKSELİŞ BAŞLANGIÇ PUANI
+  // ==========================================
+
+  let startScore =
+    priceAccelerationScore * 0.30 +
+    volumeStartScore * 0.20 +
+    tradeStartScore * 0.18 +
+    buyerScore * 0.17 +
+    bookScore * 0.10 +
+    largeScore * 0.05;
+
+  // Çok erken güçlü mikro hareket bonusu
+  if (
+    r5 > 0.05 &&
+    r10 > 0.10 &&
     (
-      volX >= 1.5 ||
-      volAccel >= 1.25
-    ) &&
-    w10.ret > -0.10;
-
-
-  if (breakOK) {
-    score =
-      Math.max(score, 86);
+      microVol >= 1.15 ||
+      microTrade >= 1.15
+    )
+  ) {
+    startScore += 8;
   }
 
+  // Alıcı + fiyat birlikte hızlanıyor
+  if (
+    buy10 >= 60 &&
+    r10 > 0.08 &&
+    r30 > 0.12
+  ) {
+    startScore += 6;
+  }
 
-  s.score =
+  // Order book güçlü destek
+  if (
+    bookImbalance >= 15
+  ) {
+    startScore += 4;
+  }
+
+  // Büyük alım desteği
+  if (
+    largeImbalance >= 25
+  ) {
+    startScore += 4;
+  }
+
+  // Negatif mikro yapı cezaları
+  if (
+    r5 < -0.15 &&
+    r10 < -0.15
+  ) {
+    startScore -= 20;
+  }
+
+  if (
+    buy30 < 40
+  ) {
+    startScore -= 15;
+  }
+
+  if (
+    bookImbalance <= -35
+  ) {
+    startScore -= 10;
+  }
+
+  if (
+    largeImbalance <= -40
+  ) {
+    startScore -= 10;
+  }
+
+  startScore =
     Math.round(
       Math.max(
         0,
-        Math.min(100, score)
+        Math.min(
+          100,
+          startScore
+        )
       )
     );
 
-  updatePeak(s);
+  // ==========================================
+  // HAREKET BAŞLATMA KOŞULLARI
+  // ==========================================
 
+  const enoughMicroData =
+    w30.n >= 3 &&
+    w30.vol > 0;
 
-  // ===================================
-  // DURUM
-  // ===================================
-
-    // ===================================
-  // DAHA SIKI SİNYAL FİLTRELERİ
-  // ===================================
-
-  const accumulation =
-    !late &&
-    s.score >= 65 &&
-
-    // Minimum gerçek aktivite
-    volX >= 1.0 &&
-    tradeX >= 0.8 &&
-
-    compression >= 55 &&
-
+  const activityStarting =
+    enoughMicroData &&
     (
-      volAccel >= 1.15 ||
-      tradeAccel >= 1.20
+      r5 > 0.02 ||
+      r10 > 0.05 ||
+      r30 > 0.10
     ) &&
-
-    w30.buyRatio >= 55;
-
-  const earlyCandidate =
-    !late &&
-
-    s.score >= 58 &&
-
-    // Hacim henüz patlamamış olsa bile
-    // hızlanmaya başlamış olmalı
-    volX >= 0.85 &&
-
-    tradeX >= 0.70 &&
-
-    // Hacim veya işlem akışından
-    // en az biri belirgin hızlanmalı
     (
-      volAccel >= 1.08 ||
-      tradeAccel >= 1.10 ||
+      eVol >= 1.05 ||
+      eTrade >= 1.05 ||
+      volAccel >= 1.05 ||
+      tradeAccel >= 1.05 ||
       microVol >= 1.08 ||
       microTrade >= 1.08
-    ) &&
+    );
 
-    // Satıcıların belirgin üstünlüğü olmasın
-    w30.buyRatio >= 52 &&
-
-    // Hareket henüz fazla ilerlememiş olsun
-    w120.ret < 2.0 &&
-
-    // Kısa vadede sert aşağı gitmesin
-    w30.ret > -0.75;
-  const preparation =
-    !late &&
-    s.score >= 75 &&
-
-    // Hacim gerçekten normalin üzerinde olmalı
-    volX >= 1.50 &&
-
-    // İşlem sayısı da yeterli olmalı
-    tradeX >= 1.00 &&
-
-    // Akış hızlanıyor olmalı
-    volAccel >= 1.20 &&
-    tradeAccel >= 1.15 &&
-
-    // Alıcı üstünlüğü
-    w30.buyRatio >= 60 &&
-
-    // Dirence yakınlık
-    resistanceDistance >= -0.50 &&
-    resistanceDistance <= 2.50 &&
-
-    // Hareket bittikten sonra yakalama
-    // ihtimalini azalt
-    w120.ret < 3.0;
-
-
-  const strong =
-    preparation &&
-
-    s.score >= 82 &&
-
-    // Güçlü sinyal için daha sert filtre
-    volX >= 2.00 &&
-    tradeX >= 1.20 &&
-
-    volAccel >= 1.40 &&
-    tradeAccel >= 1.30 &&
-
-    buyStrength >= 65 &&
-
-    w30.buyRatio >= 65 &&
-
-    // Dirence daha yakın olsun
-    resistanceDistance >= -0.30 &&
-    resistanceDistance <= 2.00 &&
-
-    // Son iki dakikada zaten uçmuş olmasın
-    w120.ret < 2.50 &&
-
+  const riseStarting =
+    enoughMicroData &&
+    startScore >= 55 &&
+    r10 > 0 &&
+    r30 > -0.10 &&
+    buy30 >= 50 &&
     (
-      microVol >= 1.10 ||
+      priceAccelerationScore >= 35 ||
+      (
+        r5 > 0.05 &&
+        r10 > 0.08
+      )
+    );
+
+  const explosionPreparation =
+    startScore >= 68 &&
+    r10 > 0.05 &&
+    r30 > 0.10 &&
+    buy30 >= 55 &&
+    (
+      eVol >= 1.15 ||
+      volAccel >= 1.15 ||
+      microVol >= 1.15
+    ) &&
+    (
+      eTrade >= 1.10 ||
+      tradeAccel >= 1.10 ||
       microTrade >= 1.10
     );
 
+  const strengthening =
+    startScore >= 72 &&
+    r30 > 0.20 &&
+    r60 > 0.25 &&
+    buy30 >= 58;
 
-  if (late) {
-    s.status = "GEÇ KALINDI";
+  // ==========================================
+  // TREND HAFIZASI
+  // ==========================================
 
-  } else if (breakOK) {
-    s.status = "KIRILIM TEYİDİ";
+  const activeTrend =
+    Number(s.trendStartPrice || 0) > 0;
 
-    } else if (strong) {
-    s.status =
-      "GÜÇLÜ PATLAMA HAZIRLIĞI";
+  // İlk gerçek başlangıç sinyali
+  if (
+    !activeTrend &&
+    riseStarting
+  ) {
+    s.trendStartPrice =
+      Number(s.price);
 
-  } else if (preparation) {
-    s.status =
+    s.trendStartTime =
+      now;
+
+    s.trendPeakPrice =
+      Number(s.price);
+
+    s.trendStartScore =
+      startScore;
+
+    s.trendWeakSince = 0;
+  }
+
+  if (
+    Number(s.trendStartPrice || 0) > 0
+  ) {
+    s.trendPeakPrice =
+      Math.max(
+        Number(
+          s.trendPeakPrice ||
+          s.trendStartPrice
+        ),
+        Number(s.price)
+      );
+  }
+
+  const trendStartPrice =
+    Number(
+      s.trendStartPrice || 0
+    );
+
+  const trendPeakPrice =
+    Number(
+      s.trendPeakPrice || 0
+    );
+
+  const fromStart =
+    trendStartPrice > 0
+      ? pct(
+          trendStartPrice,
+          s.price
+        )
+      : 0;
+
+  const fromPeak =
+    trendPeakPrice > 0
+      ? pct(
+          trendPeakPrice,
+          s.price
+        )
+      : 0;
+
+  // ==========================================
+  // TREND DEVAM PUANI
+  // ==========================================
+
+  let continuationScore = 0;
+
+  if (r10 >= 0)
+    continuationScore += 10;
+
+  if (r30 >= 0)
+    continuationScore += 15;
+
+  if (r60 >= 0)
+    continuationScore += 15;
+
+  if (r120 >= 0)
+    continuationScore += 10;
+
+  if (buy30 >= 50)
+    continuationScore += 10;
+
+  if (buy30 >= 58)
+    continuationScore += 10;
+
+  if (eVol >= 1)
+    continuationScore += 10;
+
+  if (eTrade >= 1)
+    continuationScore += 10;
+
+  if (bookImbalance >= 0)
+    continuationScore += 5;
+
+  if (largeImbalance >= 0)
+    continuationScore += 5;
+
+  continuationScore =
+    Math.min(
+      100,
+      continuationScore
+    );
+
+  // ==========================================
+  // YÜKSELİŞİN BİTİŞ MANTIĞI
+  // ==========================================
+
+  let structureBroken = false;
+
+  if (trendStartPrice > 0) {
+
+    const belowStart =
+      s.price <
+      trendStartPrice * 0.997;
+
+    const severeFlowBreak =
+      buy30 < 38 &&
+      bookImbalance < -25 &&
+      r30 < -0.30;
+
+    const severePeakCollapse =
+      fromPeak <= -8 &&
+      r60 < -0.50 &&
+      buy30 < 45;
+
+    structureBroken =
+      belowStart ||
+      severeFlowBreak ||
+      severePeakCollapse;
+
+    const weakNow =
+      continuationScore < 35 &&
+      r30 < 0 &&
+      buy30 < 48;
+
+    if (weakNow) {
+      if (!s.trendWeakSince) {
+        s.trendWeakSince = now;
+      }
+    } else {
+      s.trendWeakSince = 0;
+    }
+
+    // Tek saniyelik veriyle trend bitmesin.
+    if (
+      structureBroken &&
+      s.trendWeakSince &&
+      now - s.trendWeakSince <
+        15000
+    ) {
+      structureBroken = false;
+    }
+  }
+
+  // ==========================================
+  // DURUM KARARI
+  // ==========================================
+
+  let newStatus =
+    "İZLENİYOR";
+
+  if (
+    trendStartPrice > 0
+  ) {
+
+    if (structureBroken) {
+      newStatus =
+        "YÜKSELİŞ BİTTİ";
+
+    } else if (
+      continuationScore < 40 ||
+      (
+        fromPeak < -4 &&
+        r30 < 0
+      )
+    ) {
+      newStatus =
+        "YÜKSELİŞ ZAYIFLIYOR";
+
+    } else if (
+      strengthening ||
+      fromStart >= 2
+    ) {
+      newStatus =
+        "YÜKSELİŞ GÜÇLENİYOR";
+
+    } else if (
+      explosionPreparation
+    ) {
+      newStatus =
+        "PATLAMA HAZIRLIĞI";
+
+    } else {
+      newStatus =
+        "YÜKSELİŞ KORUNUYOR";
+    }
+
+  } else if (
+    explosionPreparation
+  ) {
+    newStatus =
       "PATLAMA HAZIRLIĞI";
 
-  } else if (accumulation) {
-  s.status =
-    "BİRİKİM TESPİT EDİLDİ";
+  } else if (
+    riseStarting
+  ) {
+    newStatus =
+      "YÜKSELİŞ BAŞLIYOR";
 
-} else if (earlyCandidate) {
-  s.status =
-    "ERKEN ADAY";
+  } else if (
+    activityStarting
+  ) {
+    newStatus =
+      "HAREKETLENME BAŞLADI";
+  }
 
-} else {
+  // Trend bittiyse hafızayı temizle.
+  // Önce YÜKSELİŞ BİTTİ durumu en az
+  // bir hesap döngüsünde görülebilsin.
+  if (
+    newStatus ===
+      "YÜKSELİŞ BİTTİ"
+  ) {
+    if (!s.trendEndedAt) {
+      s.trendEndedAt = now;
+    }
+
+    if (
+      now -
+      s.trendEndedAt >
+      30000
+    ) {
+      s.trendStartPrice = 0;
+      s.trendStartTime = 0;
+      s.trendPeakPrice = 0;
+      s.trendStartScore = 0;
+      s.trendWeakSince = 0;
+      s.trendEndedAt = 0;
+    }
+  } else {
+    s.trendEndedAt = 0;
+  }
+
   s.status =
-    "İZLENİYOR";
-}
+    newStatus;
+
+  s.score =
+    startScore;
+
+  updatePeak(s);
+
+  // ==========================================
+  // ULTIMATE ADAY
+  // ==========================================
 
   const ultimateCandidate =
-    s.score >= 75 &&
+    startScore >= 72 &&
     (
-      s.status ===
+      newStatus ===
         "PATLAMA HAZIRLIĞI" ||
-      s.status ===
-        "GÜÇLÜ PATLAMA HAZIRLIĞI" ||
-      s.status ===
-        "KIRILIM TEYİDİ"
+      newStatus ===
+        "YÜKSELİŞ GÜÇLENİYOR"
     );
 
   if (ultimateCandidate) {
-    const now =
-      Date.now();
-
     const lastLoad =
       Number(
         s.lastUltimateCandleLoad ||
@@ -1388,25 +1784,30 @@ const effectiveTradeX =
       });
     }
   }
+
+  // ==========================================
+  // METRİKLER
+  // ==========================================
+
   s.metrics = {
     w5,
     w10,
     w30,
     w60,
     w120,
+
     volumeReady:
-  ready ||
-  effectiveVolumeX > 0,
+      eVol > 0,
 
-volX:
-  Number(
-    effectiveVolumeX.toFixed(2)
-  ),
+    volX:
+      Number(
+        eVol.toFixed(2)
+      ),
 
-tradeX:
-  Number(
-    effectiveTradeX.toFixed(2)
-  ),
+    tradeX:
+      Number(
+        eTrade.toFixed(2)
+      ),
 
     volumeAcceleration:
       Number(
@@ -1434,10 +1835,14 @@ tradeX:
       ),
 
     compression:
-      Math.round(compression),
+      Math.round(
+        compression
+      ),
 
     trendScore:
-      Math.round(trend),
+      Math.round(
+        trend
+      ),
 
     resistanceDistance:
       Number(
@@ -1445,24 +1850,7 @@ tradeX:
       ),
 
     breakoutConfirmed:
-      breakOK,
-
-    earlyPriceScore:
-      early,
-
-    preparationScore:
-      s.score,
-
-    ready: true,
-
-    peak5m:
-      s.peak5m
-  };
-
-
-  recordSignal(s);
-}
-
+     
 
 // =====================================
 // TÜM AKTİF USDT PARİTELERİ
