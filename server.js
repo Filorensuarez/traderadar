@@ -429,7 +429,6 @@ async function getSymbols() {
         )
     )
 
-    .slice(0, 120)
 
     .map(
       item =>
