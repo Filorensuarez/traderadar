@@ -809,7 +809,6 @@ function analyze(
      ZORUNLU YÜKSELİŞ TEYİDİ
   ========================= */
 
-  const confirmed =
   const extended =
   (
     change3 >= 12 ||
