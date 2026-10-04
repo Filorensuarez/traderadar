@@ -202,9 +202,13 @@ function coinCard(row) {
       </div>
 
 
-      <div class="confirmation">
-        YÜKSELİŞ TEYİDİ
-      </div>
+      <div class="confirmation ${row.confirmed ? "confirmed" : "candidate"}">
+  ${
+    row.confirmed
+      ? "YÜKSELİŞ TEYİDİ"
+      : "YÜKSELİŞ ADAYI"
+  }
+</div>
 
 
       <div class="metrics">
