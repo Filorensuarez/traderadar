@@ -1396,9 +1396,9 @@ try {
         okxResults
       );
 
-    bybitResults =
+    kucoinResults =
       sortResults(
-        bybitResults
+        kucoinResults
       );
 
 
@@ -1419,14 +1419,14 @@ try {
       ).length;
 
 
-    const bybitConfirmed =
-      bybitResults.filter(
+    const kucoinConfirmed =
+      kucoinResults.filter(
         row =>
           row.confirmed
       ).length;
 
-    const bybitCandidates =
-      bybitResults.filter(
+    const kucoinCandidates =
+      kucoinResults.filter(
         row =>
           row.candidate
       ).length;
@@ -1449,7 +1449,7 @@ try {
 
       scanned:
         okxSymbols.length +
-        bybitSymbols.length,
+        kucoinSymbols.length,
 
 
       /* OKX */
@@ -1479,27 +1479,27 @@ try {
       },
 
 
-      /* BYBIT */
+      /* KUCOIN */
 
-      bybit: {
+      kucoin: {
 
         ok:
-          !bybitError,
+          !kucoinError,
 
         error:
-          bybitError,
+          kucoinError,
 
         scanned:
-          bybitSymbols.length,
+          kucoinSymbols.length,
 
         confirmed:
-          bybitConfirmed,
+          kucoinConfirmed,
 
         candidates:
-          bybitCandidates,
+          kucoinCandidates,
 
         rows:
-          bybitResults.slice(
+          kucoinResults.slice(
             0,
             30
           )
@@ -1529,7 +1529,7 @@ try {
     );
 
     console.log(
-      `Bybit: ${bybitSymbols.length} coin / ${bybitConfirmed} teyit / ${bybitCandidates} aday / ${bybitError || "OK"}`
+      `KuCoin: ${kucoinSymbols.length} coin / ${kucoinConfirmed} teyit / ${kucoinCandidates} aday / ${kucoinError || "OK"}`
     );
 
 
