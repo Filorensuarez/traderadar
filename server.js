@@ -54,7 +54,34 @@ async function getJSON(url) {
 
   return json.data;
 }
+async function getBybitJSON(url) {
 
+  const response =
+    await fetch(url, {
+      signal:
+        AbortSignal.timeout(15000)
+    });
+
+  if (!response.ok) {
+    throw new Error(
+      `Bybit HTTP ${response.status}`
+    );
+  }
+
+  const json =
+    await response.json();
+
+  if (
+    Number(json.retCode) !== 0
+  ) {
+    throw new Error(
+      json.retMsg ||
+      "Bybit veri hatası"
+    );
+  }
+
+  return json.result;
+}
 
 /* =========================
    MATEMATİK
