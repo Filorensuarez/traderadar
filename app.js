@@ -339,18 +339,26 @@ function render(data) {
   }
 
 
-  updatedEl.textContent =
-    `Son tarama: ${
-      timeText(
-        data.updatedAt
-      )
-    } | Taranan: ${
-      Number(
-        data.scanned || 0
-      )
-    } coin | Teyit: ${
-      rows.length
-    }`;
+  const confirmedCount =
+  rows.filter(
+    row => row.confirmed
+  ).length;
+
+const candidateCount =
+  rows.filter(
+    row => row.candidate
+  ).length;
+
+updatedEl.textContent =
+  `Son tarama: ${
+    timeText(data.updatedAt)
+  } | Taranan: ${
+    Number(data.scanned || 0)
+  } coin | Teyit: ${
+    confirmedCount
+  } | Aday: ${
+    candidateCount
+  }`;
 
 
   if (!rows.length) {
