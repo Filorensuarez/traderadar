@@ -1114,244 +1114,229 @@ async function scanMarket() {
   scanning = true;
 
   console.log(
-    "OKX + Bybit taraması başladı."
+    "Bağımsız borsa taraması başladı."
   );
 
   try {
 
     /* =========================
-       COİN LİSTELERİNİ AL
+       OKX
     ========================= */
 
-    const okxSymbols =
-  await getSymbols();
+    let okxSymbols = [];
+    let okxResults = [];
+    let okxError = null;
 
-let bybitSymbols = [];
-let bybitError = null;
+    try {
 
-try {
+      okxSymbols =
+        await getSymbols();
 
-  bybitSymbols =
-    await getBybitSymbols();
+      const batchSize = 5;
 
-} catch (error) {
-
-  bybitError =
-    error.message;
-
-  console.error(
-    "Bybit bağlantı hatası:",
-    error.message
-  );
-}
-
-
-    /* =========================
-       TEKİL COİN HARİTASI
-    ========================= */
-
-    const coinMap =
-      new Map();
-
-
-    /*
-      Öncelik OKX.
-
-      OKX'te bulunan coin önce
-      eklenir.
-    */
-
-    for (
-      const okxSymbol
-      of okxSymbols
-    ) {
-
-      const base =
-        okxSymbol.replace(
-          "-USDT",
-          ""
-        );
-
-      coinMap.set(
-        base,
-        {
-          base,
-          source: "OKX",
-          symbol: okxSymbol
-        }
-      );
-    }
-
-
-    /*
-      Bybit'te olup OKX'te
-      bulunmayan coinleri ekle.
-    */
-
-    for (
-      const item
-      of bybitSymbols
-    ) {
-
-      const base =
-        item.symbol.slice(
-          0,
-          -4
-        );
-
-      if (
-        !coinMap.has(base)
+      for (
+        let i = 0;
+        i < okxSymbols.length;
+        i += batchSize
       ) {
 
-        coinMap.set(
-          base,
-          {
-            base,
-            source: "BYBIT",
-            symbol: item.symbol
+        const batch =
+          okxSymbols.slice(
+            i,
+            i + batchSize
+          );
+
+        const responses =
+          await Promise.allSettled(
+
+            batch.map(
+              async symbol => {
+
+                const candles =
+                  await getCandles(
+                    symbol
+                  );
+
+                const result =
+                  analyze(
+                    symbol,
+                    candles
+                  );
+
+                if (!result) {
+                  return null;
+                }
+
+                result.source =
+                  "OKX";
+
+                return result;
+              }
+            )
+          );
+
+
+        for (
+          const response
+          of responses
+        ) {
+
+          if (
+            response.status !==
+            "fulfilled"
+          ) {
+            continue;
           }
+
+          const result =
+            response.value;
+
+          if (
+            result &&
+            (
+              result.confirmed ||
+              result.candidate
+            )
+          ) {
+
+            okxResults.push(
+              result
+            );
+          }
+        }
+
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              150
+            )
         );
       }
+
+    } catch (error) {
+
+      okxError =
+        error.message;
+
+      console.error(
+        "OKX tarama hatası:",
+        error.message
+      );
     }
 
 
-    const symbols =
-      Array.from(
-        coinMap.values()
-      );
-
-
-    console.log(
-      `OKX: ${okxSymbols.length} | Bybit: ${bybitSymbols.length} | Tekil: ${symbols.length}`
-    );
-
-
-    const results =
-      [];
-
-
     /* =========================
-       KÜÇÜK GRUPLARLA TARA
+       BYBIT
     ========================= */
 
-    const batchSize = 5;
+    let bybitSymbols = [];
+    let bybitResults = [];
+    let bybitError = null;
 
+    try {
 
-    for (
-      let i = 0;
-      i < symbols.length;
-      i += batchSize
-    ) {
+      bybitSymbols =
+        await getBybitSymbols();
 
-      const batch =
-        symbols.slice(
-          i,
-          i + batchSize
-        );
+      const batchSize = 5;
 
+      for (
+        let i = 0;
+        i < bybitSymbols.length;
+        i += batchSize
+      ) {
 
-      const responses =
-        await Promise.allSettled(
+        const batch =
+          bybitSymbols.slice(
+            i,
+            i + batchSize
+          );
 
-          batch.map(
-            async item => {
+        const responses =
+          await Promise.allSettled(
 
-              let candles;
+            batch.map(
+              async item => {
 
-
-              if (
-                item.source ===
-                "BYBIT"
-              ) {
-
-                candles =
+                const candles =
                   await getBybitCandles(
                     item.symbol
                   );
 
-              } else {
-
-                candles =
-                  await getCandles(
-                    item.symbol
+                const base =
+                  item.symbol.slice(
+                    0,
+                    -4
                   );
+
+                const result =
+                  analyze(
+                    `${base}/USDT`,
+                    candles
+                  );
+
+                if (!result) {
+                  return null;
+                }
+
+                result.source =
+                  "BYBIT";
+
+                return result;
               }
-
-
-              const displaySymbol =
-                `${item.base}/USDT`;
-
-
-              const result =
-                analyze(
-                  displaySymbol,
-                  candles
-                );
-
-
-              if (!result) {
-                return null;
-              }
-
-
-              /*
-                Sonucun hangi borsadan
-                geldiğini kaydet.
-              */
-
-              result.source =
-                item.source;
-
-
-              return result;
-            }
-          )
-        );
-
-
-      for (
-        const response
-        of responses
-      ) {
-
-        if (
-          response.status !==
-          "fulfilled"
-        ) {
-          continue;
-        }
-
-
-        const result =
-          response.value;
-
-
-        if (
-          result &&
-          (
-            result.confirmed ||
-            result.candidate
-          )
-        ) {
-
-          results.push(
-            result
+            )
           );
+
+
+        for (
+          const response
+          of responses
+        ) {
+
+          if (
+            response.status !==
+            "fulfilled"
+          ) {
+            continue;
+          }
+
+          const result =
+            response.value;
+
+          if (
+            result &&
+            (
+              result.confirmed ||
+              result.candidate
+            )
+          ) {
+
+            bybitResults.push(
+              result
+            );
+          }
         }
+
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              150
+            )
+        );
       }
 
+    } catch (error) {
 
-      /*
-        API'lere aşırı yük
-        bindirmemek için bekle.
-      */
+      bybitError =
+        error.message;
 
-      await new Promise(
-        resolve =>
-          setTimeout(
-            resolve,
-            150
-          )
+      console.error(
+        "Bybit tarama hatası:",
+        error.message
       );
     }
 
@@ -1360,35 +1345,76 @@ try {
        SIRALAMA
     ========================= */
 
-    results.sort(
-      (a, b) => {
+    const sortResults =
+      (rows) => {
 
-        /*
-          Tam teyitler önce.
-        */
+        rows.sort(
+          (a, b) => {
 
-        if (
-          a.confirmed &&
-          !b.confirmed
-        ) {
-          return -1;
-        }
+            if (
+              a.confirmed &&
+              !b.confirmed
+            ) {
+              return -1;
+            }
 
+            if (
+              b.confirmed &&
+              !a.confirmed
+            ) {
+              return 1;
+            }
 
-        if (
-          b.confirmed &&
-          !a.confirmed
-        ) {
-          return 1;
-        }
-
-
-        return (
-          b.score -
-          a.score
+            return (
+              b.score -
+              a.score
+            );
+          }
         );
-      }
-    );
+
+        return rows;
+      };
+
+
+    okxResults =
+      sortResults(
+        okxResults
+      );
+
+    bybitResults =
+      sortResults(
+        bybitResults
+      );
+
+
+    /* =========================
+       SAYILAR
+    ========================= */
+
+    const okxConfirmed =
+      okxResults.filter(
+        row =>
+          row.confirmed
+      ).length;
+
+    const okxCandidates =
+      okxResults.filter(
+        row =>
+          row.candidate
+      ).length;
+
+
+    const bybitConfirmed =
+      bybitResults.filter(
+        row =>
+          row.confirmed
+      ).length;
+
+    const bybitCandidates =
+      bybitResults.filter(
+        row =>
+          row.candidate
+      ).length;
 
 
     /* =========================
@@ -1397,46 +1423,107 @@ try {
 
     cache = {
 
-      ok: true,
+      ok:
+        !okxError,
 
       source:
-        "OKX + BYBIT",
+        "MULTI",
 
       updatedAt:
         Date.now(),
 
       scanned:
-        symbols.length,
-
-      okxCount:
-        okxSymbols.length,
-
-      bybitCount:
+        okxSymbols.length +
         bybitSymbols.length,
 
+
+      /* OKX */
+
+      okx: {
+
+        ok:
+          !okxError,
+
+        error:
+          okxError,
+
+        scanned:
+          okxSymbols.length,
+
+        confirmed:
+          okxConfirmed,
+
+        candidates:
+          okxCandidates,
+
+        rows:
+          okxResults.slice(
+            0,
+            30
+          )
+      },
+
+
+      /* BYBIT */
+
+      bybit: {
+
+        ok:
+          !bybitError,
+
+        error:
+          bybitError,
+
+        scanned:
+          bybitSymbols.length,
+
+        confirmed:
+          bybitConfirmed,
+
+        candidates:
+          bybitCandidates,
+
+        rows:
+          bybitResults.slice(
+            0,
+            30
+          )
+      },
+
+
+      /*
+        Eski arayüzün geçici olarak
+        çalışmaya devam etmesi için
+        OKX sonuçlarını rows içinde
+        de tutuyoruz.
+      */
+
       rows:
-        results.slice(
+        okxResults.slice(
           0,
           30
         ),
 
       error:
-        null
+        okxError
     };
 
 
     console.log(
-      `Çoklu borsa taraması tamamlandı: ${symbols.length} tekil coin / ${results.length} sinyal`
+      `OKX: ${okxSymbols.length} coin / ${okxConfirmed} teyit / ${okxCandidates} aday`
+    );
+
+    console.log(
+      `Bybit: ${bybitSymbols.length} coin / ${bybitConfirmed} teyit / ${bybitCandidates} aday / ${bybitError || "OK"}`
     );
 
 
   } catch (error) {
 
     console.error(
-      "Çoklu borsa tarama hatası:",
+      "Genel tarama hatası:",
       error.message
     );
-
 
     cache = {
       ...cache,
@@ -1453,7 +1540,6 @@ try {
     scanning = false;
   }
 }
-
 /* =========================
    GÜNLÜK TEYİT API
 ========================= */
