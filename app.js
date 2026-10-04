@@ -533,7 +533,7 @@ async function loadData() {
       await response.json();
 
 
-    render(data);
+    renderExchange(data);
 
   } catch (error) {
 
