@@ -591,46 +591,56 @@ async function getCandles(symbol) {
     .reverse();
 }
 /* =========================
-   BYBIT GÜNLÜK MUMLAR
+   KUCOIN GÜNLÜK MUMLAR
 ========================= */
 
-async function getBybitCandles(symbol) {
+async function getKucoinCandles(symbol) {
 
-  const result =
-    await getBybitJSON(
-      `${BYBIT}/v5/market/kline` +
-      `?category=spot` +
+  const endAt =
+    Math.floor(Date.now() / 1000);
+
+  const startAt =
+    endAt - (260 * 24 * 60 * 60);
+
+  const data =
+    await getKucoinJSON(
+      `${KUCOIN}/api/v1/market/candles` +
+      `?type=1day` +
       `&symbol=${encodeURIComponent(symbol)}` +
-      `&interval=D` +
-      `&limit=230`
+      `&startAt=${startAt}` +
+      `&endAt=${endAt}`
     );
 
   const list =
-    Array.isArray(result.list)
-      ? result.list
+    Array.isArray(data)
+      ? data
       : [];
 
   /*
-    Bybit yeni mumu önce gönderir.
-    Analiz için eski -> yeni
-    sırasına çeviriyoruz.
+    KuCoin mumları yeni -> eski
+    sırasıyla gönderir.
+
+    Analiz sistemi eski -> yeni
+    sırası kullandığı için
+    ters çeviriyoruz.
   */
 
   return list
+    .slice(0, 230)
     .map(row => ({
       time:
-        Number(row[0]),
+        Number(row[0]) * 1000,
 
       open:
         Number(row[1]),
 
-      high:
+      close:
         Number(row[2]),
 
-      low:
+      high:
         Number(row[3]),
 
-      close:
+      low:
         Number(row[4]),
 
       volume:
