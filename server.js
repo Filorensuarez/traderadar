@@ -415,7 +415,7 @@ async function getSymbols() {
           volumeUsd
         ) &&
         volumeUsd >=
-          5_000_000
+          1_000_000
       );
     })
 
@@ -429,7 +429,7 @@ async function getSymbols() {
         )
     )
 
-    .slice(0, 80)
+    .slice(0, 120)
 
     .map(
       item =>
