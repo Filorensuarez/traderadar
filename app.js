@@ -79,7 +79,57 @@ function openView(view) {
     !daily
   );
 }
+function openView(view) {
 
+  const daily =
+    view === "daily";
+
+  const long =
+    view === "long";
+
+  const radar =
+    view === "radar";
+
+
+  dailySection.hidden =
+    !daily;
+
+  longSection.hidden =
+    !long;
+
+  radarSection.hidden =
+    !radar;
+
+
+  dailyButton.classList.toggle(
+    "active",
+    daily
+  );
+
+  longButton.classList.toggle(
+    "active",
+    long
+  );
+
+  radarButton.classList.toggle(
+    "active",
+    radar
+  );
+
+
+  /*
+    Radar ilk kez açılıyorsa
+    veriyi yükle.
+  */
+
+  if (
+    radar &&
+    !radarLoaded
+  ) {
+
+    loadMinuteRadar();
+  }
+}
 
 dailyButton.addEventListener(
   "click",
