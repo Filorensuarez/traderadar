@@ -2267,7 +2267,9 @@ function updateMinuteRadarState(
     stageChangedAt:
       state.stageChangedAt
   };
-}}/* =========================
+}
+
+/* =========================
    COİN ANALİZİ
 ========================= */
 
