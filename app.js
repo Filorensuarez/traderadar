@@ -9,6 +9,37 @@ const kucoinButton =
   document.querySelector("#kucoinButton");
 const gateButton =
   document.querySelector("#gateButton");
+const radarButton =
+  document.querySelector("#radarButton");
+
+const radarSection =
+  document.querySelector("#radar");
+
+const radarRefreshButton =
+  document.querySelector(
+    "#radarRefreshButton"
+  );
+
+const radarStatus =
+  document.querySelector(
+    "#radarStatus"
+  );
+
+const radarUpdated =
+  document.querySelector(
+    "#radarUpdated"
+  );
+
+const radarCards =
+  document.querySelector(
+    "#radarCards"
+  );
+
+let radarLoading =
+  false;
+
+let radarLoaded =
+  false;
 let selectedExchange =
   "okx";
 
