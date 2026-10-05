@@ -24,7 +24,10 @@ let scanning = false;
 */
 
 const minuteRadarState =
-  let minuteRadarCache = {
+  new Map();
+
+
+let minuteRadarCache = {
 
   ok: true,
 
@@ -55,9 +58,7 @@ const minuteRadarState =
 
 
 let minuteRadarScanning =
-  false;
-  new Map();
-let cache = {
+  false;let cache = {
   ok: true,
   source: "OKX",
   updatedAt: 0,
