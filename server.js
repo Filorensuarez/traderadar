@@ -15,7 +15,16 @@ const GATE =
 app.use(express.static("."));
 
 let scanning = false;
+/*
+  Anlık radar sinyal hafızası.
 
+  Her coin için sinyalin hangi
+  mumda başladığını ve hâlen
+  aktif olup olmadığını tutar.
+*/
+
+const minuteRadarState =
+  new Map();
 let cache = {
   ok: true,
   source: "OKX",
