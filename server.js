@@ -1221,13 +1221,14 @@ function updateMinuteRadarState(
 
 
   /*
-    Şart artık sağlanmıyorsa
-    aktif sinyali kaldır.
+    Radar koşulu artık
+    sağlanmıyorsa sinyali kaldır.
   */
 
   if (!result.qualifies) {
 
     if (state) {
+
       minuteRadarState.delete(
         key
       );
@@ -1238,22 +1239,31 @@ function updateMinuteRadarState(
 
 
   /*
-    İlk kez şart sağlandı.
+    İlk sinyal.
   */
 
   if (!state) {
 
     state = {
 
-  startedAt:
-    candleTime,
+      startedAt:
+        Date.now(),
 
-  lastCandleTime:
-    candleTime,
+      firstCandleTime:
+        candleTime,
 
-  candlesAlive:
-    0
-};
+      lastCandleTime:
+        candleTime,
+
+      candlesAlive:
+        0,
+
+      highestScore:
+        result.score,
+
+      lastSignalLevel:
+        result.signalLevel
+    };
 
 
     minuteRadarState.set(
@@ -1263,20 +1273,27 @@ function updateMinuteRadarState(
 
 
     return {
+
       ...result,
 
       signal:
-        "YÜKSELİŞ BAŞLIYOR",
+        result.signalLevel,
+
+      isNew:
+        true,
 
       candlesAlive:
-        0
+        0,
+
+      highestScore:
+        result.score
     };
   }
 
 
   /*
-    Aynı mum tekrar taranırsa
-    sayaç artırılmayacak.
+    Yeni 1 dakikalık mum
+    geldiyse sayaç ilerler.
   */
 
   if (
@@ -1292,8 +1309,35 @@ function updateMinuteRadarState(
 
 
   /*
+    Görülen en yüksek puanı
+    hafızada tut.
+  */
+
+  state.highestScore =
+    Math.max(
+      state.highestScore || 0,
+      result.score
+    );
+
+
+  /*
+    Sinyal seviyesi değişimini
+    kaydet.
+  */
+
+  const levelChanged =
+    state.lastSignalLevel !==
+    result.signalLevel;
+
+
+  state.lastSignalLevel =
+    result.signalLevel;
+
+
+  /*
     Sinyal en fazla 20 yeni
-    mum boyunca ekranda kalır.
+    1 dakikalık mum boyunca
+    aktif tutulur.
   */
 
   if (
@@ -1319,13 +1363,23 @@ function updateMinuteRadarState(
     ...result,
 
     signal:
-      "YÜKSELİŞ BAŞLIYOR",
+      result.signalLevel,
+
+    isNew:
+      false,
+
+    levelChanged,
 
     candlesAlive:
-      state.candlesAlive
+      state.candlesAlive,
+
+    highestScore:
+      state.highestScore,
+
+    signalStartedAt:
+      state.startedAt
   };
-}
-/* =========================
+}/* =========================
    COİN ANALİZİ
 ========================= */
 
