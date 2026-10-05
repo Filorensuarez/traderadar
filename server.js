@@ -961,15 +961,15 @@ function updateMinuteRadarState(
 
     state = {
 
-      startedAt:
-        candleTime,
+  startedAt:
+    candleTime,
 
-      startIndex:
-        0,
+  lastCandleTime:
+    candleTime,
 
-      candlesAlive:
-        0
-    };
+  candlesAlive:
+    0
+};
 
 
     minuteRadarState.set(
