@@ -103,6 +103,13 @@ kucoinButton.addEventListener(
       "kucoin"
     )
 );
+gateButton.addEventListener(
+  "click",
+  () =>
+    selectExchange(
+      "gate"
+    )
+);
 /* =========================
    SAYI GÖSTERİMİ
 ========================= */
