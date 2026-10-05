@@ -902,6 +902,47 @@ async function getGateCandles(symbol) {
     );
 }
 /* =========================
+   GATE.IO 1 DAKİKALIK MUMLAR
+========================= */
+
+async function getGateMinuteCandles(
+  symbol
+) {
+
+  const data =
+    await getGateJSON(
+      `${GATE}/spot/candlesticks` +
+      `?currency_pair=${encodeURIComponent(symbol)}` +
+      `&interval=1m` +
+      `&limit=40`
+    );
+
+  return data
+    .map(row => ({
+      time:
+        Number(row[0]) * 1000,
+
+      volume:
+        Number(row[1]),
+
+      close:
+        Number(row[2]),
+
+      high:
+        Number(row[3]),
+
+      low:
+        Number(row[4]),
+
+      open:
+        Number(row[5])
+    }))
+    .sort(
+      (a, b) =>
+        a.time - b.time
+    );
+}
+/* =========================
    ANLIK YÜKSELİŞ RADARI
 ========================= */
 
