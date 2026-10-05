@@ -988,26 +988,84 @@ function analyzeMinuteRise(
 
   if (
     !Array.isArray(candles) ||
-    candles.length < 20
+    candles.length < 30
   ) {
     return null;
   }
 
   const data =
-    candles.slice(-40);
+    candles
+      .slice(-60)
+      .map(c => ({
+        time: Number(c.time),
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+        volume: Number(c.volume) || 0
+      }))
+      .filter(c =>
+        Number.isFinite(c.close) &&
+        c.close > 0
+      );
+
+  if (data.length < 30) {
+    return null;
+  }
 
   const last =
     data.at(-1);
 
   const price =
-    Number(last.close);
+    last.close;
 
-  if (
-    !Number.isFinite(price) ||
-    price <= 0
-  ) {
-    return null;
+
+  /* =========================
+     YARDIMCI FONKSİYONLAR
+  ========================= */
+
+  function avg(values) {
+
+    const valid =
+      values.filter(
+        Number.isFinite
+      );
+
+    if (!valid.length) {
+      return 0;
+    }
+
+    return (
+      valid.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) / valid.length
+    );
   }
+
+
+  function percentChange(
+    current,
+    previous
+  ) {
+
+    if (
+      !Number.isFinite(current) ||
+      !Number.isFinite(previous) ||
+      previous <= 0
+    ) {
+      return 0;
+    }
+
+    return (
+      (
+        current - previous
+      ) /
+      previous
+    ) * 100;
+  }
+
 
   function change(minutes) {
 
@@ -1018,31 +1076,116 @@ function analyzeMinuteRise(
       return 0;
     }
 
-    const oldPrice =
-      Number(
-        data.at(
-          -(minutes + 1)
-        ).close
-      );
+    return percentChange(
+      price,
+      data.at(
+        -(minutes + 1)
+      ).close
+    );
+  }
+
+
+  function ema(
+    values,
+    period
+  ) {
 
     if (
-      !Number.isFinite(oldPrice) ||
-      oldPrice <= 0
+      !Array.isArray(values) ||
+      !values.length
     ) {
       return 0;
     }
 
-    return (
-      (
-        price - oldPrice
-      ) /
-      oldPrice
-    ) * 100;
+    const k =
+      2 / (period + 1);
+
+    let value =
+      values[0];
+
+    for (
+      let i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      value =
+        values[i] * k +
+        value * (1 - k);
+    }
+
+    return value;
   }
 
 
+  function rsi(
+    values,
+    period = 14
+  ) {
+
+    if (
+      values.length <
+      period + 1
+    ) {
+      return 50;
+    }
+
+    const sample =
+      values.slice(
+        -(period + 1)
+      );
+
+    let gains = 0;
+    let losses = 0;
+
+    for (
+      let i = 1;
+      i < sample.length;
+      i++
+    ) {
+
+      const difference =
+        sample[i] -
+        sample[i - 1];
+
+      if (difference > 0) {
+        gains += difference;
+      } else {
+        losses +=
+          Math.abs(difference);
+      }
+    }
+
+    const averageGain =
+      gains / period;
+
+    const averageLoss =
+      losses / period;
+
+    if (averageLoss === 0) {
+      return 100;
+    }
+
+    const rs =
+      averageGain /
+      averageLoss;
+
+    return (
+      100 -
+      100 / (1 + rs)
+    );
+  }
+
+
+  /* =========================
+     FİYAT DEĞİŞİMLERİ
+  ========================= */
+
   const change1 =
     change(1);
+
+  const change2 =
+    change(2);
 
   const change3 =
     change(3);
@@ -1050,189 +1193,654 @@ function analyzeMinuteRise(
   const change5 =
     change(5);
 
+  const change10 =
+    change(10);
+
   const change15 =
     change(15);
 
 
-  /*
-    HACİM İVMESİ
+  const priceAcceleration =
+    change1 -
+    change5 / 5;
 
-    Son 3 mumun ortalama hacmini,
-    önceki 15 mumun ortalamasıyla
-    karşılaştırıyoruz.
-  */
+
+  const acceleration3 =
+    change3 / 3 -
+    change10 / 10;
+
+
+  /* =========================
+     HACİM
+  ========================= */
 
   const volumes =
     data.map(
-      candle =>
-        Number(candle.volume) || 0
+      c => c.volume
     );
+
+
+  const baselineVolumes =
+    volumes.slice(
+      -23,
+      -3
+    );
+
 
   const recentVolumes =
     volumes.slice(-3);
 
-  const previousVolumes =
-    volumes.slice(-18, -3);
 
-
-  const recentVolumeAverage =
-    average(
-      recentVolumes
-    ) || 0;
-
-  const previousVolumeAverage =
-    average(
-      previousVolumes
-    ) || 0;
-
-
-  const volumeAcceleration =
-    previousVolumeAverage > 0
-      ? recentVolumeAverage /
-        previousVolumeAverage
-      : 0;
-
-
-  /*
-    FİYAT İVMESİ
-  */
-
-  const priceAcceleration =
-    change1 -
-    (
-      change5 / 5
+  const baselineVolume =
+    avg(
+      baselineVolumes
     );
 
 
-  /*
-    PUANLAMA
-  */
+  const recentVolume =
+    avg(
+      recentVolumes
+    );
+
+
+  const volumeAcceleration =
+    baselineVolume > 0
+      ? recentVolume /
+        baselineVolume
+      : 0;
+
+
+  const lastVolumeRatio =
+    baselineVolume > 0
+      ? last.volume /
+        baselineVolume
+      : 0;
+
+
+  /* =========================
+     MUM GÖVDESİ
+  ========================= */
+
+  function bodySize(candle) {
+
+    return Math.abs(
+      candle.close -
+      candle.open
+    );
+  }
+
+
+  const oldBodies =
+    data
+      .slice(-18, -3)
+      .map(bodySize);
+
+
+  const recentBodies =
+    data
+      .slice(-3)
+      .map(bodySize);
+
+
+  const oldBodyAverage =
+    avg(oldBodies);
+
+
+  const recentBodyAverage =
+    avg(recentBodies);
+
+
+  const bodyExpansion =
+    oldBodyAverage > 0
+      ? recentBodyAverage /
+        oldBodyAverage
+      : 0;
+
+
+  const greenCandles =
+    data
+      .slice(-5)
+      .filter(
+        c =>
+          c.close >
+          c.open
+      ).length;
+
+
+  /* =========================
+     EMA 7 / EMA 25
+  ========================= */
+
+  const closes =
+    data.map(
+      c => c.close
+    );
+
+
+  const ema7 =
+    ema(
+      closes,
+      7
+    );
+
+
+  const ema25 =
+    ema(
+      closes,
+      25
+    );
+
+
+  const previousCloses =
+    closes.slice(
+      0,
+      -3
+    );
+
+
+  const ema7Previous =
+    ema(
+      previousCloses,
+      7
+    );
+
+
+  const ema25Previous =
+    ema(
+      previousCloses,
+      25
+    );
+
+
+  const ema7Slope =
+    percentChange(
+      ema7,
+      ema7Previous
+    );
+
+
+  const emaSpread =
+    percentChange(
+      ema7,
+      ema25
+    );
+
+
+  const previousSpread =
+    percentChange(
+      ema7Previous,
+      ema25Previous
+    );
+
+
+  const emaSpreadAcceleration =
+    emaSpread -
+    previousSpread;
+
+
+  /* =========================
+     RSI
+  ========================= */
+
+  const rsiNow =
+    rsi(
+      closes,
+      14
+    );
+
+
+  const rsiPrevious =
+    rsi(
+      closes.slice(
+        0,
+        -3
+      ),
+      14
+    );
+
+
+  const rsiAcceleration =
+    rsiNow -
+    rsiPrevious;
+
+
+  /* =========================
+     MACD
+  ========================= */
+
+  function macdHistogram(
+    values
+  ) {
+
+    if (values.length < 26) {
+      return 0;
+    }
+
+    const fast =
+      ema(
+        values,
+        12
+      );
+
+    const slow =
+      ema(
+        values,
+        26
+      );
+
+    return fast - slow;
+  }
+
+
+  const macdNow =
+    macdHistogram(
+      closes
+    );
+
+
+  const macdPrevious =
+    macdHistogram(
+      closes.slice(
+        0,
+        -3
+      )
+    );
+
+
+  const macdAcceleration =
+    macdNow -
+    macdPrevious;
+
+
+  /* =========================
+     SIKIŞMA / DURAĞANLIK
+  ========================= */
+
+  const compressionWindow =
+    data.slice(
+      -23,
+      -3
+    );
+
+
+  const compressionHigh =
+    Math.max(
+      ...compressionWindow.map(
+        c => c.high
+      )
+    );
+
+
+  const compressionLow =
+    Math.min(
+      ...compressionWindow.map(
+        c => c.low
+      )
+    );
+
+
+  const compressionRange =
+    compressionLow > 0
+      ? (
+          (
+            compressionHigh -
+            compressionLow
+          ) /
+          compressionLow
+        ) * 100
+      : 0;
+
+
+  const wasCompressed =
+    compressionRange <= 3.0;
+
+
+  /* =========================
+     YÜKSEK TEPE / YÜKSEK DİP
+  ========================= */
+
+  const recent5 =
+    data.slice(-5);
+
+
+  let higherStructure =
+    0;
+
+
+  for (
+    let i = 1;
+    i < recent5.length;
+    i++
+  ) {
+
+    if (
+      recent5[i].high >
+      recent5[i - 1].high
+    ) {
+      higherStructure += 1;
+    }
+
+    if (
+      recent5[i].low >
+      recent5[i - 1].low
+    ) {
+      higherStructure += 1;
+    }
+  }
+
+
+  /* =========================
+     ERKEN HAREKET PUANI
+  ========================= */
 
   let score = 0;
 
 
-  if (change1 >= 0.25) {
-    score += 15;
-  }
-
-  if (change1 >= 0.60) {
-    score += 10;
-  }
-
-
-  if (change3 >= 0.60) {
-    score += 15;
-  }
-
-  if (change3 >= 1.20) {
-    score += 10;
-  }
-
-
-  if (change5 >= 1.00) {
-    score += 10;
+  if (wasCompressed) {
+    score += 8;
   }
 
 
   if (
-    change15 > 0
+    volumeAcceleration >= 1.3
+  ) {
+    score += 8;
+  }
+
+  if (
+    volumeAcceleration >= 2
+  ) {
+    score += 7;
+  }
+
+  if (
+    lastVolumeRatio >= 3
   ) {
     score += 5;
   }
 
 
   if (
-    volumeAcceleration >= 1.5
+    bodyExpansion >= 1.4
   ) {
-    score += 10;
+    score += 7;
   }
 
   if (
-    volumeAcceleration >= 2.5
+    bodyExpansion >= 2.2
   ) {
-    score += 10;
+    score += 5;
+  }
+
+
+  if (
+    greenCandles >= 3
+  ) {
+    score += 5;
+  }
+
+
+  if (
+    ema7Slope > 0
+  ) {
+    score += 6;
+  }
+
+  if (
+    emaSpreadAcceleration > 0
+  ) {
+    score += 7;
+  }
+
+  if (
+    ema7 > ema25
+  ) {
+    score += 5;
+  }
+
+
+  if (
+    rsiNow >= 50 &&
+    rsiNow <= 72
+  ) {
+    score += 5;
+  }
+
+  if (
+    rsiAcceleration >= 3
+  ) {
+    score += 6;
+  }
+
+
+  if (
+    macdAcceleration > 0
+  ) {
+    score += 7;
+  }
+
+
+  if (
+    change1 >= 0.20
+  ) {
+    score += 5;
+  }
+
+  if (
+    change3 >= 0.50
+  ) {
+    score += 5;
+  }
+
+  if (
+    change5 >= 0.80
+  ) {
+    score += 5;
   }
 
 
   if (
     priceAcceleration > 0
   ) {
-    score += 10;
+    score += 5;
+  }
+
+
+  if (
+    acceleration3 > 0
+  ) {
+    score += 4;
+  }
+
+
+  if (
+    higherStructure >= 5
+  ) {
+    score += 5;
   }
 
 
   score =
     Math.min(
-      score,
-      100
+      100,
+      score
     );
 
 
-  /*
-    SİNYAL SEVİYESİ
-  */
+  /* =========================
+     HAREKETİN AŞAMASI
+  ========================= */
 
-  let signalLevel =
-    "İZLE";
+  let stage =
+    "DURAĞAN";
+
+  let stageNumber =
+    0;
 
 
-  if (score >= 80) {
+  const lateMove =
+    change15 >= 8 ||
+    change10 >= 7 ||
+    (
+      change5 >= 5 &&
+      rsiNow >= 75
+    );
 
-    signalLevel =
-      "GÜÇLÜ TEYİT";
+
+  const momentumWeakening =
+    change15 >= 5 &&
+    (
+      priceAcceleration < 0 ||
+      macdAcceleration < 0 ||
+      rsiAcceleration < -3
+    );
+
+
+  if (lateMove) {
+
+    stage =
+      momentumWeakening
+        ? "ZİRVE RİSKİ"
+        : "GEÇ KALINDI";
+
+    stageNumber = 5;
 
   } else if (
-    score >= 65
+    score >= 82 &&
+    change5 >= 1.5 &&
+    volumeAcceleration >= 1.5
   ) {
 
-    signalLevel =
-      "KIRILIM YAKLAŞIYOR";
+    stage =
+      "YÜKSELİŞ TEYİDİ";
+
+    stageNumber = 4;
 
   } else if (
-    score >= 50
+    score >= 70
   ) {
 
-    signalLevel =
-      "HAREKETLENİYOR";
+    stage =
+      "YÜKSELİŞ BAŞLIYOR";
+
+    stageNumber = 3;
+
+  } else if (
+    score >= 55
+  ) {
+
+    stage =
+      "ERKEN HAREKET";
+
+    stageNumber = 2;
+
+  } else if (
+    (
+      wasCompressed &&
+      volumeAcceleration >= 1.2
+    ) ||
+    (
+      ema7Slope > 0 &&
+      bodyExpansion >= 1.2
+    )
+  ) {
+
+    stage =
+      "UYANIYOR";
+
+    stageNumber = 1;
   }
 
 
   /*
-    Radar yalnızca anlamlı
-    hareketleri sonuç listesine alır.
+    Zirve riski ayrıca
+    mevcut güçlü hareketin
+    zayıflamasını gösterir.
+  */
+
+  if (
+    !lateMove &&
+    momentumWeakening
+  ) {
+
+    stage =
+      "HAREKET ZAYIFLIYOR";
+
+    stageNumber = 5;
+  }
+
+
+  const signalLevel =
+    stage;
+
+
+  /*
+    Radar artık erken aşamayı da
+    gösterebilir. Durağan coinleri
+    sonuç listesine almıyoruz.
   */
 
   const qualifies =
-    score >= 50;
+    stageNumber >= 1;
 
 
   return {
 
     symbol,
-
     source,
-
     price,
 
     change1,
-
+    change2,
     change3,
-
     change5,
-
+    change10,
     change15,
 
     volumeAcceleration,
+    lastVolumeRatio,
+
+    bodyExpansion,
+    greenCandles,
+
+    ema7,
+    ema25,
+    ema7Slope,
+    emaSpread,
+    emaSpreadAcceleration,
+
+    rsi:
+      rsiNow,
+
+    rsiAcceleration,
+
+    macd:
+      macdNow,
+
+    macdAcceleration,
+
+    compressionRange,
+    wasCompressed,
+
+    higherStructure,
 
     priceAcceleration,
+    acceleration3,
 
     score,
 
+    stage,
+    stageNumber,
+
     signalLevel,
+
+    lateMove,
+    momentumWeakening,
 
     qualifies
   };
-}/* =========================
+}
+/* =========================
    RADAR SİNYAL YÖNETİMİ
 ========================= */
 
