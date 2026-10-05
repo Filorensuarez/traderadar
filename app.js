@@ -416,7 +416,9 @@ function renderExchange(data) {
 
 
   const exchangeName =
-    selectedExchange === "kucoin"
+  selectedExchange === "gate"
+    ? "GATE.IO"
+    : selectedExchange === "kucoin"
       ? "KUCOIN"
       : "OKX";
 
