@@ -1697,7 +1697,17 @@ gateResults =
           row.candidate
       ).length;
 
+const gateConfirmed =
+  gateResults.filter(
+    row =>
+      row.confirmed
+  ).length;
 
+const gateCandidates =
+  gateResults.filter(
+    row =>
+      row.candidate
+  ).length;
     /* =========================
        CACHE
     ========================= */
