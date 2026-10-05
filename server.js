@@ -58,7 +58,8 @@ let minuteRadarCache = {
 
 
 let minuteRadarScanning =
-  false;let cache = {
+  false;
+let cache = {
   ok: true,
   source: "OKX",
   updatedAt: 0,
