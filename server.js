@@ -1782,13 +1782,28 @@ const gateCandidates =
           )
       },
 gate: {
-  ok
-  error
-  scanned
-  confirmed
-  candidates
-  rows
-}
+
+  ok:
+    !gateError,
+
+  error:
+    gateError,
+
+  scanned:
+    gateSymbols.length,
+
+  confirmed:
+    gateConfirmed,
+
+  candidates:
+    gateCandidates,
+
+  rows:
+    gateResults.slice(
+      0,
+      30
+    )
+},
 
       /*
         Eski arayüzün geçici olarak
