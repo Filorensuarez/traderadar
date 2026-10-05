@@ -1781,7 +1781,14 @@ const gateCandidates =
             30
           )
       },
-
+gate: {
+  ok
+  error
+  scanned
+  confirmed
+  candidates
+  rows
+}
 
       /*
         Eski arayüzün geçici olarak
