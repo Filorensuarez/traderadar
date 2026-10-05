@@ -1831,7 +1831,10 @@ gate: {
       `KuCoin: ${kucoinSymbols.length} coin / ${kucoinConfirmed} teyit / ${kucoinCandidates} aday / ${kucoinError || "OK"}`
     );
 
-
+console.log(
+  `Gate.io: ${gateSymbols.length} coin / ${gateConfirmed} teyit / ${gateCandidates} aday / ${gateError || "OK"}`
+);
+    
   } catch (error) {
 
     console.error(
