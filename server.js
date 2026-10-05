@@ -915,6 +915,133 @@ function analyzeMinuteRise(
   };
 }
 /* =========================
+   RADAR SİNYAL YÖNETİMİ
+========================= */
+
+function updateMinuteRadarState(
+  result,
+  candleTime
+) {
+
+  if (!result) {
+    return null;
+  }
+
+
+  const key =
+    `${result.source}:${result.symbol}`;
+
+
+  let state =
+    minuteRadarState.get(key);
+
+
+  /*
+    Şart artık sağlanmıyorsa
+    aktif sinyali kaldır.
+  */
+
+  if (!result.qualifies) {
+
+    if (state) {
+      minuteRadarState.delete(
+        key
+      );
+    }
+
+    return null;
+  }
+
+
+  /*
+    İlk kez şart sağlandı.
+  */
+
+  if (!state) {
+
+    state = {
+
+      startedAt:
+        candleTime,
+
+      startIndex:
+        0,
+
+      candlesAlive:
+        0
+    };
+
+
+    minuteRadarState.set(
+      key,
+      state
+    );
+
+
+    return {
+      ...result,
+
+      signal:
+        "YÜKSELİŞ BAŞLIYOR",
+
+      candlesAlive:
+        0
+    };
+  }
+
+
+  /*
+    Aynı mum tekrar taranırsa
+    sayaç artırılmayacak.
+  */
+
+  if (
+    state.lastCandleTime !==
+    candleTime
+  ) {
+
+    state.candlesAlive += 1;
+
+    state.lastCandleTime =
+      candleTime;
+  }
+
+
+  /*
+    Sinyal en fazla 20 yeni
+    mum boyunca ekranda kalır.
+  */
+
+  if (
+    state.candlesAlive >= 20
+  ) {
+
+    minuteRadarState.delete(
+      key
+    );
+
+    return null;
+  }
+
+
+  minuteRadarState.set(
+    key,
+    state
+  );
+
+
+  return {
+
+    ...result,
+
+    signal:
+      "YÜKSELİŞ BAŞLIYOR",
+
+    candlesAlive:
+      state.candlesAlive
+  };
+}
+/* =========================
    COİN ANALİZİ
 ========================= */
 
