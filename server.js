@@ -804,6 +804,60 @@ async function getKucoinCandles(symbol) {
     .reverse();
 }
 /* =========================
+   KUCOIN 1 DAKİKALIK MUMLAR
+========================= */
+
+async function getKucoinMinuteCandles(
+  symbol
+) {
+
+  const endAt =
+    Math.floor(
+      Date.now() / 1000
+    );
+
+  const startAt =
+    endAt -
+    (45 * 60);
+
+  const data =
+    await getKucoinJSON(
+      `${KUCOIN}/api/v1/market/candles` +
+      `?type=1min` +
+      `&symbol=${encodeURIComponent(symbol)}` +
+      `&startAt=${startAt}` +
+      `&endAt=${endAt}`
+    );
+
+  const list =
+    Array.isArray(data)
+      ? data
+      : [];
+
+  return list
+    .slice(0, 40)
+    .map(row => ({
+      time:
+        Number(row[0]) * 1000,
+
+      open:
+        Number(row[1]),
+
+      close:
+        Number(row[2]),
+
+      high:
+        Number(row[3]),
+
+      low:
+        Number(row[4]),
+
+      volume:
+        Number(row[5])
+    }))
+    .reverse();
+}
+/* =========================
    GATE.IO GÜNLÜK MUMLAR
 ========================= */
 
