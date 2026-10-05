@@ -1664,7 +1664,10 @@ try {
         kucoinResults
       );
 
-
+gateResults =
+  sortResults(
+    gateResults
+  );
     /* =========================
        SAYILAR
     ========================= */
