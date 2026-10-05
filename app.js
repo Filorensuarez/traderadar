@@ -836,7 +836,346 @@ function minuteRadarCard(item) {
   `;
 }
 
+function minuteRadarCard(item) {
 
+  const score =
+    Number(item.score || 0);
+
+  const stage =
+    item.stage ||
+    item.signal ||
+    item.signalLevel ||
+    "İZLE";
+
+
+  const multiText =
+    item.multiExchange
+      ? `Çoklu borsa teyidi: ${
+          item.exchangeConfirmations
+        } borsa`
+      : `Borsa: ${
+          item.source || "-"
+        }`;
+
+
+  /*
+    Aşama rengi
+  */
+
+  let stageClass =
+    "candidate";
+
+
+  if (
+    stage === "YÜKSELİŞ TEYİDİ" ||
+    stage === "YÜKSELİŞ BAŞLIYOR"
+  ) {
+
+    stageClass =
+      "confirmed";
+  }
+
+
+  if (
+    stage === "GEÇ KALINDI" ||
+    stage === "ZİRVE RİSKİ" ||
+    stage === "HAREKET ZAYIFLIYOR"
+  ) {
+
+    stageClass =
+      "late";
+  }
+
+
+  return `
+    <article class="coin-card">
+
+      <div class="coin-top">
+
+        <div>
+
+          <h3>
+            ${item.symbol}
+          </h3>
+
+          <div class="confirmation ${stageClass}">
+            ${stage}
+          </div>
+
+        </div>
+
+        <div class="score">
+          ${number(score, 0)}/100
+        </div>
+
+      </div>
+
+
+      <div class="metrics">
+
+        <div>
+          <span>Anlık Fiyat</span>
+          <strong>
+            ${price(item.price)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Başlangıç Fiyatı</span>
+          <strong>
+            ${
+              item.startPrice
+                ? price(item.startPrice)
+                : "-"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>Başlangıçtan</span>
+          <strong>
+            ${number(
+              item.moveFromStart,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>Maks. Hareket</span>
+          <strong>
+            ${number(
+              item.maxMoveFromStart,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>Zirveden</span>
+          <strong>
+            ${number(
+              item.pullbackFromPeak,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>Hareket Yaşı</span>
+          <strong>
+            ${Number(
+              item.movementAge || 0
+            )} dk
+          </strong>
+        </div>
+
+        <div>
+          <span>1 dk</span>
+          <strong>
+            ${number(
+              item.change1,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>3 dk</span>
+          <strong>
+            ${number(
+              item.change3,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>5 dk</span>
+          <strong>
+            ${number(
+              item.change5,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>10 dk</span>
+          <strong>
+            ${number(
+              item.change10,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>15 dk</span>
+          <strong>
+            ${number(
+              item.change15,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>Hacim İvmesi</span>
+          <strong>
+            ${number(
+              item.volumeAcceleration,
+              2
+            )}x
+          </strong>
+        </div>
+
+        <div>
+          <span>Son Mum Hacmi</span>
+          <strong>
+            ${number(
+              item.lastVolumeRatio,
+              2
+            )}x
+          </strong>
+        </div>
+
+        <div>
+          <span>Mum Büyümesi</span>
+          <strong>
+            ${number(
+              item.bodyExpansion,
+              2
+            )}x
+          </strong>
+        </div>
+
+        <div>
+          <span>EMA7 / EMA25</span>
+          <strong>
+            ${
+              Number(item.ema7) >
+              Number(item.ema25)
+                ? "Yukarı"
+                : "Aşağı"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>EMA İvmesi</span>
+          <strong>
+            ${number(
+              item.emaSpreadAcceleration,
+              3
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>RSI</span>
+          <strong>
+            ${number(
+              item.rsi,
+              1
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>RSI İvmesi</span>
+          <strong>
+            ${number(
+              item.rsiAcceleration,
+              2
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>MACD İvmesi</span>
+          <strong>
+            ${number(
+              item.macdAcceleration,
+              6
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Sıkışma</span>
+          <strong>
+            ${
+              item.wasCompressed
+                ? "VAR"
+                : "YOK"
+            }
+          </strong>
+        </div>
+
+      </div>
+
+
+      <div class="reasons">
+
+        <span>
+          ${multiText}
+        </span>
+
+        <span>
+          Aşama:
+          ${
+            Number(
+              item.stageNumber || 0
+            )
+          }/5
+        </span>
+
+        ${
+          item.isNew
+            ? `
+              <span>
+                Yeni hareket tespit edildi
+              </span>
+            `
+            : ""
+        }
+
+        ${
+          item.levelChanged
+            ? `
+              <span>
+                Hareket aşaması değişti
+              </span>
+            `
+            : ""
+        }
+
+        ${
+          item.lateMove
+            ? `
+              <span>
+                Hareket önemli ölçüde ilerledi
+              </span>
+            `
+            : ""
+        }
+
+        ${
+          item.momentumWeakening
+            ? `
+              <span>
+                Momentum zayıflıyor
+              </span>
+            `
+            : ""
+        }
+
+      </div>
+
+    </article>
+  `;
+}
 /* =========================
    ANLIK RADARI GÖSTER
 ========================= */
