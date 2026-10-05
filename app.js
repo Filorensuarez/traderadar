@@ -382,7 +382,9 @@ function renderExchange(data) {
     data;
 
   const exchangeData =
-    selectedExchange === "kucoin"
+  selectedExchange === "gate"
+    ? data.gate
+    : selectedExchange === "kucoin"
       ? data.kucoin
       : data.okx;
 
