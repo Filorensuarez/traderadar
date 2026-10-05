@@ -24,6 +24,38 @@ let scanning = false;
 */
 
 const minuteRadarState =
+  let minuteRadarCache = {
+
+  ok: true,
+
+  updatedAt: 0,
+
+  scanned: 0,
+
+  rows: [],
+
+  exchanges: {
+
+    okx: {
+      scanned: 0,
+      error: null
+    },
+
+    kucoin: {
+      scanned: 0,
+      error: null
+    },
+
+    gate: {
+      scanned: 0,
+      error: null
+    }
+  }
+};
+
+
+let minuteRadarScanning =
+  false;
   new Map();
 let cache = {
   ok: true,
