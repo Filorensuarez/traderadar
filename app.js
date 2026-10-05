@@ -63,27 +63,6 @@ function openView(view) {
   const daily =
     view === "daily";
 
-  dailySection.hidden =
-    !daily;
-
-  longSection.hidden =
-    daily;
-
-  dailyButton.classList.toggle(
-    "active",
-    daily
-  );
-
-  longButton.classList.toggle(
-    "active",
-    !daily
-  );
-}
-function openView(view) {
-
-  const daily =
-    view === "daily";
-
   const long =
     view === "long";
 
