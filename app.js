@@ -121,6 +121,13 @@ longButton.addEventListener(
   () => openView("long")
 );
 
+radarButton.addEventListener(
+  "click",
+  () =>
+    openView(
+      "radar"
+    )
+);
 function selectExchange(exchange) {
 
   selectedExchange =
