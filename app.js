@@ -681,3 +681,340 @@ setInterval(
   loadData,
   60 * 1000
 );
+
+/* =========================
+   ANLIK RADAR KARTI
+========================= */
+
+function minuteRadarCard(item) {
+
+  const score =
+    Number(item.score || 0);
+
+  const signal =
+    item.signal ||
+    item.signalLevel ||
+    "İZLE";
+
+
+  const multiText =
+    item.multiExchange
+      ? `Çoklu borsa teyidi: ${
+          item.exchangeConfirmations
+        } borsa`
+      : `Borsa: ${
+          item.source || "-"
+        }`;
+
+
+  return `
+    <article class="coin-card">
+
+      <div class="coin-top">
+
+        <div>
+
+          <h3>
+            ${item.symbol}
+          </h3>
+
+          <div class="confirmation ${
+            score >= 80
+              ? "confirmed"
+              : "candidate"
+          }">
+            ${signal}
+          </div>
+
+        </div>
+
+        <div class="score">
+          ${number(score, 0)}/100
+        </div>
+
+      </div>
+
+
+      <div class="metrics">
+
+        <div>
+          <span>Anlık Fiyat</span>
+          <strong>
+            ${price(item.price)}
+          </strong>
+        </div>
+
+        <div>
+          <span>1 dk</span>
+          <strong>
+            ${number(item.change1, 2)}%
+          </strong>
+        </div>
+
+        <div>
+          <span>3 dk</span>
+          <strong>
+            ${number(item.change3, 2)}%
+          </strong>
+        </div>
+
+        <div>
+          <span>5 dk</span>
+          <strong>
+            ${number(item.change5, 2)}%
+          </strong>
+        </div>
+
+        <div>
+          <span>15 dk</span>
+          <strong>
+            ${number(item.change15, 2)}%
+          </strong>
+        </div>
+
+        <div>
+          <span>Hacim İvmesi</span>
+          <strong>
+            ${number(
+              item.volumeAcceleration,
+              2
+            )}x
+          </strong>
+        </div>
+
+        <div>
+          <span>Fiyat İvmesi</span>
+          <strong>
+            ${number(
+              item.priceAcceleration,
+              3
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Aktif Mum</span>
+          <strong>
+            ${Number(
+              item.candlesAlive || 0
+            )}
+          </strong>
+        </div>
+
+      </div>
+
+
+      <div class="reasons">
+
+        <span>
+          ${multiText}
+        </span>
+
+        ${
+          item.isNew
+            ? `
+              <span>
+                Yeni sinyal
+              </span>
+            `
+            : ""
+        }
+
+        ${
+          item.levelChanged
+            ? `
+              <span>
+                Sinyal seviyesi değişti
+              </span>
+            `
+            : ""
+        }
+
+      </div>
+
+    </article>
+  `;
+}
+
+
+/* =========================
+   ANLIK RADARI GÖSTER
+========================= */
+
+function renderMinuteRadar(data) {
+
+  const rows =
+    Array.isArray(data.rows)
+      ? data.rows
+      : [];
+
+
+  radarStatus.textContent =
+    data.ok
+      ? "Anlık radar aktif"
+      : "Anlık radar bağlantı sorunu";
+
+
+  radarUpdated.textContent =
+    `Son tarama: ${
+      timeText(data.updatedAt)
+    } | Taranan: ${
+      Number(data.scanned || 0)
+    } | Aktif sinyal: ${
+      rows.length
+    }`;
+
+
+  if (!rows.length) {
+
+    radarCards.innerHTML = `
+      <div class="empty-card">
+
+        Şu anda anlık yükseliş
+        koşullarını sağlayan coin
+        bulunamadı.
+
+        <br><br>
+
+        Radar 1, 3, 5 ve 15
+        dakikalık fiyat hareketini,
+        hacim ivmesini ve fiyat
+        ivmesini izliyor.
+
+      </div>
+    `;
+
+    return;
+  }
+
+
+  radarCards.innerHTML =
+    rows
+      .map(minuteRadarCard)
+      .join("");
+}
+
+
+/* =========================
+   ANLIK RADAR VERİSİ
+========================= */
+
+async function loadMinuteRadar(
+  force = false
+) {
+
+  if (radarLoading) {
+    return;
+  }
+
+
+  radarLoading =
+    true;
+
+  radarRefreshButton.disabled =
+    true;
+
+  radarRefreshButton.textContent =
+    "Taranıyor...";
+
+  radarStatus.textContent =
+    "Üç borsa taranıyor...";
+
+
+  try {
+
+    const url =
+      force
+        ? `/api/minute-radar?t=${Date.now()}`
+        : "/api/minute-radar";
+
+
+    const response =
+      await fetch(
+        url,
+        {
+          cache:
+            "no-store"
+        }
+      );
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        `HTTP ${response.status}`
+      );
+    }
+
+
+    const data =
+      await response.json();
+
+
+    radarLoaded =
+      true;
+
+
+    renderMinuteRadar(
+      data
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Anlık Radar:",
+      error
+    );
+
+
+    radarStatus.textContent =
+      "Anlık radar bağlantı sorunu";
+
+
+    radarUpdated.textContent =
+      "Radar verisi alınamadı.";
+
+
+    radarCards.innerHTML = `
+      <div class="empty-card">
+
+        Anlık radar verisi
+        alınamadı.
+
+        <br><br>
+
+        ${
+          error.message ||
+          "Bilinmeyen hata"
+        }
+
+      </div>
+    `;
+
+
+  } finally {
+
+    radarLoading =
+      false;
+
+    radarRefreshButton.disabled =
+      false;
+
+    radarRefreshButton.textContent =
+      "Yenile";
+  }
+}
+
+
+/* =========================
+   RADAR YENİLE
+========================= */
+
+radarRefreshButton.addEventListener(
+  "click",
+  () =>
+    loadMinuteRadar(
+      true
+    )
+);
