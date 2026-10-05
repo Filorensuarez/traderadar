@@ -1724,8 +1724,9 @@ const gateCandidates =
         Date.now(),
 
       scanned:
-        okxSymbols.length +
-        kucoinSymbols.length,
+  okxSymbols.length +
+  kucoinSymbols.length +
+  gateSymbols.length,
 
 
       /* OKX */
