@@ -75,7 +75,10 @@ function selectExchange(exchange) {
     "active",
     exchange === "kucoin"
   );
-
+gateButton.classList.toggle(
+  "active",
+  exchange === "gate"
+);
   if (lastData) {
     renderExchange(
       lastData
