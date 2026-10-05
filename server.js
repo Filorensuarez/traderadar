@@ -2946,7 +2946,46 @@ app.get(
     );
   }
 );
+/* =========================
+   ANLIK YÜKSELİŞ RADARI API
+========================= */
 
+app.get(
+  "/api/minute-radar",
+  async (
+    req,
+    res
+  ) => {
+
+    res.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+
+    /*
+      İlk istek veya eski veri varsa
+      yeni radar taraması çalıştır.
+    */
+
+    if (
+      !minuteRadarCache.updatedAt ||
+      (
+        Date.now() -
+        minuteRadarCache.updatedAt
+      ) >
+      60 * 1000
+    ) {
+
+      await scanMinuteRadar();
+    }
+
+
+    res.json(
+      minuteRadarCache
+    );
+  }
+);
 
 /* =========================
    SAĞLIK KONTROLÜ
