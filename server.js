@@ -86,7 +86,36 @@ async function getKucoinJSON(url) {
 
   return json.data;
 }
-  
+  async function getGateJSON(url) {
+
+  const response =
+    await fetch(url, {
+      headers: {
+        "Accept":
+          "application/json"
+      },
+
+      signal:
+        AbortSignal.timeout(15000)
+    });
+
+  if (!response.ok) {
+    throw new Error(
+      `Gate.io HTTP ${response.status}`
+    );
+  }
+
+  const json =
+    await response.json();
+
+  if (!Array.isArray(json)) {
+    throw new Error(
+      "Gate.io veri formatı hatası"
+    );
+  }
+
+  return json;
+}
 /* =========================
    MATEMATİK
 ========================= */
