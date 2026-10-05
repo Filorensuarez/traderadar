@@ -2471,6 +2471,447 @@ console.log(
   }
 }
 /* =========================
+   ANLIK RADAR TARAMASI
+========================= */
+
+async function scanMinuteRadar() {
+
+  if (minuteRadarScanning) {
+    return;
+  }
+
+  minuteRadarScanning = true;
+
+  const allResults = [];
+
+  const exchangeStatus = {
+
+    okx: {
+      scanned: 0,
+      error: null
+    },
+
+    kucoin: {
+      scanned: 0,
+      error: null
+    },
+
+    gate: {
+      scanned: 0,
+      error: null
+    }
+  };
+
+
+  /*
+    Bir borsayı bağımsız tarar.
+
+    Böylece bir borsa hata verirse
+    diğerleri çalışmaya devam eder.
+  */
+
+  async function scanExchange(
+    exchange,
+    symbols,
+    candleFunction
+  ) {
+
+    const batchSize = 4;
+
+    let scanned = 0;
+
+
+    for (
+      let i = 0;
+      i < symbols.length;
+      i += batchSize
+    ) {
+
+      const batch =
+        symbols.slice(
+          i,
+          i + batchSize
+        );
+
+
+      const responses =
+        await Promise.allSettled(
+
+          batch.map(
+            async item => {
+
+              let symbol;
+              let displaySymbol;
+
+
+              /*
+                OKX listesi doğrudan
+                string döndürür.
+
+                KuCoin ve Gate.io
+                nesne döndürür.
+              */
+
+              if (
+                exchange === "OKX"
+              ) {
+
+                symbol =
+                  item;
+
+                displaySymbol =
+                  item.replace(
+                    "-USDT",
+                    "/USDT"
+                  );
+
+              } else if (
+                exchange === "KUCOIN"
+              ) {
+
+                symbol =
+                  item.symbol;
+
+                displaySymbol =
+                  item.symbol.replace(
+                    "-USDT",
+                    "/USDT"
+                  );
+
+              } else {
+
+                symbol =
+                  item.symbol;
+
+                displaySymbol =
+                  item.symbol.replace(
+                    "_USDT",
+                    "/USDT"
+                  );
+              }
+
+
+              const candles =
+                await candleFunction(
+                  symbol
+                );
+
+
+              scanned += 1;
+
+
+              if (
+                !Array.isArray(candles) ||
+                candles.length < 20
+              ) {
+                return null;
+              }
+
+
+              const analysis =
+                analyzeMinuteRise(
+                  displaySymbol,
+                  candles,
+                  exchange
+                );
+
+
+              if (!analysis) {
+                return null;
+              }
+
+
+              const lastCandle =
+                candles.at(-1);
+
+
+              const candleTime =
+                Number(
+                  lastCandle.time
+                );
+
+
+              return (
+                updateMinuteRadarState(
+                  analysis,
+                  candleTime
+                )
+              );
+            }
+          )
+        );
+
+
+      for (
+        const response
+        of responses
+      ) {
+
+        if (
+          response.status !==
+          "fulfilled"
+        ) {
+          continue;
+        }
+
+
+        const result =
+          response.value;
+
+
+        if (result) {
+
+          allResults.push(
+            result
+          );
+        }
+      }
+
+
+      /*
+        Borsaların API limitlerine
+        gereksiz yük bindirmeyelim.
+      */
+
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            120
+          )
+      );
+    }
+
+
+    return scanned;
+  }
+
+
+  try {
+
+    /*
+      OKX
+    */
+
+    try {
+
+      const okxSymbols =
+        await getSymbols();
+
+
+      exchangeStatus.okx.scanned =
+        await scanExchange(
+          "OKX",
+          okxSymbols,
+          getOKXMinuteCandles
+        );
+
+    } catch (error) {
+
+      exchangeStatus.okx.error =
+        error.message;
+
+      console.error(
+        "Anlık radar OKX:",
+        error.message
+      );
+    }
+
+
+    /*
+      KUCOIN
+    */
+
+    try {
+
+      const kucoinSymbols =
+        await getKucoinSymbols();
+
+
+      exchangeStatus.kucoin.scanned =
+        await scanExchange(
+          "KUCOIN",
+          kucoinSymbols,
+          getKucoinMinuteCandles
+        );
+
+    } catch (error) {
+
+      exchangeStatus.kucoin.error =
+        error.message;
+
+      console.error(
+        "Anlık radar KuCoin:",
+        error.message
+      );
+    }
+
+
+    /*
+      GATE.IO
+    */
+
+    try {
+
+      const gateSymbols =
+        await getGateSymbols();
+
+
+      exchangeStatus.gate.scanned =
+        await scanExchange(
+          "GATE.IO",
+          gateSymbols,
+          getGateMinuteCandles
+        );
+
+    } catch (error) {
+
+      exchangeStatus.gate.error =
+        error.message;
+
+      console.error(
+        "Anlık radar Gate.io:",
+        error.message
+      );
+    }
+
+
+    /*
+      Önce yüksek puan.
+
+      Aynı puanda hacim ivmesi
+      daha güçlü olan üstte.
+    */
+
+    allResults.sort(
+      (a, b) => {
+
+        if (
+          b.score !==
+          a.score
+        ) {
+
+          return (
+            b.score -
+            a.score
+          );
+        }
+
+
+        return (
+          b.volumeAcceleration -
+          a.volumeAcceleration
+        );
+      }
+    );
+
+
+    /*
+      Aynı coin farklı borsalarda
+      sinyal veriyorsa bunu say.
+    */
+
+    const symbolCounts =
+      new Map();
+
+
+    for (
+      const result
+      of allResults
+    ) {
+
+      symbolCounts.set(
+        result.symbol,
+        (
+          symbolCounts.get(
+            result.symbol
+          ) || 0
+        ) + 1
+      );
+    }
+
+
+    const finalResults =
+      allResults.map(
+        result => ({
+
+          ...result,
+
+          exchangeConfirmations:
+            symbolCounts.get(
+              result.symbol
+            ) || 1,
+
+          multiExchange:
+            (
+              symbolCounts.get(
+                result.symbol
+              ) || 1
+            ) >= 2
+        })
+      );
+
+
+    minuteRadarCache = {
+
+      ok: true,
+
+      updatedAt:
+        Date.now(),
+
+      scanned:
+        exchangeStatus.okx.scanned +
+        exchangeStatus.kucoin.scanned +
+        exchangeStatus.gate.scanned,
+
+      rows:
+        finalResults.slice(
+          0,
+          50
+        ),
+
+      exchanges:
+        exchangeStatus
+    };
+
+
+    console.log(
+      `Anlık radar: ${minuteRadarCache.scanned} tarama / ${finalResults.length} aktif sinyal`
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Anlık radar genel hata:",
+      error.message
+    );
+
+
+    minuteRadarCache = {
+      ...minuteRadarCache,
+
+      ok: false,
+
+      updatedAt:
+        Date.now(),
+
+      error:
+        error.message,
+
+      exchanges:
+        exchangeStatus
+    };
+
+
+  } finally {
+
+    minuteRadarScanning =
+      false;
+  }
+}
+
+/* =========================
    GÜNLÜK TEYİT API
 ========================= */
 
