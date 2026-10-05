@@ -708,6 +708,44 @@ async function getCandles(symbol) {
     .reverse();
 }
 /* =========================
+   OKX 1 DAKİKALIK MUMLAR
+========================= */
+
+async function getOKXMinuteCandles(
+  symbol
+) {
+
+  const data =
+    await getJSON(
+      `${OKX}/api/v5/market/candles` +
+      `?instId=${encodeURIComponent(symbol)}` +
+      `&bar=1m` +
+      `&limit=40`
+    );
+
+  return data
+    .map(row => ({
+      time:
+        Number(row[0]),
+
+      open:
+        Number(row[1]),
+
+      high:
+        Number(row[2]),
+
+      low:
+        Number(row[3]),
+
+      close:
+        Number(row[4]),
+
+      volume:
+        Number(row[5])
+    }))
+    .reverse();
+}
+/* =========================
    KUCOIN GÜNLÜK MUMLAR
 ========================= */
 
