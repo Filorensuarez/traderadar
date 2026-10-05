@@ -801,6 +801,111 @@ async function getGateCandles(symbol) {
     );
 }
 /* =========================
+   ANLIK YÜKSELİŞ RADARI
+========================= */
+
+function analyzeMinuteRise(
+  symbol,
+  candles,
+  source
+) {
+
+  if (
+    !Array.isArray(candles) ||
+    candles.length < 40
+  ) {
+    return null;
+  }
+
+  const data =
+    candles.slice(-40);
+
+  const changes =
+    data.map(candle => {
+
+      const open =
+        Number(candle.open);
+
+      const close =
+        Number(candle.close);
+
+      if (
+        !Number.isFinite(open) ||
+        !Number.isFinite(close) ||
+        open <= 0
+      ) {
+        return 0;
+      }
+
+      return (
+        (
+          close - open
+        ) /
+        open
+      ) * 100;
+    });
+
+
+  const previous20 =
+    changes.slice(
+      0,
+      20
+    );
+
+  const recent20 =
+    changes.slice(
+      20,
+      40
+    );
+
+
+  const previousAverage =
+    previous20.reduce(
+      (sum, value) =>
+        sum + value,
+      0
+    ) / 20;
+
+
+  const recentAverage =
+    recent20.reduce(
+      (sum, value) =>
+        sum + value,
+      0
+    ) / 20;
+
+
+  const difference =
+    recentAverage -
+    previousAverage;
+
+
+  const qualifies =
+    recentAverage > 0 &&
+    difference >= 2;
+
+
+  return {
+
+    symbol,
+
+    source,
+
+    price:
+      Number(
+        data.at(-1).close
+      ),
+
+    previousAverage,
+
+    recentAverage,
+
+    difference,
+
+    qualifies
+  };
+}
+/* =========================
    COİN ANALİZİ
 ========================= */
 
