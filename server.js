@@ -1853,26 +1853,52 @@ function updateMinuteRadarState(
     return null;
   }
 
-
   const key =
     `${result.source}:${result.symbol}`;
-
 
   let state =
     minuteRadarState.get(key);
 
 
   /*
-    Radar koşulu artık
-    sağlanmıyorsa sinyali kaldır.
+    Henüz radar aşamasına
+    girmemiş coin.
   */
 
   if (!result.qualifies) {
 
+    /*
+      Daha önce hareket başlamışsa
+      hemen hafızadan silmiyoruz.
+
+      Böylece hareket bittikten sonra
+      sonucu değerlendirebiliriz.
+    */
+
     if (state) {
 
-      minuteRadarState.delete(
-        key
+      state.inactiveCandles =
+        (state.inactiveCandles || 0) + 1;
+
+      /*
+        5 mum boyunca tekrar
+        canlanmazsa kaldır.
+      */
+
+      if (
+        state.inactiveCandles >= 5
+      ) {
+
+        minuteRadarState.delete(
+          key
+        );
+
+        return null;
+      }
+
+      minuteRadarState.set(
+        key,
+        state
       );
     }
 
@@ -1881,7 +1907,7 @@ function updateMinuteRadarState(
 
 
   /*
-    İlk sinyal.
+    İLK YAKALAMA
   */
 
   if (!state) {
@@ -1897,14 +1923,38 @@ function updateMinuteRadarState(
       lastCandleTime:
         candleTime,
 
+      startPrice:
+        result.price,
+
+      lowestPrice:
+        result.price,
+
+      highestPrice:
+        result.price,
+
       candlesAlive:
+        0,
+
+      inactiveCandles:
         0,
 
       highestScore:
         result.score,
 
-      lastSignalLevel:
-        result.signalLevel
+      firstScore:
+        result.score,
+
+      firstStage:
+        result.stage,
+
+      lastStage:
+        result.stage,
+
+      highestStageNumber:
+        result.stageNumber || 0,
+
+      stageChangedAt:
+        Date.now()
     };
 
 
@@ -1919,23 +1969,51 @@ function updateMinuteRadarState(
       ...result,
 
       signal:
-        result.signalLevel,
+        result.stage,
 
       isNew:
         true,
 
+      levelChanged:
+        false,
+
       candlesAlive:
         0,
 
+      movementAge:
+        0,
+
+      startPrice:
+        state.startPrice,
+
+      moveFromStart:
+        0,
+
+      maxMoveFromStart:
+        0,
+
+      pullbackFromPeak:
+        0,
+
       highestScore:
-        result.score
+        state.highestScore,
+
+      firstStage:
+        state.firstStage
     };
   }
 
 
   /*
-    Yeni 1 dakikalık mum
-    geldiyse sayaç ilerler.
+    Coin yeniden aktif.
+  */
+
+  state.inactiveCandles =
+    0;
+
+
+  /*
+    YENİ 1 DAKİKALIK MUM
   */
 
   if (
@@ -1951,8 +2029,72 @@ function updateMinuteRadarState(
 
 
   /*
-    Görülen en yüksek puanı
-    hafızada tut.
+    FİYAT GEÇMİŞİ
+  */
+
+  state.highestPrice =
+    Math.max(
+      state.highestPrice ||
+        result.price,
+      result.price
+    );
+
+
+  state.lowestPrice =
+    Math.min(
+      state.lowestPrice ||
+        result.price,
+      result.price
+    );
+
+
+  /*
+    BAŞLANGIÇTAN İTİBAREN
+    HAREKET
+  */
+
+  const moveFromStart =
+    state.startPrice > 0
+      ? (
+          (
+            result.price -
+            state.startPrice
+          ) /
+          state.startPrice
+        ) * 100
+      : 0;
+
+
+  const maxMoveFromStart =
+    state.startPrice > 0
+      ? (
+          (
+            state.highestPrice -
+            state.startPrice
+          ) /
+          state.startPrice
+        ) * 100
+      : 0;
+
+
+  /*
+    ZİRVEDEN GERİ ÇEKİLME
+  */
+
+  const pullbackFromPeak =
+    state.highestPrice > 0
+      ? (
+          (
+            result.price -
+            state.highestPrice
+          ) /
+          state.highestPrice
+        ) * 100
+      : 0;
+
+
+  /*
+    EN YÜKSEK PUAN
   */
 
   state.highestScore =
@@ -1963,27 +2105,96 @@ function updateMinuteRadarState(
 
 
   /*
-    Sinyal seviyesi değişimini
-    kaydet.
+    AŞAMA DEĞİŞİMİ
   */
 
   const levelChanged =
-    state.lastSignalLevel !==
-    result.signalLevel;
+    state.lastStage !==
+    result.stage;
 
 
-  state.lastSignalLevel =
-    result.signalLevel;
+  if (levelChanged) {
+
+    state.stageChangedAt =
+      Date.now();
+  }
+
+
+  state.lastStage =
+    result.stage;
+
+
+  state.highestStageNumber =
+    Math.max(
+      state.highestStageNumber || 0,
+      result.stageNumber || 0
+    );
 
 
   /*
-    Sinyal en fazla 20 yeni
-    1 dakikalık mum boyunca
-    aktif tutulur.
+    HAREKET YAŞI
+
+    Her mum 1 dakika.
+  */
+
+  const movementAge =
+    state.candlesAlive;
+
+
+  /*
+    EK ZİRVE KONTROLÜ
+
+    Analiz motorunun verdiği
+    uyarıya ek olarak zirveden
+    belirgin geri çekilme varsa
+    riski artır.
+  */
+
+  let finalStage =
+    result.stage;
+
+
+  if (
+    maxMoveFromStart >= 5 &&
+    pullbackFromPeak <= -2.5
+  ) {
+
+    finalStage =
+      "ZİRVE RİSKİ";
+  }
+
+
+  /*
+    Hareket çok ilerlediyse
+    yeni alım fırsatı gibi
+    göstermiyoruz.
   */
 
   if (
-    state.candlesAlive >= 20
+    finalStage !==
+      "ZİRVE RİSKİ" &&
+    (
+      result.change15 >= 8 ||
+      maxMoveFromStart >= 10
+    )
+  ) {
+
+    finalStage =
+      "GEÇ KALINDI";
+  }
+
+
+  /*
+    Maksimum takip süresi:
+    60 adet 1 dakikalık mum.
+
+    Böylece RVN/NIL gibi
+    daha uzun hareketleri de
+    izleyebiliriz.
+  */
+
+  if (
+    state.candlesAlive >= 60
   ) {
 
     minuteRadarState.delete(
@@ -2004,8 +2215,11 @@ function updateMinuteRadarState(
 
     ...result,
 
+    stage:
+      finalStage,
+
     signal:
-      result.signalLevel,
+      finalStage,
 
     isNew:
       false,
@@ -2015,13 +2229,45 @@ function updateMinuteRadarState(
     candlesAlive:
       state.candlesAlive,
 
+    movementAge,
+
+    startPrice:
+      state.startPrice,
+
+    currentPrice:
+      result.price,
+
+    highestPrice:
+      state.highestPrice,
+
+    lowestPrice:
+      state.lowestPrice,
+
+    moveFromStart,
+
+    maxMoveFromStart,
+
+    pullbackFromPeak,
+
     highestScore:
       state.highestScore,
 
+    firstScore:
+      state.firstScore,
+
+    firstStage:
+      state.firstStage,
+
+    highestStageNumber:
+      state.highestStageNumber,
+
     signalStartedAt:
-      state.startedAt
+      state.startedAt,
+
+    stageChangedAt:
+      state.stageChangedAt
   };
-}/* =========================
+}}/* =========================
    COİN ANALİZİ
 ========================= */
 
