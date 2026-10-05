@@ -86,7 +86,7 @@ async function getKucoinJSON(url) {
 
   return json.data;
 }
-  async function getGateJSON(url) {
+async function getGateJSON(url) {
 
   const response =
     await fetch(url, {
@@ -579,7 +579,82 @@ async function getKucoinSymbols() {
         "KUCOIN"
     }));
 }
+/* =========================
+   GATE.IO COİN LİSTESİ
+========================= */
 
+async function getGateSymbols() {
+
+  const tickers =
+    await getGateJSON(
+      `${GATE}/spot/tickers`
+    );
+
+  const excluded =
+    new Set([
+      "USDC",
+      "USDT",
+      "DAI",
+      "EUR",
+      "USD"
+    ]);
+
+  return tickers
+    .filter(item => {
+
+      const symbol =
+        String(
+          item.currency_pair || ""
+        );
+
+      if (
+        !symbol.endsWith("_USDT")
+      ) {
+        return false;
+      }
+
+      const base =
+        symbol.replace(
+          "_USDT",
+          ""
+        );
+
+      if (
+        excluded.has(base)
+      ) {
+        return false;
+      }
+
+      /*
+        quote_volume:
+        24 saatlik USDT işlem hacmi.
+      */
+
+      const volumeUsd =
+        Number(
+          item.quote_volume
+        );
+
+      return (
+        Number.isFinite(volumeUsd) &&
+        volumeUsd >= 200_000
+      );
+    })
+
+    .sort(
+      (a, b) =>
+        Number(b.quote_volume) -
+        Number(a.quote_volume)
+    )
+
+    .map(item => ({
+      symbol:
+        item.currency_pair,
+
+      source:
+        "GATE"
+    }));
+}
 /* =========================
    OKX GÜNLÜK MUMLAR
 ========================= */
@@ -681,7 +756,50 @@ async function getKucoinCandles(symbol) {
     }))
     .reverse();
 }
+/* =========================
+   GATE.IO GÜNLÜK MUMLAR
+========================= */
 
+async function getGateCandles(symbol) {
+
+  const data =
+    await getGateJSON(
+      `${GATE}/spot/candlesticks` +
+      `?currency_pair=${encodeURIComponent(symbol)}` +
+      `&interval=1d` +
+      `&limit=230`
+    );
+
+  /*
+    Gate.io verisini analiz motorunun
+    kullandığı biçime dönüştürüyoruz.
+  */
+
+  return data
+    .map(row => ({
+      time:
+        Number(row[0]) * 1000,
+
+      volume:
+        Number(row[1]),
+
+      close:
+        Number(row[2]),
+
+      high:
+        Number(row[3]),
+
+      low:
+        Number(row[4]),
+
+      open:
+        Number(row[5])
+    }))
+    .sort(
+      (a, b) =>
+        a.time - b.time
+    );
+}
 /* =========================
    COİN ANALİZİ
 ========================= */
@@ -1386,6 +1504,118 @@ try {
 
   console.error(
     "KuCoin tarama hatası:",
+    error.message
+  );
+}
+    /* =========================
+   GATE.IO
+========================= */
+
+let gateSymbols = [];
+let gateResults = [];
+let gateError = null;
+
+try {
+
+  gateSymbols =
+    await getGateSymbols();
+
+  const batchSize = 5;
+
+  for (
+    let i = 0;
+    i < gateSymbols.length;
+    i += batchSize
+  ) {
+
+    const batch =
+      gateSymbols.slice(
+        i,
+        i + batchSize
+      );
+
+    const responses =
+      await Promise.allSettled(
+
+        batch.map(
+          async item => {
+
+            const candles =
+              await getGateCandles(
+                item.symbol
+              );
+
+            const base =
+              item.symbol.replace(
+                "_USDT",
+                ""
+              );
+
+            const result =
+              analyze(
+                `${base}/USDT`,
+                candles
+              );
+
+            if (!result) {
+              return null;
+            }
+
+            result.source =
+              "GATE";
+
+            return result;
+          }
+        )
+      );
+
+
+    for (
+      const response
+      of responses
+    ) {
+
+      if (
+        response.status !==
+        "fulfilled"
+      ) {
+        continue;
+      }
+
+      const result =
+        response.value;
+
+      if (
+        result &&
+        (
+          result.confirmed ||
+          result.candidate
+        )
+      ) {
+
+        gateResults.push(
+          result
+        );
+      }
+    }
+
+
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          150
+        )
+    );
+  }
+
+} catch (error) {
+
+  gateError =
+    error.message;
+
+  console.error(
+    "Gate.io tarama hatası:",
     error.message
   );
 }
