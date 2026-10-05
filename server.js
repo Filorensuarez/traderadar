@@ -5,8 +5,12 @@ const PORT = process.env.PORT || 3000;
 
 const OKX =
   "https://www.okx.com";
+
 const KUCOIN =
   "https://api.kucoin.com";
+
+const GATE =
+  "https://api.gateio.ws/api/v4";
 
 app.use(express.static("."));
 
