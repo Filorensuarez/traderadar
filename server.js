@@ -954,7 +954,7 @@ function analyzeMinuteRise(
 
   if (
     !Array.isArray(candles) ||
-    candles.length < 40
+    candles.length < 20
   ) {
     return null;
   }
@@ -962,69 +962,214 @@ function analyzeMinuteRise(
   const data =
     candles.slice(-40);
 
-  const changes =
-    data.map(candle => {
+  const last =
+    data.at(-1);
 
-      const open =
-        Number(candle.open);
+  const price =
+    Number(last.close);
 
-      const close =
-        Number(candle.close);
+  if (
+    !Number.isFinite(price) ||
+    price <= 0
+  ) {
+    return null;
+  }
 
-      if (
-        !Number.isFinite(open) ||
-        !Number.isFinite(close) ||
-        open <= 0
-      ) {
-        return 0;
-      }
+  function change(minutes) {
 
-      return (
-        (
-          close - open
-        ) /
-        open
-      ) * 100;
-    });
+    if (
+      data.length <
+      minutes + 1
+    ) {
+      return 0;
+    }
+
+    const oldPrice =
+      Number(
+        data.at(
+          -(minutes + 1)
+        ).close
+      );
+
+    if (
+      !Number.isFinite(oldPrice) ||
+      oldPrice <= 0
+    ) {
+      return 0;
+    }
+
+    return (
+      (
+        price - oldPrice
+      ) /
+      oldPrice
+    ) * 100;
+  }
 
 
-  const previous20 =
-    changes.slice(
-      0,
-      20
+  const change1 =
+    change(1);
+
+  const change3 =
+    change(3);
+
+  const change5 =
+    change(5);
+
+  const change15 =
+    change(15);
+
+
+  /*
+    HACİM İVMESİ
+
+    Son 3 mumun ortalama hacmini,
+    önceki 15 mumun ortalamasıyla
+    karşılaştırıyoruz.
+  */
+
+  const volumes =
+    data.map(
+      candle =>
+        Number(candle.volume) || 0
     );
 
-  const recent20 =
-    changes.slice(
-      20,
-      40
+  const recentVolumes =
+    volumes.slice(-3);
+
+  const previousVolumes =
+    volumes.slice(-18, -3);
+
+
+  const recentVolumeAverage =
+    average(
+      recentVolumes
+    ) || 0;
+
+  const previousVolumeAverage =
+    average(
+      previousVolumes
+    ) || 0;
+
+
+  const volumeAcceleration =
+    previousVolumeAverage > 0
+      ? recentVolumeAverage /
+        previousVolumeAverage
+      : 0;
+
+
+  /*
+    FİYAT İVMESİ
+  */
+
+  const priceAcceleration =
+    change1 -
+    (
+      change5 / 5
     );
 
 
-  const previousAverage =
-    previous20.reduce(
-      (sum, value) =>
-        sum + value,
-      0
-    ) / 20;
+  /*
+    PUANLAMA
+  */
+
+  let score = 0;
 
 
-  const recentAverage =
-    recent20.reduce(
-      (sum, value) =>
-        sum + value,
-      0
-    ) / 20;
+  if (change1 >= 0.25) {
+    score += 15;
+  }
+
+  if (change1 >= 0.60) {
+    score += 10;
+  }
 
 
-  const difference =
-    recentAverage -
-    previousAverage;
+  if (change3 >= 0.60) {
+    score += 15;
+  }
 
+  if (change3 >= 1.20) {
+    score += 10;
+  }
+
+
+  if (change5 >= 1.00) {
+    score += 10;
+  }
+
+
+  if (
+    change15 > 0
+  ) {
+    score += 5;
+  }
+
+
+  if (
+    volumeAcceleration >= 1.5
+  ) {
+    score += 10;
+  }
+
+  if (
+    volumeAcceleration >= 2.5
+  ) {
+    score += 10;
+  }
+
+
+  if (
+    priceAcceleration > 0
+  ) {
+    score += 10;
+  }
+
+
+  score =
+    Math.min(
+      score,
+      100
+    );
+
+
+  /*
+    SİNYAL SEVİYESİ
+  */
+
+  let signalLevel =
+    "İZLE";
+
+
+  if (score >= 80) {
+
+    signalLevel =
+      "GÜÇLÜ TEYİT";
+
+  } else if (
+    score >= 65
+  ) {
+
+    signalLevel =
+      "KIRILIM YAKLAŞIYOR";
+
+  } else if (
+    score >= 50
+  ) {
+
+    signalLevel =
+      "HAREKETLENİYOR";
+  }
+
+
+  /*
+    Radar yalnızca anlamlı
+    hareketleri sonuç listesine alır.
+  */
 
   const qualifies =
-    recentAverage > 0 &&
-    difference >= 2;
+    score >= 50;
 
 
   return {
@@ -1033,21 +1178,27 @@ function analyzeMinuteRise(
 
     source,
 
-    price:
-      Number(
-        data.at(-1).close
-      ),
+    price,
 
-    previousAverage,
+    change1,
 
-    recentAverage,
+    change3,
 
-    difference,
+    change5,
+
+    change15,
+
+    volumeAcceleration,
+
+    priceAcceleration,
+
+    score,
+
+    signalLevel,
 
     qualifies
   };
-}
-/* =========================
+}/* =========================
    RADAR SİNYAL YÖNETİMİ
 ========================= */
 
