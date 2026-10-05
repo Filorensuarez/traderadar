@@ -7,6 +7,8 @@ const okxButton =
 
 const kucoinButton =
   document.querySelector("#kucoinButton");
+const gateButton =
+  document.querySelector("#gateButton");
 let selectedExchange =
   "okx";
 
