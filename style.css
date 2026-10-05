@@ -413,3 +413,10 @@ footer {
   border-color: rgba(255, 184, 77, 0.45);
   color: #ffb84d;
 }
+/* ANLIK RADAR - GEÇ / RİSKLİ HAREKET */
+
+.confirmation.late {
+  background: rgba(255, 90, 90, 0.12);
+  border-color: rgba(255, 90, 90, 0.50);
+  color: #ff6b6b;
+}
