@@ -188,6 +188,10 @@ function updateMicroTrades(
    SENARYO 3
    FİYAT İVMESİ
 ========================= */
+/* =========================
+   SENARYO 3
+   FİYAT İVMESİ BAŞLIYOR
+========================= */
 
 function analyzeScenario3(
   source,
@@ -201,25 +205,26 @@ function analyzeScenario3(
     );
 
   const trades =
-    state.trades;
+    Array.isArray(state.trades)
+      ? state.trades
+      : [];
 
-  if (
-    !Array.isArray(trades) ||
-    trades.length < 5
-  ) {
+  if (trades.length < 5) {
     return null;
   }
 
 
-  const now =
-    Date.now();
-
-  const latest =
+  const latestTrade =
     trades.at(-1);
+
+  const now =
+    Number(
+      latestTrade.time
+    ) || Date.now();
 
   const currentPrice =
     Number(
-      latest.price
+      latestTrade.price
     );
 
 
@@ -232,8 +237,8 @@ function analyzeScenario3(
 
 
   /*
-    Belirli saniye penceresinin
-    istatistiklerini hesaplar.
+    BELİRLİ SANİYE PENCERESİNİ
+    HESAPLAR
   */
 
   function windowStats(
@@ -249,7 +254,9 @@ function analyzeScenario3(
       trades.filter(
         trade =>
           trade.time >=
-          startTime
+          startTime &&
+          trade.time <=
+          now
       );
 
 
@@ -263,17 +270,13 @@ function analyzeScenario3(
 
         volume: 0,
 
-        trades:
-          0,
+        tradeCount: 0,
 
-        tradesPerSecond:
-          0,
+        tradesPerSecond: 0,
 
-        volumePerSecond:
-          0,
+        volumePerSecond: 0,
 
-        buyerRatio:
-          0
+        buyerRatio: 0
       };
     }
 
@@ -335,8 +338,10 @@ function analyzeScenario3(
 
     const buyerRatio =
       volume > 0
-        ? buyVolume /
-          volume
+        ? (
+            buyVolume /
+            volume
+          ) * 100
         : 0;
 
 
@@ -348,7 +353,7 @@ function analyzeScenario3(
 
       volume,
 
-      trades:
+      tradeCount:
         rows.length,
 
       tradesPerSecond:
@@ -359,11 +364,14 @@ function analyzeScenario3(
         volume /
         seconds,
 
-      buyerRatio:
-        buyerRatio * 100
+      buyerRatio
     };
   }
 
+
+  /*
+    5 / 10 / 30 / 60 SANİYE
+  */
 
   const w5 =
     windowStats(5);
@@ -379,10 +387,39 @@ function analyzeScenario3(
 
 
   /*
+    FİYAT İVMESİ
+
+    Hareket büyüdükçe daha uzun
+    pencerelerde toplam değişimin
+    artmasını bekliyoruz.
+  */
+
+  const priceAcceleration =
+    (
+      w10.priceChange >
+      w5.priceChange
+    ) &&
+    (
+      w30.priceChange >
+      w10.priceChange
+    ) &&
+    (
+      w60.priceChange >
+      w30.priceChange
+    );
+
+
+  /*
     HACİM İVMESİ
 
-    Hacim/sn karşılaştırılır.
+    Ham toplam hacim yerine
+    hacim/saniye değerini de
+    karşılaştırıyoruz.
   */
+
+  const volumeAcceleration5 =
+    w5.volumePerSecond;
+
 
   const volumeAcceleration10 =
     w5.volumePerSecond > 0
@@ -406,7 +443,27 @@ function analyzeScenario3(
 
 
   /*
-    İŞLEM FREKANSI İVMESİ
+    HACİMİN GENEL OLARAK
+    GÜÇLENMESİ
+  */
+
+  const volumeGrowing =
+    (
+      w10.volume >
+      w5.volume
+    ) &&
+    (
+      w30.volume >
+      w10.volume
+    ) &&
+    (
+      w60.volume >
+      w30.volume
+    );
+
+
+  /*
+    İŞLEM FREKANSI
   */
 
   const tradeAcceleration10 =
@@ -431,65 +488,37 @@ function analyzeScenario3(
 
 
   /*
-    FİYAT İVMESİ
-
-    Daha uzun pencerelerde
-    toplam yükselişin büyümesini
-    arıyoruz.
-  */
-
-  const priceAcceleration =
-    (
-      w10.priceChange >
-      w5.priceChange
-    ) &&
-    (
-      w30.priceChange >
-      w10.priceChange
-    ) &&
-    (
-      w60.priceChange >
-      w30.priceChange
-    );
-
-
-  /*
-    HACİMİN KADEMELİ
-    GÜÇLENMESİ
-  */
-
-  const volumeGrowing =
-    (
-      w10.volume >
-      w5.volume
-    ) &&
-    (
-      w30.volume >
-      w10.volume
-    ) &&
-    (
-      w60.volume >
-      w30.volume
-    );
-
-
-  /*
-    İŞLEM FREKANSININ
-    GÜÇLENMESİ
+    Kısa pencere doğal olarak
+    daha oynak olduğu için burada
+    kusursuz doğrusal artış
+    aramıyoruz.
   */
 
   const tradeFrequencyGrowing =
     (
       w10.tradesPerSecond >=
-      w5.tradesPerSecond * 0.80
+      w5.tradesPerSecond * 0.75
     ) &&
     (
       w30.tradesPerSecond >=
-      w10.tradesPerSecond * 0.80
+      w10.tradesPerSecond * 0.75
     ) &&
     (
       w60.tradesPerSecond >=
-      w30.tradesPerSecond * 0.70
+      w30.tradesPerSecond * 0.65
+    );
+
+
+  /*
+    ALICI BASKISI
+  */
+
+  const buyerStrengthening =
+    (
+      w10.buyerRatio >= 52
+    ) &&
+    (
+      w30.buyerRatio >= 55
     );
 
 
@@ -500,33 +529,69 @@ function analyzeScenario3(
   let score = 0;
 
 
+  /*
+    Fiyat
+  */
+
   if (
     w5.priceChange >= 0.05
   ) {
-    score += 8;
+    score += 5;
+  }
+
+
+  if (
+    w5.priceChange >= 0.10
+  ) {
+    score += 5;
   }
 
 
   if (
     w10.priceChange >= 0.15
   ) {
-    score += 10;
+    score += 7;
+  }
+
+
+  if (
+    w10.priceChange >= 0.22
+  ) {
+    score += 5;
   }
 
 
   if (
     w30.priceChange >= 0.35
   ) {
-    score += 12;
+    score += 7;
+  }
+
+
+  if (
+    w30.priceChange >= 0.55
+  ) {
+    score += 5;
   }
 
 
   if (
     w60.priceChange >= 0.60
   ) {
-    score += 15;
+    score += 8;
   }
 
+
+  if (
+    w60.priceChange >= 0.95
+  ) {
+    score += 5;
+  }
+
+
+  /*
+    Üçlü ivme teyidi
+  */
 
   if (priceAcceleration) {
     score += 15;
@@ -534,26 +599,31 @@ function analyzeScenario3(
 
 
   if (volumeGrowing) {
-    score += 15;
+    score += 12;
   }
 
 
   if (
     tradeFrequencyGrowing
   ) {
-    score += 15;
+    score += 12;
   }
 
 
   if (
-    w10.buyerRatio >= 55
+    buyerStrengthening
   ) {
-    score += 5;
+    score += 7;
   }
 
 
+  /*
+    Çok güçlü kısa vadeli
+    alıcı baskısı.
+  */
+
   if (
-    w30.buyerRatio >= 60
+    w10.buyerRatio >= 60
   ) {
     score += 5;
   }
@@ -567,14 +637,35 @@ function analyzeScenario3(
 
 
   /*
-    SINYAL SINIFI
+    GEÇ KALINDI KONTROLÜ
+
+    Senaryo 3'ün amacı hareketi
+    başlangıcında yakalamaktır.
+  */
+
+  const lateMove =
+    (
+      w60.priceChange >= 3
+    ) ||
+    (
+      w30.priceChange >= 2.5
+    );
+
+
+  /*
+    DURUM
   */
 
   let status =
     "İVME ZAYIF";
 
 
-  if (
+  if (lateMove) {
+
+    status =
+      "GEÇ KALINDI";
+
+  } else if (
     score >= 80 &&
     priceAcceleration &&
     volumeGrowing &&
@@ -600,23 +691,6 @@ function analyzeScenario3(
   }
 
 
-  /*
-    Fiyat çoktan aşırı
-    yükselmişse erken sinyal
-    olarak göstermiyoruz.
-  */
-
-  const lateMove =
-    w60.priceChange >= 3;
-
-
-  if (lateMove) {
-
-    status =
-      "GEÇ KALINDI";
-  }
-
-
   const qualifies =
     score >= 40;
 
@@ -634,6 +708,11 @@ function analyzeScenario3(
 
     status,
 
+
+    /*
+      FİYAT
+    */
+
     price5:
       w5.priceChange,
 
@@ -645,6 +724,11 @@ function analyzeScenario3(
 
     price60:
       w60.priceChange,
+
+
+    /*
+      HACİM
+    */
 
     volume5:
       w5.volume,
@@ -670,6 +754,11 @@ function analyzeScenario3(
     volumePerSecond60:
       w60.volumePerSecond,
 
+
+    /*
+      İŞLEM FREKANSI
+    */
+
     tradesPerSecond5:
       w5.tradesPerSecond,
 
@@ -681,6 +770,11 @@ function analyzeScenario3(
 
     tradesPerSecond60:
       w60.tradesPerSecond,
+
+
+    /*
+      ALICI ORANI
+    */
 
     buyerRatio5:
       w5.buyerRatio,
@@ -694,6 +788,13 @@ function analyzeScenario3(
     buyerRatio60:
       w60.buyerRatio,
 
+
+    /*
+      İVME ORANLARI
+    */
+
+    volumeAcceleration5,
+
     volumeAcceleration10,
 
     volumeAcceleration30,
@@ -706,11 +807,18 @@ function analyzeScenario3(
 
     tradeAcceleration60,
 
+
+    /*
+      ÜÇ ANA KOŞUL
+    */
+
     priceAcceleration,
 
     volumeGrowing,
 
     tradeFrequencyGrowing,
+
+    buyerStrengthening,
 
     lateMove,
 
