@@ -5412,7 +5412,544 @@ console.log(
 /* =========================
    ANLIK RADAR TARAMASI
 ========================= */
+/* =========================
+   YÜKSELİŞ SENARYOLARI TARAMASI
+========================= */
 
+async function scanScenarios() {
+
+  if (scenarioCache.scanning) {
+    return;
+  }
+
+  scenarioCache.scanning =
+    true;
+
+
+  const scenario1Rows = [];
+  const scenario2Rows = [];
+  const scenario3Rows = [];
+  const scenario4Rows = [];
+
+
+  let scanned = 0;
+  let generalError = null;
+
+
+  try {
+
+    const symbols =
+      await getGateSymbols();
+
+
+    /*
+      API yükünü kontrollü tut.
+    */
+
+    const batchSize = 4;
+
+
+    for (
+      let i = 0;
+      i < symbols.length;
+      i += batchSize
+    ) {
+
+      const batch =
+        symbols.slice(
+          i,
+          i + batchSize
+        );
+
+
+      const responses =
+        await Promise.allSettled(
+
+          batch.map(
+            async item => {
+
+              const symbol =
+                item.symbol;
+
+
+              /*
+                1 DAKİKALIK MUMLAR
+              */
+
+              const candles =
+                await getGateMinuteCandles(
+                  symbol
+                );
+
+
+              if (
+                !Array.isArray(candles) ||
+                candles.length < 30
+              ) {
+                return;
+              }
+
+
+              scanned += 1;
+
+
+              const displaySymbol =
+                symbol.replace(
+                  "_USDT",
+                  "/USDT"
+                );
+
+
+              /* =====================
+                 SENARYO 1
+              ===================== */
+
+              const scenario1 =
+                analyzeScenario1(
+                  displaySymbol,
+                  candles,
+                  "GATE.IO"
+                );
+
+
+              if (
+                scenario1 &&
+                scenario1.qualifies
+              ) {
+
+                scenario1Rows.push(
+                  scenario1
+                );
+              }
+
+
+              /* =====================
+                 SENARYO 4
+              ===================== */
+
+              const scenario4 =
+                analyzeScenario4(
+                  displaySymbol,
+                  candles,
+                  "GATE.IO"
+                );
+
+
+              if (
+                scenario4 &&
+                scenario4.qualifies
+              ) {
+
+                scenario4Rows.push(
+                  scenario4
+                );
+              }
+
+
+              /*
+                SENARYO 2 + 3 ÖN ELEME
+
+                İşlem ve order-book verisini
+                her coinde çekmeyelim.
+
+                Son 5 dakikada fiyat henüz
+                erken hareket bölgesindeyse
+                ayrıntılı inceleme yap.
+              */
+
+              const latest =
+                candles.at(-1);
+
+              const old =
+                candles.at(-6);
+
+
+              const latestPrice =
+                Number(
+                  latest?.close
+                );
+
+
+              const oldPrice =
+                Number(
+                  old?.close
+                );
+
+
+              if (
+                !Number.isFinite(
+                  latestPrice
+                ) ||
+                !Number.isFinite(
+                  oldPrice
+                ) ||
+                oldPrice <= 0
+              ) {
+                return;
+              }
+
+
+              const change5 =
+                (
+                  (
+                    latestPrice -
+                    oldPrice
+                  ) /
+                  oldPrice
+                ) * 100;
+
+
+              /*
+                Çok düşen veya zaten
+                fazla yükselmiş coinleri
+                mikro analizden çıkar.
+              */
+
+              if (
+                change5 < -0.50 ||
+                change5 > 2.50
+              ) {
+                return;
+              }
+
+
+              /* =====================
+                 GATE.IO SON İŞLEMLER
+              ===================== */
+
+              const rawTrades =
+                await getGateJSON(
+                  `${GATE}/spot/trades` +
+                  `?currency_pair=${encodeURIComponent(symbol)}` +
+                  `&limit=200`
+                );
+
+
+              const normalizedTrades =
+                rawTrades
+                  .map(
+                    trade => {
+
+                      const time =
+                        Number(
+                          trade.create_time_ms
+                        ) ||
+                        Number(
+                          trade.create_time
+                        ) * 1000;
+
+
+                      return {
+
+                        time,
+
+                        price:
+                          Number(
+                            trade.price
+                          ),
+
+                        amount:
+                          Number(
+                            trade.amount
+                          ),
+
+                        side:
+                          trade.side
+                      };
+                    }
+                  )
+                  .filter(
+                    trade =>
+                      Number.isFinite(
+                        trade.time
+                      ) &&
+                      Number.isFinite(
+                        trade.price
+                      ) &&
+                      Number.isFinite(
+                        trade.amount
+                      )
+                  );
+
+
+              /*
+                Mikro hafızayı besle.
+              */
+
+              updateMicroTrades(
+                "GATE.IO",
+                displaySymbol,
+                normalizedTrades
+              );
+
+
+              /* =====================
+                 SENARYO 3
+              ===================== */
+
+              const scenario3 =
+                analyzeScenario3(
+                  "GATE.IO",
+                  displaySymbol
+                );
+
+
+              if (
+                scenario3 &&
+                scenario3.qualifies
+              ) {
+
+                scenario3Rows.push(
+                  scenario3
+                );
+              }
+
+
+              /* =====================
+                 SENARYO 2
+              ===================== */
+
+              /*
+                Senaryo 2 fonksiyonu
+                trade + order book verisini
+                ayrıca değerlendirir.
+              */
+
+              const scenario2 =
+                await analyzeScenario2Gate(
+                  symbol,
+                  candles
+                );
+
+
+              if (
+                scenario2 &&
+                scenario2.qualifies
+              ) {
+
+                scenario2Rows.push(
+                  scenario2
+                );
+              }
+            }
+          )
+        );
+
+
+      /*
+        Promise hataları tüm taramayı
+        durdurmasın.
+      */
+
+      for (
+        const response
+        of responses
+      ) {
+
+        if (
+          response.status ===
+          "rejected"
+        ) {
+
+          console.error(
+            "Senaryo coin hatası:",
+            response.reason?.message ||
+            response.reason
+          );
+        }
+      }
+
+
+      /*
+        Gate.io API'sine gereksiz
+        yük bindirmemek için
+        gruplar arasında bekle.
+      */
+
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            150
+          )
+      );
+    }
+
+
+    /* =========================
+       SIRALAMA
+    ========================= */
+
+    scenario1Rows.sort(
+      (a, b) =>
+        b.score -
+        a.score
+    );
+
+
+    scenario2Rows.sort(
+      (a, b) =>
+        b.score -
+        a.score
+    );
+
+
+    scenario3Rows.sort(
+      (a, b) =>
+        b.score -
+        a.score
+    );
+
+
+    scenario4Rows.sort(
+      (a, b) =>
+        b.score -
+        a.score
+    );
+
+
+    /* =========================
+       CACHE
+    ========================= */
+
+    scenarioCache = {
+
+      updatedAt:
+        Date.now(),
+
+      scanning:
+        false,
+
+
+      scenario1: {
+
+        ok: true,
+
+        scanned,
+
+        rows:
+          scenario1Rows.slice(
+            0,
+            50
+          ),
+
+        error:
+          null
+      },
+
+
+      scenario2: {
+
+        ok: true,
+
+        scanned,
+
+        rows:
+          scenario2Rows.slice(
+            0,
+            50
+          ),
+
+        error:
+          null
+      },
+
+
+      scenario3: {
+
+        ok: true,
+
+        scanned,
+
+        rows:
+          scenario3Rows.slice(
+            0,
+            50
+          ),
+
+        error:
+          null
+      },
+
+
+      scenario4: {
+
+        ok: true,
+
+        scanned,
+
+        rows:
+          scenario4Rows.slice(
+            0,
+            50
+          ),
+
+        error:
+          null
+      }
+    };
+
+
+    console.log(
+      `Senaryolar: ${scanned} coin | S1 ${scenario1Rows.length} | S2 ${scenario2Rows.length} | S3 ${scenario3Rows.length} | S4 ${scenario4Rows.length}`
+    );
+
+
+  } catch (error) {
+
+    generalError =
+      error.message;
+
+
+    console.error(
+      "Senaryo tarama hatası:",
+      error.message
+    );
+
+
+    scenarioCache = {
+
+      ...scenarioCache,
+
+      updatedAt:
+        Date.now(),
+
+      scanning:
+        false,
+
+
+      scenario1: {
+        ...scenarioCache.scenario1,
+        ok: false,
+        error: generalError
+      },
+
+      scenario2: {
+        ...scenarioCache.scenario2,
+        ok: false,
+        error: generalError
+      },
+
+      scenario3: {
+        ...scenarioCache.scenario3,
+        ok: false,
+        error: generalError
+      },
+
+      scenario4: {
+        ...scenarioCache.scenario4,
+        ok: false,
+        error: generalError
+      }
+    };
+
+
+  } finally {
+
+    scenarioCache.scanning =
+      false;
+  }
+}
 async function scanMinuteRadar() {
 
   if (minuteRadarScanning) {
