@@ -4767,7 +4767,7 @@ function analyze(
     rsi(closes);
 
   const MACD =
-    macd(closes);
+    calculateMACD(closes);
 
   const ATR =
     atr(candles);
