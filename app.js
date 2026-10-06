@@ -2029,17 +2029,6 @@ async function loadScenarios() {
    PUSH BİLDİRİMLERİ
 ========================= */
 
-const enableNotificationsButton =
-  document.querySelector(
-    "#enableNotificationsButton"
-  );
-
-const notificationStatus =
-  document.querySelector(
-    "#notificationStatus"
-  );
-
-
 /*
   VAPID public key'i
   PushManager formatına çevir.
