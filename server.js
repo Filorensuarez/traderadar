@@ -1841,6 +1841,505 @@ function analyzeMinuteRise(
   };
 }
 /* =========================
+   SENARYO 1
+   SESSİZLİK VE SIKIŞMA
+========================= */
+
+function analyzeScenario1(
+  symbol,
+  candles,
+  source
+) {
+
+  if (
+    !Array.isArray(candles) ||
+    candles.length < 30
+  ) {
+    return null;
+  }
+
+  const data =
+    candles.slice(-40);
+
+  const current =
+    data.at(-1);
+
+  const price =
+    Number(current.close);
+
+  if (
+    !Number.isFinite(price) ||
+    price <= 0
+  ) {
+    return null;
+  }
+
+
+  const closes =
+    data.map(
+      c => Number(c.close)
+    );
+
+  const highs =
+    data.map(
+      c => Number(c.high)
+    );
+
+  const lows =
+    data.map(
+      c => Number(c.low)
+    );
+
+
+  /*
+    1. VOLATİLİTE
+  */
+
+  function rangePercent(
+    candles
+  ) {
+
+    if (!candles.length) {
+      return 0;
+    }
+
+    const high =
+      Math.max(
+        ...candles.map(
+          c => Number(c.high)
+        )
+      );
+
+    const low =
+      Math.min(
+        ...candles.map(
+          c => Number(c.low)
+        )
+      );
+
+    if (low <= 0) {
+      return 0;
+    }
+
+    return (
+      (
+        high - low
+      ) /
+      low
+    ) * 100;
+  }
+
+
+  const recent10 =
+    data.slice(-10);
+
+  const previous20 =
+    data.slice(-30, -10);
+
+
+  const recentRange =
+    rangePercent(
+      recent10
+    );
+
+  const previousRange =
+    rangePercent(
+      previous20
+    );
+
+
+  const volatilityRatio =
+    previousRange > 0
+      ? recentRange /
+        previousRange
+      : 1;
+
+
+  const volatilityFalling =
+    volatilityRatio <= 0.70;
+
+
+  /*
+    2. BOLLINGER BANT GENİŞLİĞİ
+  */
+
+  function standardDeviation(
+    values
+  ) {
+
+    if (!values.length) {
+      return 0;
+    }
+
+    const mean =
+      values.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) /
+      values.length;
+
+
+    const variance =
+      values.reduce(
+        (sum, value) =>
+          sum +
+          Math.pow(
+            value - mean,
+            2
+          ),
+        0
+      ) /
+      values.length;
+
+
+    return Math.sqrt(
+      variance
+    );
+  }
+
+
+  function bollingerWidth(
+    values
+  ) {
+
+    if (values.length < 20) {
+      return 0;
+    }
+
+    const sample =
+      values.slice(-20);
+
+    const middle =
+      sample.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) /
+      sample.length;
+
+
+    const sd =
+      standardDeviation(
+        sample
+      );
+
+
+    if (middle <= 0) {
+      return 0;
+    }
+
+
+    const upper =
+      middle +
+      2 * sd;
+
+    const lower =
+      middle -
+      2 * sd;
+
+
+    return (
+      (
+        upper - lower
+      ) /
+      middle
+    ) * 100;
+  }
+
+
+  const currentBollingerWidth =
+    bollingerWidth(
+      closes
+    );
+
+
+  const oldBollingerWidth =
+    bollingerWidth(
+      closes.slice(
+        0,
+        -10
+      )
+    );
+
+
+  const bollingerRatio =
+    oldBollingerWidth > 0
+      ? currentBollingerWidth /
+        oldBollingerWidth
+      : 1;
+
+
+  const bollingerSqueeze =
+    bollingerRatio <= 0.80;
+
+
+  /*
+    3. ATR
+  */
+
+  function trueRange(
+    candle,
+    previousClose
+  ) {
+
+    return Math.max(
+      Number(candle.high) -
+        Number(candle.low),
+
+      Math.abs(
+        Number(candle.high) -
+        previousClose
+      ),
+
+      Math.abs(
+        Number(candle.low) -
+        previousClose
+      )
+    );
+  }
+
+
+  const trueRanges = [];
+
+
+  for (
+    let i = 1;
+    i < data.length;
+    i++
+  ) {
+
+    trueRanges.push(
+      trueRange(
+        data[i],
+        Number(
+          data[i - 1].close
+        )
+      )
+    );
+  }
+
+
+  const recentATR =
+    trueRanges
+      .slice(-10)
+      .reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) / 10;
+
+
+  const previousATRValues =
+    trueRanges.slice(
+      -30,
+      -10
+    );
+
+
+  const previousATR =
+    previousATRValues.length
+      ? previousATRValues.reduce(
+          (sum, value) =>
+            sum + value,
+          0
+        ) /
+        previousATRValues.length
+      : 0;
+
+
+  const atrRatio =
+    previousATR > 0
+      ? recentATR /
+        previousATR
+      : 1;
+
+
+  const atrLow =
+    atrRatio <= 0.75;
+
+
+  /*
+    4. DAR FİYAT ALANI
+  */
+
+  const narrowRange =
+    recentRange <= 2.0;
+
+
+  /*
+    5. DİRENÇ TESTİ
+  */
+
+  const resistanceWindow =
+    data.slice(-20);
+
+
+  const resistance =
+    Math.max(
+      ...resistanceWindow.map(
+        c => Number(c.high)
+      )
+    );
+
+
+  const resistanceTolerance =
+    resistance * 0.006;
+
+
+  let resistanceTests = 0;
+
+
+  for (
+    const candle
+    of resistanceWindow
+  ) {
+
+    const high =
+      Number(candle.high);
+
+    if (
+      Math.abs(
+        resistance - high
+      ) <=
+      resistanceTolerance
+    ) {
+
+      resistanceTests += 1;
+    }
+  }
+
+
+  const repeatedResistance =
+    resistanceTests >= 3;
+
+
+  const distanceToResistance =
+    resistance > 0
+      ? (
+          (
+            resistance - price
+          ) /
+          resistance
+        ) * 100
+      : 0;
+
+
+  /*
+    PUAN
+  */
+
+  let score = 0;
+
+
+  if (volatilityFalling) {
+    score += 20;
+  }
+
+
+  if (bollingerSqueeze) {
+    score += 20;
+  }
+
+
+  if (atrLow) {
+    score += 20;
+  }
+
+
+  if (narrowRange) {
+    score += 20;
+  }
+
+
+  if (repeatedResistance) {
+    score += 20;
+  }
+
+
+  /*
+    SINIFLANDIRMA
+  */
+
+  let status =
+    "ZAYIF SIKIŞMA";
+
+
+  if (score >= 80) {
+
+    status =
+      "SIKIŞMA GÜÇLÜ";
+
+  } else if (
+    score >= 60
+  ) {
+
+    status =
+      "SIKIŞMA OLUŞUYOR";
+
+  } else if (
+    score >= 40
+  ) {
+
+    status =
+      "SIKIŞMA ADAYI";
+  }
+
+
+  /*
+    Sadece anlamlı adayları
+    Senaryo 1 ekranına gönder.
+  */
+
+  const qualifies =
+    score >= 40;
+
+
+  return {
+
+    symbol,
+
+    source,
+
+    price,
+
+    score,
+
+    status,
+
+    volatilityFalling,
+
+    volatilityRatio,
+
+    recentRange,
+
+    previousRange,
+
+    bollingerSqueeze,
+
+    bollingerWidth:
+      currentBollingerWidth,
+
+    bollingerRatio,
+
+    atrLow,
+
+    atrRatio,
+
+    narrowRange,
+
+    resistance,
+
+    resistanceTests,
+
+    repeatedResistance,
+
+    distanceToResistance,
+
+    qualifies
+  };
+}
+/* =========================
    RADAR SİNYAL YÖNETİMİ
 ========================= */
 
