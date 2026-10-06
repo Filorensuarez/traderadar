@@ -203,6 +203,14 @@ radarButton.addEventListener(
       "radar"
     )
 );
+
+scenarioButton.addEventListener(
+  "click",
+  () =>
+    openView(
+      "scenario"
+    )
+);
 function selectExchange(exchange) {
 
   selectedExchange =
