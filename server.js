@@ -164,7 +164,195 @@ async function sendPush(
 
     return;
   }
+/* =========================
+   SENARYO BİLDİRİMLERİ
+========================= */
 
+async function notifyScenarioChanges(
+  cache
+) {
+
+  const groups = [
+
+    [
+      "scenario1",
+      1
+    ],
+
+    [
+      "scenario2",
+      2
+    ],
+
+    [
+      "scenario3",
+      3
+    ],
+
+    [
+      "scenario4",
+      4
+    ]
+  ];
+
+
+  /*
+    Bu taramada hâlâ aktif olan
+    sinyalleri burada tutuyoruz.
+  */
+
+  const activeNow =
+    new Set();
+
+
+  for (
+    const [
+      scenarioName,
+      scenarioNumber
+    ]
+    of groups
+  ) {
+
+    const rows =
+      Array.isArray(
+        cache?.[
+          scenarioName
+        ]?.rows
+      )
+        ? cache[
+            scenarioName
+          ].rows
+        : [];
+
+
+    for (
+      const row
+      of rows
+    ) {
+
+      const symbol =
+        row.symbol ||
+        row.instId ||
+        row.pair ||
+        "Coin";
+
+
+      const source =
+        row.source ||
+        row.exchange ||
+        "";
+
+
+      /*
+        Senaryo + borsa + coin
+        benzersiz sinyal kimliği.
+      */
+
+      const key =
+        `${scenarioNumber}:${source}:${symbol}`;
+
+
+      activeNow.add(
+        key
+      );
+
+
+      /*
+        Aynı sinyal daha önce
+        bildirildiyse tekrar gönderme.
+      */
+
+      if (
+        scenarioSeen.has(
+          key
+        )
+      ) {
+
+        continue;
+      }
+
+
+      scenarioSeen.set(
+        key,
+        Date.now()
+      );
+
+
+      const score =
+        Number(
+          row.score
+        );
+
+
+      const scoreText =
+        Number.isFinite(
+          score
+        )
+          ? ` • ${Math.round(score)}/100`
+          : "";
+
+
+      const sourceText =
+        source
+          ? ` • ${source}`
+          : "";
+
+
+      await sendPush({
+
+        title:
+          `TradeRadar • Senaryo ${scenarioNumber}`,
+
+        body:
+          `${symbol}${sourceText} • Senaryo ${scenarioNumber} koşullarını sağladı${scoreText}`,
+
+        tag:
+          `scenario-${key}`,
+
+        url:
+          "/#scenario",
+
+        scenario:
+          scenarioNumber,
+
+        symbol,
+
+        source,
+
+        score:
+          Number.isFinite(score)
+            ? score
+            : null
+      });
+    }
+  }
+
+
+  /*
+    Coin senaryodan çıktıysa
+    hafızadan kaldırıyoruz.
+
+    Daha sonra tekrar aynı senaryoya
+    girerse yeni bildirim gelebilir.
+  */
+
+  for (
+    const key
+    of scenarioSeen.keys()
+  ) {
+
+    if (
+      !activeNow.has(
+        key
+      )
+    ) {
+
+      scenarioSeen.delete(
+        key
+      );
+    }
+  }
+}
 
   const body =
     JSON.stringify(
