@@ -1,28 +1,17 @@
-/* =========================
-   TRADERADAR SERVICE WORKER
-========================= */
-
-
-/*
-  PUSH BİLDİRİMİ GELDİĞİNDE
-*/
-
 self.addEventListener(
   "push",
   event => {
 
     let data = {};
 
-
     try {
 
-      if (event.data) {
+      data =
+        event.data
+          ? event.data.json()
+          : {};
 
-        data =
-          event.data.json();
-      }
-
-    } catch (error) {
+    } catch {
 
       data = {
         title:
@@ -31,7 +20,7 @@ self.addEventListener(
         body:
           event.data
             ? event.data.text()
-            : "Yeni senaryo tespit edildi."
+            : "Yeni senaryo bulundu."
       };
     }
 
@@ -45,13 +34,7 @@ self.addEventListener(
 
       body:
         data.body ||
-        "Yeni yükseliş senaryosu tespit edildi.",
-
-      icon:
-        "/icon-192.png",
-
-      badge:
-        "/icon-192.png",
+        "Yeni yükseliş senaryosu bulundu.",
 
       tag:
         data.tag ||
@@ -67,34 +50,20 @@ self.addEventListener(
 
         url:
           data.url ||
-          "/#scenario",
-
-        scenario:
-          data.scenario ||
-          null,
-
-        symbol:
-          data.symbol ||
-          null
+          "/#scenario"
       }
     };
 
 
     event.waitUntil(
-
-      self.registration
-        .showNotification(
-          title,
-          options
-        )
+      self.registration.showNotification(
+        title,
+        options
+      )
     );
   }
 );
 
-
-/* =========================
-   BİLDİRİME TIKLANDIĞINDA
-========================= */
 
 self.addEventListener(
   "notificationclick",
@@ -104,91 +73,52 @@ self.addEventListener(
 
 
     const targetUrl =
-      event.notification
-        .data?.url ||
+      event.notification.data?.url ||
       "/#scenario";
 
 
     event.waitUntil(
 
-      clients
-        .matchAll({
+      clients.matchAll({
+        type:
+          "window",
 
-          type:
-            "window",
+        includeUncontrolled:
+          true
+      })
 
-          includeUncontrolled:
-            true
-        })
+      .then(
+        windowClients => {
 
-        .then(
-          clientList => {
-
-            /*
-              TradeRadar zaten açıksa
-              mevcut pencereyi öne getir.
-            */
-
-            for (
-              const client
-              of clientList
-            ) {
-
-              if (
-                "focus" in client
-              ) {
-
-                client.navigate(
-                  targetUrl
-                );
-
-                return client.focus();
-              }
-            }
-
-
-            /*
-              Uygulama kapalıysa
-              yeni pencere aç.
-            */
+          for (
+            const client
+            of windowClients
+          ) {
 
             if (
-              clients.openWindow
+              "focus"
+              in client
             ) {
 
-              return clients.openWindow(
+              client.navigate(
                 targetUrl
               );
+
+              return client.focus();
             }
-
-
-            return null;
           }
-        )
-    );
-  }
-);
 
 
-/* =========================
-   SERVICE WORKER AKTİFLEŞTİR
-========================= */
+          if (
+            clients.openWindow
+          ) {
 
-self.addEventListener(
-  "install",
-  () => {
-
-    self.skipWaiting();
-  }
-);
-
-
-self.addEventListener(
-  "activate",
-  event => {
-
-    event.waitUntil(
-      self.clients.claim()
+            return clients.openWindow(
+              targetUrl
+            );
+          }
+        }
+      )
     );
   }
 );
