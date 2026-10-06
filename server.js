@@ -2340,6 +2340,514 @@ function analyzeScenario1(
   };
 }
 /* =========================
+   SENARYO 2
+   PARA VE EMİR AKIŞI
+========================= */
+
+async function analyzeScenario2Gate(
+  symbol,
+  candles
+) {
+
+  if (
+    !Array.isArray(candles) ||
+    candles.length < 10
+  ) {
+    return null;
+  }
+
+
+  const last =
+    candles.at(-1);
+
+  const old =
+    candles.at(-6);
+
+
+  const price =
+    Number(last.close);
+
+  const oldPrice =
+    Number(old.close);
+
+
+  if (
+    !Number.isFinite(price) ||
+    !Number.isFinite(oldPrice) ||
+    oldPrice <= 0
+  ) {
+    return null;
+  }
+
+
+  /*
+    ÖN ELEME
+
+    Son 5 dakikadaki hareket
+    henüz erken bölgede olmalı.
+  */
+
+  const priceChange5 =
+    (
+      (
+        price -
+        oldPrice
+      ) /
+      oldPrice
+    ) * 100;
+
+
+  if (
+    priceChange5 < 0.20 ||
+    priceChange5 > 1.50
+  ) {
+    return null;
+  }
+
+
+  /*
+    SON İŞLEMLER
+  */
+
+  const trades =
+    await getGateJSON(
+      `${GATE}/spot/trades` +
+      `?currency_pair=${encodeURIComponent(symbol)}` +
+      `&limit=200`
+    );
+
+
+  /*
+    EMİR DEFTERİ
+  */
+
+  const response =
+    await fetch(
+      `${GATE}/spot/order_book` +
+      `?currency_pair=${encodeURIComponent(symbol)}` +
+      `&limit=20`,
+      {
+        headers: {
+          "Accept":
+            "application/json"
+        },
+
+        signal:
+          AbortSignal.timeout(
+            15000
+          )
+      }
+    );
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      `Gate.io order book HTTP ${response.status}`
+    );
+  }
+
+
+  const book =
+    await response.json();
+
+
+  const bids =
+    Array.isArray(book.bids)
+      ? book.bids
+      : [];
+
+
+  const asks =
+    Array.isArray(book.asks)
+      ? book.asks
+      : [];
+
+
+  if (
+    !trades.length ||
+    !bids.length ||
+    !asks.length
+  ) {
+    return null;
+  }
+
+
+  /*
+    ALIŞ / SATIŞ HACMİ
+  */
+
+  let buyVolume = 0;
+  let sellVolume = 0;
+
+  let buyTrades = 0;
+  let sellTrades = 0;
+
+
+  let oldestTime =
+    Date.now();
+
+  let newestTime =
+    0;
+
+
+  for (
+    const trade
+    of trades
+  ) {
+
+    const amount =
+      Number(
+        trade.amount
+      ) || 0;
+
+
+    const tradePrice =
+      Number(
+        trade.price
+      ) || 0;
+
+
+    const value =
+      amount *
+      tradePrice;
+
+
+    /*
+      Gate.io trade side:
+      buy / sell
+    */
+
+    if (
+      trade.side === "buy"
+    ) {
+
+      buyVolume +=
+        value;
+
+      buyTrades += 1;
+
+    } else {
+
+      sellVolume +=
+        value;
+
+      sellTrades += 1;
+    }
+
+
+    const time =
+      Number(
+        trade.create_time_ms
+      ) ||
+      Number(
+        trade.create_time
+      ) * 1000;
+
+
+    if (
+      Number.isFinite(time)
+    ) {
+
+      oldestTime =
+        Math.min(
+          oldestTime,
+          time
+        );
+
+      newestTime =
+        Math.max(
+          newestTime,
+          time
+        );
+    }
+  }
+
+
+  const totalVolume =
+    buyVolume +
+    sellVolume;
+
+
+  const buyerRatio =
+    totalVolume > 0
+      ? buyVolume /
+        totalVolume
+      : 0;
+
+
+  /*
+    İŞLEM / SANİYE
+  */
+
+  const seconds =
+    Math.max(
+      1,
+      (
+        newestTime -
+        oldestTime
+      ) / 1000
+    );
+
+
+  const tradesPerSecond =
+    trades.length /
+    seconds;
+
+
+  /*
+    HACİM / SANİYE
+  */
+
+  const volumePerSecond =
+    totalVolume /
+    seconds;
+
+
+  /*
+    BID / ASK DERİNLİĞİ
+    İlk 10 kademe.
+  */
+
+  const bidDepth =
+    bids
+      .slice(0, 10)
+      .reduce(
+        (
+          sum,
+          row
+        ) => {
+
+          return (
+            sum +
+            Number(row[0]) *
+            Number(row[1])
+          );
+        },
+        0
+      );
+
+
+  const askDepth =
+    asks
+      .slice(0, 10)
+      .reduce(
+        (
+          sum,
+          row
+        ) => {
+
+          return (
+            sum +
+            Number(row[0]) *
+            Number(row[1])
+          );
+        },
+        0
+      );
+
+
+  const bidAskRatio =
+    askDepth > 0
+      ? bidDepth /
+        askDepth
+      : 0;
+
+
+  /*
+    SPREAD
+  */
+
+  const bestBid =
+    Number(
+      bids[0][0]
+    );
+
+
+  const bestAsk =
+    Number(
+      asks[0][0]
+    );
+
+
+  const middle =
+    (
+      bestBid +
+      bestAsk
+    ) / 2;
+
+
+  const spreadPercent =
+    middle > 0
+      ? (
+          (
+            bestAsk -
+            bestBid
+          ) /
+          middle
+        ) * 100
+      : 0;
+
+
+  /*
+    PUAN
+  */
+
+  let score = 0;
+
+
+  if (
+    buyerRatio >= 0.55
+  ) {
+    score += 15;
+  }
+
+
+  if (
+    buyerRatio >= 0.65
+  ) {
+    score += 10;
+  }
+
+
+  if (
+    tradesPerSecond >= 1
+  ) {
+    score += 10;
+  }
+
+
+  if (
+    tradesPerSecond >= 3
+  ) {
+    score += 10;
+  }
+
+
+  if (
+    bidAskRatio >= 1.20
+  ) {
+    score += 15;
+  }
+
+
+  if (
+    bidAskRatio >= 1.60
+  ) {
+    score += 10;
+  }
+
+
+  if (
+    spreadPercent <= 0.20
+  ) {
+    score += 10;
+  }
+
+
+  if (
+    priceChange5 >= 0.30 &&
+    priceChange5 <= 1.00
+  ) {
+    score += 10;
+  }
+
+
+  if (
+    volumePerSecond > 0
+  ) {
+    score += 10;
+  }
+
+
+  score =
+    Math.min(
+      score,
+      100
+    );
+
+
+  let status =
+    "PARA AKIŞI ZAYIF";
+
+
+  if (
+    score >= 80
+  ) {
+
+    status =
+      "PARA AKIŞI GÜÇLÜ";
+
+  } else if (
+    score >= 60
+  ) {
+
+    status =
+      "ALICILAR GÜÇLENİYOR";
+
+  } else if (
+    score >= 40
+  ) {
+
+    status =
+      "PARA GİRİŞİ BAŞLIYOR";
+  }
+
+
+  const qualifies =
+    score >= 40;
+
+
+  return {
+
+    symbol:
+      symbol.replace(
+        "_USDT",
+        "/USDT"
+      ),
+
+    source:
+      "GATE.IO",
+
+    price,
+
+    priceChange5,
+
+    score,
+
+    status,
+
+    buyerRatio:
+      buyerRatio * 100,
+
+    buyVolume,
+
+    sellVolume,
+
+    buyTrades,
+
+    sellTrades,
+
+    tradesPerSecond,
+
+    volumePerSecond,
+
+    bidDepth,
+
+    askDepth,
+
+    bidAskRatio,
+
+    bestBid,
+
+    bestAsk,
+
+    spreadPercent,
+
+    qualifies
+  };
+}
+/* =========================
    RADAR SİNYAL YÖNETİMİ
 ========================= */
 
