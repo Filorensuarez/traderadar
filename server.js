@@ -197,7 +197,13 @@ function updateMicroTrades(
    SENARYO 4
    BÜYÜK TEYİT
 ========================= */
+function analyzeScenario3(...) {
+  ...
+}
 
+function analyzeScenario4(...) {
+  ...
+}
 function analyzeScenario4(
   symbol,
   candles,
