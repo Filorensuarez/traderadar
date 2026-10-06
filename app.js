@@ -60,6 +60,15 @@ const scenario4Panel =
   document.querySelector(
     "#scenario4"
   );
+const enableNotificationsButton =
+  document.querySelector(
+    "#enableNotificationsButton"
+  );
+
+const notificationStatus =
+  document.querySelector(
+    "#notificationStatus"
+  );
 
 let scenarioData =
   null;
