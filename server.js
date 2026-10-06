@@ -1498,6 +1498,25 @@ let scenarioCache = {
 
 let minuteRadarScanning =
   false;
+let scenarioCache = {
+
+  ok: true,
+
+  updatedAt: 0,
+
+  scanning: false,
+
+  scenarios: {
+
+    1: [],
+    2: [],
+    3: [],
+    4: []
+
+  },
+
+  error: null
+};
 let cache = {
   ok: true,
   source: "OKX",
