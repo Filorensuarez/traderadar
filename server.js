@@ -1754,7 +1754,7 @@ function rsi(
    MACD
 ========================= */
 
-function macd(closes) {
+function calculateMACD(closes) {
 
   if (
     closes.length < 40
