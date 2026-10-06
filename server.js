@@ -4,8 +4,6 @@ import fs from "fs";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const app = express();
-const PORT = process.env.PORT || 3000;
 
 const OKX =
   "https://www.okx.com";
