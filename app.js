@@ -2015,3 +2015,409 @@ async function loadScenarios() {
       false;
   }
 }
+
+/* =========================
+   PUSH BİLDİRİMLERİ
+========================= */
+
+const enableNotificationsButton =
+  document.querySelector(
+    "#enableNotificationsButton"
+  );
+
+const notificationStatus =
+  document.querySelector(
+    "#notificationStatus"
+  );
+
+
+/*
+  VAPID public key'i
+  PushManager formatına çevir.
+*/
+
+function urlBase64ToUint8Array(
+  base64String
+) {
+
+  const padding =
+    "=".repeat(
+      (
+        4 -
+        base64String.length % 4
+      ) % 4
+    );
+
+
+  const base64 =
+    (
+      base64String +
+      padding
+    )
+      .replace(
+        /-/g,
+        "+"
+      )
+      .replace(
+        /_/g,
+        "/"
+      );
+
+
+  const rawData =
+    window.atob(
+      base64
+    );
+
+
+  return Uint8Array.from(
+    [...rawData].map(
+      character =>
+        character.charCodeAt(0)
+    )
+  );
+}
+
+
+/* =========================
+   SERVICE WORKER
+========================= */
+
+async function getServiceWorker() {
+
+  if (
+    !(
+      "serviceWorker"
+      in navigator
+    )
+  ) {
+
+    throw new Error(
+      "Bu tarayıcı Service Worker desteklemiyor."
+    );
+  }
+
+
+  return navigator
+    .serviceWorker
+    .register(
+      "/service-worker.js"
+    );
+}
+
+
+/* =========================
+   BİLDİRİMİ AÇ
+========================= */
+
+async function enablePushNotifications() {
+
+  if (
+    !(
+      "Notification"
+      in window
+    )
+  ) {
+
+    throw new Error(
+      "Bu tarayıcı bildirimleri desteklemiyor."
+    );
+  }
+
+
+  enableNotificationsButton.disabled =
+    true;
+
+  enableNotificationsButton.textContent =
+    "Açılıyor...";
+
+  notificationStatus.textContent =
+    "Bildirim izni hazırlanıyor...";
+
+
+  try {
+
+    const permission =
+      await Notification
+        .requestPermission();
+
+
+    if (
+      permission !==
+      "granted"
+    ) {
+
+      notificationStatus.textContent =
+        "Bildirim izni verilmedi.";
+
+      return;
+    }
+
+
+    const registration =
+      await getServiceWorker();
+
+
+    /*
+      Service Worker tamamen
+      hazır olana kadar bekle.
+    */
+
+    await navigator
+      .serviceWorker
+      .ready;
+
+
+    /*
+      Sunucudan public VAPID
+      anahtarını al.
+    */
+
+    const keyResponse =
+      await fetch(
+        "/api/push/public-key",
+        {
+          cache:
+            "no-store"
+        }
+      );
+
+
+    if (
+      !keyResponse.ok
+    ) {
+
+      throw new Error(
+        `Bildirim anahtarı alınamadı: HTTP ${
+          keyResponse.status
+        }`
+      );
+    }
+
+
+    const keyData =
+      await keyResponse.json();
+
+
+    if (
+      !keyData.ok ||
+      !keyData.publicKey
+    ) {
+
+      throw new Error(
+        "Sunucuda bildirim anahtarı hazır değil."
+      );
+    }
+
+
+    /*
+      Daha önce abonelik varsa
+      tekrar oluşturma.
+    */
+
+    let subscription =
+      await registration
+        .pushManager
+        .getSubscription();
+
+
+    if (!subscription) {
+
+      subscription =
+        await registration
+          .pushManager
+          .subscribe({
+
+            userVisibleOnly:
+              true,
+
+            applicationServerKey:
+              urlBase64ToUint8Array(
+                keyData.publicKey
+              )
+          });
+    }
+
+
+    /*
+      Aboneliği Railway
+      sunucusuna kaydet.
+    */
+
+    const response =
+      await fetch(
+        "/api/push/subscribe",
+        {
+
+          method:
+            "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify(
+              subscription
+            )
+        }
+      );
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        `Abonelik kaydedilemedi: HTTP ${
+          response.status
+        }`
+      );
+    }
+
+
+    const result =
+      await response.json();
+
+
+    if (!result.ok) {
+
+      throw new Error(
+        result.error ||
+        "Bildirim aboneliği kaydedilemedi."
+      );
+    }
+
+
+    notificationStatus.textContent =
+      "Bildirimler açık. Yeni yükseliş senaryosu yakalandığında haber verilecek.";
+
+    enableNotificationsButton.textContent =
+      "Bildirimler Açık";
+
+
+  } catch (error) {
+
+    console.error(
+      "Push bildirimi:",
+      error
+    );
+
+
+    notificationStatus.textContent =
+      `Bildirim açılamadı: ${
+        error.message
+      }`;
+
+
+    enableNotificationsButton.textContent =
+      "Bildirimleri Aç";
+
+
+  } finally {
+
+    enableNotificationsButton.disabled =
+      false;
+  }
+}
+
+
+/* =========================
+   BİLDİRİM DURUMUNU KONTROL ET
+========================= */
+
+async function checkNotificationStatus() {
+
+  if (
+    !(
+      "Notification"
+      in window
+    ) ||
+    !(
+      "serviceWorker"
+      in navigator
+    )
+  ) {
+
+    notificationStatus.textContent =
+      "Bu cihaz push bildirimini desteklemiyor.";
+
+    return;
+  }
+
+
+  if (
+    Notification.permission ===
+    "denied"
+  ) {
+
+    notificationStatus.textContent =
+      "Bildirim izni tarayıcıdan engellenmiş.";
+
+    return;
+  }
+
+
+  if (
+    Notification.permission !==
+    "granted"
+  ) {
+
+    notificationStatus.textContent =
+      "Bildirimler kapalı.";
+
+    return;
+  }
+
+
+  try {
+
+    const registration =
+      await getServiceWorker();
+
+
+    const subscription =
+      await registration
+        .pushManager
+        .getSubscription();
+
+
+    if (subscription) {
+
+      notificationStatus.textContent =
+        "Bildirimler açık.";
+
+      enableNotificationsButton.textContent =
+        "Bildirimler Açık";
+
+    } else {
+
+      notificationStatus.textContent =
+        "Bildirim aboneliği henüz oluşturulmadı.";
+    }
+
+
+  } catch (error) {
+
+    notificationStatus.textContent =
+      "Bildirim durumu kontrol edilemedi.";
+  }
+}
+
+
+/* =========================
+   BİLDİRİM DÜĞMESİ
+========================= */
+
+enableNotificationsButton
+  .addEventListener(
+    "click",
+    enablePushNotifications
+  );
+
+
+/*
+  Sayfa açıldığında mevcut
+  bildirim durumunu kontrol et.
+*/
+
+checkNotificationStatus();
