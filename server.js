@@ -192,7 +192,376 @@ function updateMicroTrades(
    SENARYO 3
    FİYAT İVMESİ BAŞLIYOR
 ========================= */
+/* =========================
+   SENARYO 3
+   FİYAT İVMESİ BAŞLIYOR
+========================= */
 
+function analyzeScenario3(
+  source,
+  symbol
+) {
+
+  const state =
+    getMicroState(
+      source,
+      symbol
+    );
+
+  const trades =
+    Array.isArray(state.trades)
+      ? state.trades
+      : [];
+
+  if (trades.length < 5) {
+    return null;
+  }
+
+  const latestTrade =
+    trades.at(-1);
+
+  const now =
+    Number(latestTrade.time) ||
+    Date.now();
+
+  const currentPrice =
+    Number(latestTrade.price);
+
+  if (
+    !Number.isFinite(currentPrice) ||
+    currentPrice <= 0
+  ) {
+    return null;
+  }
+
+
+  function windowStats(seconds) {
+
+    const startTime =
+      now -
+      seconds * 1000;
+
+    const rows =
+      trades.filter(
+        trade =>
+          trade.time >= startTime &&
+          trade.time <= now
+      );
+
+    if (!rows.length) {
+
+      return {
+        priceChange: 0,
+        volume: 0,
+        tradesPerSecond: 0,
+        volumePerSecond: 0,
+        buyerRatio: 0
+      };
+    }
+
+    const firstPrice =
+      Number(
+        rows[0].price
+      );
+
+    const lastPrice =
+      Number(
+        rows.at(-1).price
+      );
+
+    const priceChange =
+      firstPrice > 0
+        ? (
+            (
+              lastPrice -
+              firstPrice
+            ) /
+            firstPrice
+          ) * 100
+        : 0;
+
+    let volume = 0;
+    let buyVolume = 0;
+
+    for (
+      const trade
+      of rows
+    ) {
+
+      const value =
+        Number(
+          trade.value
+        ) || 0;
+
+      volume += value;
+
+      if (
+        trade.side === "buy"
+      ) {
+        buyVolume += value;
+      }
+    }
+
+    return {
+
+      priceChange,
+
+      volume,
+
+      tradesPerSecond:
+        rows.length /
+        seconds,
+
+      volumePerSecond:
+        volume /
+        seconds,
+
+      buyerRatio:
+        volume > 0
+          ? (
+              buyVolume /
+              volume
+            ) * 100
+          : 0
+    };
+  }
+
+
+  const w5 =
+    windowStats(5);
+
+  const w10 =
+    windowStats(10);
+
+  const w30 =
+    windowStats(30);
+
+  const w60 =
+    windowStats(60);
+
+
+  const priceAcceleration =
+    w10.priceChange >
+      w5.priceChange &&
+    w30.priceChange >
+      w10.priceChange &&
+    w60.priceChange >
+      w30.priceChange;
+
+
+  const volumeGrowing =
+    w10.volume >
+      w5.volume &&
+    w30.volume >
+      w10.volume &&
+    w60.volume >
+      w30.volume;
+
+
+  const tradeFrequencyGrowing =
+    w10.tradesPerSecond >=
+      w5.tradesPerSecond * 0.75 &&
+    w30.tradesPerSecond >=
+      w10.tradesPerSecond * 0.75 &&
+    w60.tradesPerSecond >=
+      w30.tradesPerSecond * 0.65;
+
+
+  const buyerStrengthening =
+    w10.buyerRatio >= 52 &&
+    w30.buyerRatio >= 55;
+
+
+  let score = 0;
+
+
+  if (w5.priceChange >= 0.05) {
+    score += 5;
+  }
+
+  if (w5.priceChange >= 0.10) {
+    score += 5;
+  }
+
+  if (w10.priceChange >= 0.15) {
+    score += 7;
+  }
+
+  if (w10.priceChange >= 0.22) {
+    score += 5;
+  }
+
+  if (w30.priceChange >= 0.35) {
+    score += 7;
+  }
+
+  if (w30.priceChange >= 0.55) {
+    score += 5;
+  }
+
+  if (w60.priceChange >= 0.60) {
+    score += 8;
+  }
+
+  if (w60.priceChange >= 0.95) {
+    score += 5;
+  }
+
+  if (priceAcceleration) {
+    score += 15;
+  }
+
+  if (volumeGrowing) {
+    score += 12;
+  }
+
+  if (tradeFrequencyGrowing) {
+    score += 12;
+  }
+
+  if (buyerStrengthening) {
+    score += 7;
+  }
+
+  if (w10.buyerRatio >= 60) {
+    score += 5;
+  }
+
+
+  score =
+    Math.min(
+      score,
+      100
+    );
+
+
+  const lateMove =
+    w60.priceChange >= 3 ||
+    w30.priceChange >= 2.5;
+
+
+  let status =
+    "İVME ZAYIF";
+
+
+  if (lateMove) {
+
+    status =
+      "GEÇ KALINDI";
+
+  } else if (
+    score >= 80 &&
+    priceAcceleration &&
+    volumeGrowing &&
+    tradeFrequencyGrowing
+  ) {
+
+    status =
+      "GÜÇLÜ FİYAT İVMESİ";
+
+  } else if (
+    score >= 60
+  ) {
+
+    status =
+      "İVME HIZLANIYOR";
+
+  } else if (
+    score >= 40
+  ) {
+
+    status =
+      "İVME OLUŞUYOR";
+  }
+
+
+  return {
+
+    symbol,
+
+    source,
+
+    price:
+      currentPrice,
+
+    score,
+
+    status,
+
+    price5:
+      w5.priceChange,
+
+    price10:
+      w10.priceChange,
+
+    price30:
+      w30.priceChange,
+
+    price60:
+      w60.priceChange,
+
+    volume5:
+      w5.volume,
+
+    volume10:
+      w10.volume,
+
+    volume30:
+      w30.volume,
+
+    volume60:
+      w60.volume,
+
+    volumePerSecond5:
+      w5.volumePerSecond,
+
+    volumePerSecond10:
+      w10.volumePerSecond,
+
+    volumePerSecond30:
+      w30.volumePerSecond,
+
+    volumePerSecond60:
+      w60.volumePerSecond,
+
+    tradesPerSecond5:
+      w5.tradesPerSecond,
+
+    tradesPerSecond10:
+      w10.tradesPerSecond,
+
+    tradesPerSecond30:
+      w30.tradesPerSecond,
+
+    tradesPerSecond60:
+      w60.tradesPerSecond,
+
+    buyerRatio5:
+      w5.buyerRatio,
+
+    buyerRatio10:
+      w10.buyerRatio,
+
+    buyerRatio30:
+      w30.buyerRatio,
+
+    buyerRatio60:
+      w60.buyerRatio,
+
+    priceAcceleration,
+
+    volumeGrowing,
+
+    tradeFrequencyGrowing,
+
+    buyerStrengthening,
+
+    lateMove,
+
+    qualifies:
+      score >= 40
+  };
+}
 /* =========================
    SENARYO 4
    BÜYÜK TEYİT
