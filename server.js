@@ -7492,3 +7492,54 @@ setInterval(
   scanMarket,
   5 * 60 * 1000
 );
+
+/* =========================
+   7/24 SENARYO TARAMASI
+========================= */
+
+/*
+  Sunucu açıldıktan 30 saniye
+  sonra ilk senaryo taramasını
+  başlat.
+*/
+
+setTimeout(
+  () => {
+
+    scanScenarios()
+      .catch(
+        error => {
+
+          console.error(
+            "Otomatik senaryo taraması:",
+            error.message
+          );
+        }
+      );
+  },
+  30 * 1000
+);
+
+
+/*
+  Uygulama veya telefon açık
+  olmasa da Railway üzerinde
+  senaryoları 2 dakikada bir tara.
+*/
+
+setInterval(
+  () => {
+
+    scanScenarios()
+      .catch(
+        error => {
+
+          console.error(
+            "Otomatik senaryo taraması:",
+            error.message
+          );
+        }
+      );
+  },
+  2 * 60 * 1000
+);
