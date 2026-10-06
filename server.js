@@ -7295,6 +7295,139 @@ app.get(
   }
 );
 /* =========================
+   PUSH BİLDİRİM API
+========================= */
+
+
+/*
+  Telefonun kullanacağı
+  public VAPID anahtarı.
+*/
+
+app.get(
+  "/api/push/public-key",
+  (
+    req,
+    res
+  ) => {
+
+    res.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+
+    res.json({
+
+      ok:
+        Boolean(
+          VAPID_PUBLIC_KEY
+        ),
+
+      publicKey:
+        VAPID_PUBLIC_KEY
+    });
+  }
+);
+
+
+/*
+  Telefonu bildirim sistemine
+  kaydet.
+*/
+
+app.post(
+  "/api/push/subscribe",
+  (
+    req,
+    res
+  ) => {
+
+    const subscription =
+      req.body;
+
+
+    if (
+      !subscription ||
+      !subscription.endpoint
+    ) {
+
+      return res
+        .status(400)
+        .json({
+
+          ok: false,
+
+          error:
+            "Geçersiz push aboneliği"
+        });
+    }
+
+
+    const exists =
+      pushSubscriptions.some(
+        item =>
+          item.endpoint ===
+          subscription.endpoint
+      );
+
+
+    if (!exists) {
+
+      pushSubscriptions.push(
+        subscription
+      );
+
+      savePushSubscriptions();
+    }
+
+
+    res.json({
+
+      ok: true,
+
+      subscriptions:
+        pushSubscriptions.length
+    });
+  }
+);
+
+
+/*
+  Bildirim aboneliğini kaldır.
+*/
+
+app.post(
+  "/api/push/unsubscribe",
+  (
+    req,
+    res
+  ) => {
+
+    const endpoint =
+      req.body?.endpoint;
+
+
+    if (endpoint) {
+
+      pushSubscriptions =
+        pushSubscriptions.filter(
+          item =>
+            item.endpoint !==
+            endpoint
+        );
+
+
+      savePushSubscriptions();
+    }
+
+
+    res.json({
+      ok: true
+    });
+  }
+);
+/* =========================
    SAĞLIK KONTROLÜ
 ========================= */
 
