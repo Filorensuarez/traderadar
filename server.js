@@ -6462,7 +6462,47 @@ app.get(
     );
   }
 );
+/* =========================
+   YÜKSELİŞ SENARYOLARI API
+========================= */
 
+app.get(
+  "/api/scenarios",
+  async (
+    req,
+    res
+  ) => {
+
+    res.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+
+    /*
+      İlk istek veya veri
+      60 saniyeden eskiyse
+      senaryoları yeniden tara.
+    */
+
+    if (
+      !scenarioCache.updatedAt ||
+      (
+        Date.now() -
+        scenarioCache.updatedAt
+      ) >
+      60 * 1000
+    ) {
+
+      await scanScenarios();
+    }
+
+
+    res.json(
+      scenarioCache
+    );
+  }
+);
 /* =========================
    SAĞLIK KONTROLÜ
 ========================= */
