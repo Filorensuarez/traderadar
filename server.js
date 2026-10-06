@@ -1426,9 +1426,11 @@ function analyzeScenario4(
 
     falseBreakout,
 
-    qualifies
+        qualifies
   };
-  /* =========================
+}
+
+/* =========================
    YÜKSELİŞ SENARYOLARI CACHE
 ========================= */
 
