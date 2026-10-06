@@ -146,8 +146,6 @@ function savePushSubscriptions() {
     );
   }
 }
-
-
 /* =========================
    PUSH GÖNDER
 ========================= */
@@ -161,9 +159,72 @@ async function sendPush(
     !VAPID_PRIVATE_KEY ||
     !pushSubscriptions.length
   ) {
-
     return;
   }
+
+  const body =
+    JSON.stringify(
+      payload
+    );
+
+  const activeSubscriptions = [];
+
+  for (
+    const subscription
+    of pushSubscriptions
+  ) {
+
+    try {
+
+      await webpush.sendNotification(
+        subscription,
+        body,
+        {
+          TTL: 120
+        }
+      );
+
+      activeSubscriptions.push(
+        subscription
+      );
+
+    } catch (error) {
+
+      /*
+        404 ve 410:
+        Abonelik artık geçerli değil.
+      */
+
+      if (
+        error.statusCode !== 404 &&
+        error.statusCode !== 410
+      ) {
+
+        activeSubscriptions.push(
+          subscription
+        );
+
+        console.error(
+          "Push gönderilemedi:",
+          error.message
+        );
+      }
+    }
+  }
+
+  if (
+    activeSubscriptions.length !==
+    pushSubscriptions.length
+  ) {
+
+    pushSubscriptions =
+      activeSubscriptions;
+
+    savePushSubscriptions();
+  }
+}
+
+
 /* =========================
    SENARYO BİLDİRİMLERİ
 ========================= */
@@ -173,32 +234,15 @@ async function notifyScenarioChanges(
 ) {
 
   const groups = [
-
-    [
-      "scenario1",
-      1
-    ],
-
-    [
-      "scenario2",
-      2
-    ],
-
-    [
-      "scenario3",
-      3
-    ],
-
-    [
-      "scenario4",
-      4
-    ]
+    ["scenario1", 1],
+    ["scenario2", 2],
+    ["scenario3", 3],
+    ["scenario4", 4]
   ];
 
-
   /*
-    Bu taramada hâlâ aktif olan
-    sinyalleri burada tutuyoruz.
+    Bu taramada aktif olan
+    senaryolar.
   */
 
   const activeNow =
@@ -244,8 +288,8 @@ async function notifyScenarioChanges(
 
 
       /*
-        Senaryo + borsa + coin
-        benzersiz sinyal kimliği.
+        Her coin + borsa + senaryo
+        için benzersiz kimlik.
       */
 
       const key =
@@ -258,8 +302,9 @@ async function notifyScenarioChanges(
 
 
       /*
-        Aynı sinyal daha önce
-        bildirildiyse tekrar gönderme.
+        Daha önce aynı senaryo için
+        bildirim gönderildiyse
+        tekrar gönderme.
       */
 
       if (
@@ -267,7 +312,6 @@ async function notifyScenarioChanges(
           key
         )
       ) {
-
         continue;
       }
 
@@ -288,7 +332,9 @@ async function notifyScenarioChanges(
         Number.isFinite(
           score
         )
-          ? ` • ${Math.round(score)}/100`
+          ? ` • ${Math.round(
+              score
+            )}/100`
           : "";
 
 
@@ -320,7 +366,9 @@ async function notifyScenarioChanges(
         source,
 
         score:
-          Number.isFinite(score)
+          Number.isFinite(
+            score
+          )
             ? score
             : null
       });
@@ -329,11 +377,12 @@ async function notifyScenarioChanges(
 
 
   /*
-    Coin senaryodan çıktıysa
-    hafızadan kaldırıyoruz.
+    Coin artık senaryoyu
+    sağlamıyorsa hafızadan çıkar.
 
-    Daha sonra tekrar aynı senaryoya
-    girerse yeni bildirim gelebilir.
+    Daha sonra yeniden aynı
+    senaryoya girerse tekrar
+    bildirim gönderilebilir.
   */
 
   for (
@@ -351,74 +400,6 @@ async function notifyScenarioChanges(
         key
       );
     }
-  }
-}
-
-  const body =
-    JSON.stringify(
-      payload
-    );
-
-
-  const activeSubscriptions = [];
-
-
-  for (
-    const subscription
-    of pushSubscriptions
-  ) {
-
-    try {
-
-      await webpush.sendNotification(
-        subscription,
-        body,
-        {
-          TTL: 120
-        }
-      );
-
-
-      activeSubscriptions.push(
-        subscription
-      );
-
-    } catch (error) {
-
-      /*
-        404 / 410:
-        Telefon artık bu aboneliği
-        kullanmıyor.
-      */
-
-      if (
-        error.statusCode !== 404 &&
-        error.statusCode !== 410
-      ) {
-
-        activeSubscriptions.push(
-          subscription
-        );
-
-
-        console.error(
-          "Push gönderilemedi:",
-          error.message
-        );
-      }
-    }
-  }
-
-
-  if (
-    activeSubscriptions.length !==
-    pushSubscriptions.length
-  ) {
-
-    pushSubscriptions =
-      activeSubscriptions;
-
-    savePushSubscriptions();
   }
 }
 
