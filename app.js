@@ -1365,3 +1365,647 @@ radarRefreshButton.addEventListener(
       true
     )
 );
+
+/* =========================
+   YÜKSELİŞ SENARYOSU KARTI
+========================= */
+
+function scenarioCard(
+  item,
+  scenarioNumber
+) {
+
+  const score =
+    Number(item.score || 0);
+
+  const status =
+    item.status || "-";
+
+
+  let details = "";
+
+
+  /* SENARYO 1 */
+
+  if (scenarioNumber === 1) {
+
+    details = `
+      <div class="metrics">
+
+        <div>
+          <span>Fiyat</span>
+          <strong>
+            ${price(item.price)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Volatilite</span>
+          <strong>
+            ${
+              item.volatilityFalling
+                ? "Düşüyor"
+                : "Normal"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>Fiyat Aralığı</span>
+          <strong>
+            ${number(
+              item.recentRange,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>Bollinger</span>
+          <strong>
+            ${
+              item.bollingerSqueeze
+                ? "Daralıyor"
+                : "Normal"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>ATR</span>
+          <strong>
+            ${
+              item.atrLow
+                ? "Düşük"
+                : "Normal"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>Direnç Testi</span>
+          <strong>
+            ${
+              Number(
+                item.resistanceTests || 0
+              )
+            } kez
+          </strong>
+        </div>
+
+        <div>
+          <span>Direnç</span>
+          <strong>
+            ${price(
+              item.resistance
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Dirence Uzaklık</span>
+          <strong>
+            ${number(
+              item.distanceToResistance,
+              2
+            )}%
+          </strong>
+        </div>
+
+      </div>
+    `;
+  }
+
+
+  /* SENARYO 2 */
+
+  if (scenarioNumber === 2) {
+
+    details = `
+      <div class="metrics">
+
+        <div>
+          <span>Fiyat</span>
+          <strong>
+            ${price(item.price)}
+          </strong>
+        </div>
+
+        <div>
+          <span>5 dk</span>
+          <strong>
+            ${number(
+              item.priceChange5,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>Alıcı Hacmi</span>
+          <strong>
+            ${number(
+              item.buyerRatio,
+              1
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>İşlem/sn</span>
+          <strong>
+            ${number(
+              item.tradesPerSecond,
+              2
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Hacim/sn</span>
+          <strong>
+            ${number(
+              item.volumePerSecond,
+              2
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Bid / Ask</span>
+          <strong>
+            ${number(
+              item.bidAskRatio,
+              2
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Spread</span>
+          <strong>
+            ${number(
+              item.spreadPercent,
+              3
+            )}%
+          </strong>
+        </div>
+
+      </div>
+    `;
+  }
+
+
+  /* SENARYO 3 */
+
+  if (scenarioNumber === 3) {
+
+    details = `
+      <div class="metrics">
+
+        <div>
+          <span>Fiyat</span>
+          <strong>
+            ${price(item.price)}
+          </strong>
+        </div>
+
+        <div>
+          <span>5 sn</span>
+          <strong>
+            ${number(
+              item.price5,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>10 sn</span>
+          <strong>
+            ${number(
+              item.price10,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>30 sn</span>
+          <strong>
+            ${number(
+              item.price30,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>60 sn</span>
+          <strong>
+            ${number(
+              item.price60,
+              2
+            )}%
+          </strong>
+        </div>
+
+        <div>
+          <span>Hacim İvmesi</span>
+          <strong>
+            ${
+              item.volumeGrowing
+                ? "Artıyor"
+                : "Zayıf"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>İşlem Frekansı</span>
+          <strong>
+            ${
+              item.tradeFrequencyGrowing
+                ? "Artıyor"
+                : "Zayıf"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>Alıcı Oranı</span>
+          <strong>
+            ${number(
+              item.buyerRatio30,
+              1
+            )}%
+          </strong>
+        </div>
+
+      </div>
+    `;
+  }
+
+
+  /* SENARYO 4 */
+
+  if (scenarioNumber === 4) {
+
+    details = `
+      <div class="metrics">
+
+        <div>
+          <span>Fiyat</span>
+          <strong>
+            ${price(item.price)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Direnç</span>
+          <strong>
+            ${price(
+              item.resistance
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Kırılım</span>
+          <strong>
+            ${
+              item.breakout
+                ? "VAR"
+                : "YOK"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>Kırılım Hacmi</span>
+          <strong>
+            ${number(
+              item.volumeRatio,
+              2
+            )}x
+          </strong>
+        </div>
+
+        <div>
+          <span>VWAP</span>
+          <strong>
+            ${
+              item.aboveVWAP
+                ? "Üstünde"
+                : "Altında"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>EMA20 / EMA50</span>
+          <strong>
+            ${
+              item.emaBullish
+                ? "Bullish"
+                : "Zayıf"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>RSI</span>
+          <strong>
+            ${number(
+              item.rsi,
+              1
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>MACD</span>
+          <strong>
+            ${
+              item.macdBullish
+                ? "Bullish"
+                : "Zayıf"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>Higher High</span>
+          <strong>
+            ${
+              item.higherHigh
+                ? "VAR"
+                : "YOK"
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>Retest</span>
+          <strong>
+            ${
+              item.retestHeld
+                ? "Korundu"
+                : "Yok"
+            }
+          </strong>
+        </div>
+
+      </div>
+    `;
+  }
+
+
+  return `
+    <article class="coin-card">
+
+      <div class="coin-top">
+
+        <div>
+
+          <h3>
+            ${item.symbol}
+          </h3>
+
+          <div class="confirmation ${
+            score >= 80
+              ? "confirmed"
+              : "candidate"
+          }">
+            ${status}
+          </div>
+
+        </div>
+
+        <div class="score">
+          ${number(
+            score,
+            0
+          )}/100
+        </div>
+
+      </div>
+
+      ${details}
+
+      <div class="reasons">
+
+        <span>
+          Borsa:
+          ${item.source || "GATE.IO"}
+        </span>
+
+        <span>
+          Senaryo ${scenarioNumber}
+        </span>
+
+      </div>
+
+    </article>
+  `;
+}
+
+
+/* =========================
+   SENARYO PANELİNİ GÖSTER
+========================= */
+
+function renderScenarioPanel(
+  number
+) {
+
+  if (!scenarioData) {
+    return;
+  }
+
+
+  const key =
+    `scenario${number}`;
+
+
+  const data =
+    scenarioData[key];
+
+
+  const panel =
+    [
+      scenario1Panel,
+      scenario2Panel,
+      scenario3Panel,
+      scenario4Panel
+    ][number - 1];
+
+
+  if (
+    !data ||
+    !panel
+  ) {
+    return;
+  }
+
+
+  const rows =
+    Array.isArray(data.rows)
+      ? data.rows
+      : [];
+
+
+  if (data.error) {
+
+    panel.innerHTML = `
+      <h3>
+        Senaryo ${number}
+      </h3>
+
+      <div class="empty-card">
+        ${data.error}
+      </div>
+    `;
+
+    return;
+  }
+
+
+  if (!rows.length) {
+
+    panel.innerHTML = `
+      <h3>
+        Senaryo ${number}
+      </h3>
+
+      <div class="empty-card">
+        Şu anda bu senaryonun
+        koşullarını sağlayan coin
+        bulunamadı.
+      </div>
+    `;
+
+    return;
+  }
+
+
+  panel.innerHTML = `
+    <h3>
+      Senaryo ${number}
+    </h3>
+
+    <div class="updated-line">
+      Taranan:
+      ${Number(
+        data.scanned || 0
+      )}
+      coin |
+      Bulunan:
+      ${rows.length}
+    </div>
+
+    <div class="cards">
+      ${
+        rows
+          .map(
+            item =>
+              scenarioCard(
+                item,
+                number
+              )
+          )
+          .join("")
+      }
+    </div>
+  `;
+}
+
+
+/* =========================
+   SENARYOLARI GÖSTER
+========================= */
+
+function renderScenarios(
+  data
+) {
+
+  scenarioData =
+    data;
+
+
+  renderScenarioPanel(1);
+
+  renderScenarioPanel(2);
+
+  renderScenarioPanel(3);
+
+  renderScenarioPanel(4);
+}
+
+
+/* =========================
+   SENARYO VERİSİNİ AL
+========================= */
+
+async function loadScenarios() {
+
+  if (scenarioLoading) {
+    return;
+  }
+
+
+  scenarioLoading =
+    true;
+
+
+  try {
+
+    const response =
+      await fetch(
+        "/api/scenarios",
+        {
+          cache:
+            "no-store"
+        }
+      );
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        `HTTP ${response.status}`
+      );
+    }
+
+
+    const data =
+      await response.json();
+
+
+    renderScenarios(
+      data
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Yükseliş Senaryoları:",
+      error
+    );
+
+
+    scenario1Panel.innerHTML = `
+      <div class="empty-card">
+        Senaryo verileri alınamadı.
+        ${error.message}
+      </div>
+    `;
+
+
+  } finally {
+
+    scenarioLoading =
+      false;
+  }
+}
