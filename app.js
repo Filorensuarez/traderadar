@@ -11,7 +11,61 @@ const gateButton =
   document.querySelector("#gateButton");
 const radarButton =
   document.querySelector("#radarButton");
+const scenarioButton =
+  document.querySelector(
+    "#scenarioButton"
+  );
 
+const scenarioSection =
+  document.querySelector(
+    "#scenario"
+  );
+
+const scenario1Button =
+  document.querySelector(
+    "#scenario1Button"
+  );
+
+const scenario2Button =
+  document.querySelector(
+    "#scenario2Button"
+  );
+
+const scenario3Button =
+  document.querySelector(
+    "#scenario3Button"
+  );
+
+const scenario4Button =
+  document.querySelector(
+    "#scenario4Button"
+  );
+
+const scenario1Panel =
+  document.querySelector(
+    "#scenario1"
+  );
+
+const scenario2Panel =
+  document.querySelector(
+    "#scenario2"
+  );
+
+const scenario3Panel =
+  document.querySelector(
+    "#scenario3"
+  );
+
+const scenario4Panel =
+  document.querySelector(
+    "#scenario4"
+  );
+
+let scenarioData =
+  null;
+
+let scenarioLoading =
+  false;
 const radarSection =
   document.querySelector("#radar");
 
