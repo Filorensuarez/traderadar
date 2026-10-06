@@ -25,7 +25,165 @@ let scanning = false;
 
 const minuteRadarState =
   new Map();
+/*
+  SENARYO 2 + SENARYO 3
+  MİKRO PİYASA HAFIZASI
 
+  Her coin için son 90 saniyelik
+  işlem akışını saklar.
+*/
+
+const microMarketState =
+  new Map();
+
+
+function getMicroState(
+  source,
+  symbol
+) {
+
+  const key =
+    `${source}:${symbol}`;
+
+
+  if (
+    !microMarketState.has(key)
+  ) {
+
+    microMarketState.set(
+      key,
+      {
+        trades: [],
+
+        snapshots: [],
+
+        updatedAt: 0
+      }
+    );
+  }
+
+
+  return (
+    microMarketState.get(key)
+  );
+}
+
+
+/*
+  Yeni işlemleri hafızaya ekler.
+*/
+
+function updateMicroTrades(
+  source,
+  symbol,
+  trades
+) {
+
+  const state =
+    getMicroState(
+      source,
+      symbol
+    );
+
+
+  const now =
+    Date.now();
+
+
+  for (
+    const trade
+    of trades
+  ) {
+
+    const time =
+      Number(trade.time);
+
+    const price =
+      Number(trade.price);
+
+    const amount =
+      Number(trade.amount);
+
+    const side =
+      trade.side;
+
+
+    if (
+      !Number.isFinite(time) ||
+      !Number.isFinite(price) ||
+      !Number.isFinite(amount) ||
+      price <= 0 ||
+      amount <= 0
+    ) {
+      continue;
+    }
+
+
+    state.trades.push({
+      time,
+      price,
+      amount,
+
+      value:
+        price * amount,
+
+      side
+    });
+  }
+
+
+  /*
+    Yalnız son 90 saniyeyi tut.
+  */
+
+  state.trades =
+    state.trades.filter(
+      trade =>
+        trade.time >=
+        now - 90_000
+    );
+
+
+  /*
+    Aynı işlem tekrar geldiyse
+    basit tekilleştirme.
+  */
+
+  const unique =
+    new Map();
+
+
+  for (
+    const trade
+    of state.trades
+  ) {
+
+    const tradeKey =
+      `${trade.time}:${trade.price}:${trade.amount}:${trade.side}`;
+
+    unique.set(
+      tradeKey,
+      trade
+    );
+  }
+
+
+  state.trades =
+    Array.from(
+      unique.values()
+    )
+      .sort(
+        (a, b) =>
+          a.time - b.time
+      );
+
+
+  state.updatedAt =
+    now;
+
+
+  return state;
+}
 
 let minuteRadarCache = {
 
