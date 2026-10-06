@@ -1065,6 +1065,44 @@ function analyzeScenario4(
 
     qualifies
   };
+  /* =========================
+   YÜKSELİŞ SENARYOLARI CACHE
+========================= */
+
+let scenarioCache = {
+
+  updatedAt: 0,
+
+  scanning: false,
+
+  scenario1: {
+    ok: true,
+    scanned: 0,
+    rows: [],
+    error: null
+  },
+
+  scenario2: {
+    ok: true,
+    scanned: 0,
+    rows: [],
+    error: null
+  },
+
+  scenario3: {
+    ok: true,
+    scanned: 0,
+    rows: [],
+    error: null
+  },
+
+  scenario4: {
+    ok: true,
+    scanned: 0,
+    rows: [],
+    error: null
+  }
+};
 }let minuteRadarCache = {
 
   ok: true,
