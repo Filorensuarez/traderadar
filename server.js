@@ -184,7 +184,539 @@ function updateMicroTrades(
 
   return state;
 }
+/* =========================
+   SENARYO 3
+   FİYAT İVMESİ
+========================= */
 
+function analyzeScenario3(
+  source,
+  symbol
+) {
+
+  const state =
+    getMicroState(
+      source,
+      symbol
+    );
+
+  const trades =
+    state.trades;
+
+  if (
+    !Array.isArray(trades) ||
+    trades.length < 5
+  ) {
+    return null;
+  }
+
+
+  const now =
+    Date.now();
+
+  const latest =
+    trades.at(-1);
+
+  const currentPrice =
+    Number(
+      latest.price
+    );
+
+
+  if (
+    !Number.isFinite(currentPrice) ||
+    currentPrice <= 0
+  ) {
+    return null;
+  }
+
+
+  /*
+    Belirli saniye penceresinin
+    istatistiklerini hesaplar.
+  */
+
+  function windowStats(
+    seconds
+  ) {
+
+    const startTime =
+      now -
+      seconds * 1000;
+
+
+    const rows =
+      trades.filter(
+        trade =>
+          trade.time >=
+          startTime
+      );
+
+
+    if (!rows.length) {
+
+      return {
+
+        seconds,
+
+        priceChange: 0,
+
+        volume: 0,
+
+        trades:
+          0,
+
+        tradesPerSecond:
+          0,
+
+        volumePerSecond:
+          0,
+
+        buyerRatio:
+          0
+      };
+    }
+
+
+    const firstPrice =
+      Number(
+        rows[0].price
+      );
+
+
+    const lastPrice =
+      Number(
+        rows.at(-1).price
+      );
+
+
+    const priceChange =
+      firstPrice > 0
+        ? (
+            (
+              lastPrice -
+              firstPrice
+            ) /
+            firstPrice
+          ) * 100
+        : 0;
+
+
+    let volume = 0;
+
+    let buyVolume = 0;
+
+
+    for (
+      const trade
+      of rows
+    ) {
+
+      const value =
+        Number(
+          trade.value
+        ) || 0;
+
+
+      volume +=
+        value;
+
+
+      if (
+        trade.side ===
+        "buy"
+      ) {
+
+        buyVolume +=
+          value;
+      }
+    }
+
+
+    const buyerRatio =
+      volume > 0
+        ? buyVolume /
+          volume
+        : 0;
+
+
+    return {
+
+      seconds,
+
+      priceChange,
+
+      volume,
+
+      trades:
+        rows.length,
+
+      tradesPerSecond:
+        rows.length /
+        seconds,
+
+      volumePerSecond:
+        volume /
+        seconds,
+
+      buyerRatio:
+        buyerRatio * 100
+    };
+  }
+
+
+  const w5 =
+    windowStats(5);
+
+  const w10 =
+    windowStats(10);
+
+  const w30 =
+    windowStats(30);
+
+  const w60 =
+    windowStats(60);
+
+
+  /*
+    HACİM İVMESİ
+
+    Hacim/sn karşılaştırılır.
+  */
+
+  const volumeAcceleration10 =
+    w5.volumePerSecond > 0
+      ? w10.volumePerSecond /
+        w5.volumePerSecond
+      : 0;
+
+
+  const volumeAcceleration30 =
+    w10.volumePerSecond > 0
+      ? w30.volumePerSecond /
+        w10.volumePerSecond
+      : 0;
+
+
+  const volumeAcceleration60 =
+    w30.volumePerSecond > 0
+      ? w60.volumePerSecond /
+        w30.volumePerSecond
+      : 0;
+
+
+  /*
+    İŞLEM FREKANSI İVMESİ
+  */
+
+  const tradeAcceleration10 =
+    w5.tradesPerSecond > 0
+      ? w10.tradesPerSecond /
+        w5.tradesPerSecond
+      : 0;
+
+
+  const tradeAcceleration30 =
+    w10.tradesPerSecond > 0
+      ? w30.tradesPerSecond /
+        w10.tradesPerSecond
+      : 0;
+
+
+  const tradeAcceleration60 =
+    w30.tradesPerSecond > 0
+      ? w60.tradesPerSecond /
+        w30.tradesPerSecond
+      : 0;
+
+
+  /*
+    FİYAT İVMESİ
+
+    Daha uzun pencerelerde
+    toplam yükselişin büyümesini
+    arıyoruz.
+  */
+
+  const priceAcceleration =
+    (
+      w10.priceChange >
+      w5.priceChange
+    ) &&
+    (
+      w30.priceChange >
+      w10.priceChange
+    ) &&
+    (
+      w60.priceChange >
+      w30.priceChange
+    );
+
+
+  /*
+    HACİMİN KADEMELİ
+    GÜÇLENMESİ
+  */
+
+  const volumeGrowing =
+    (
+      w10.volume >
+      w5.volume
+    ) &&
+    (
+      w30.volume >
+      w10.volume
+    ) &&
+    (
+      w60.volume >
+      w30.volume
+    );
+
+
+  /*
+    İŞLEM FREKANSININ
+    GÜÇLENMESİ
+  */
+
+  const tradeFrequencyGrowing =
+    (
+      w10.tradesPerSecond >=
+      w5.tradesPerSecond * 0.80
+    ) &&
+    (
+      w30.tradesPerSecond >=
+      w10.tradesPerSecond * 0.80
+    ) &&
+    (
+      w60.tradesPerSecond >=
+      w30.tradesPerSecond * 0.70
+    );
+
+
+  /*
+    PUANLAMA
+  */
+
+  let score = 0;
+
+
+  if (
+    w5.priceChange >= 0.05
+  ) {
+    score += 8;
+  }
+
+
+  if (
+    w10.priceChange >= 0.15
+  ) {
+    score += 10;
+  }
+
+
+  if (
+    w30.priceChange >= 0.35
+  ) {
+    score += 12;
+  }
+
+
+  if (
+    w60.priceChange >= 0.60
+  ) {
+    score += 15;
+  }
+
+
+  if (priceAcceleration) {
+    score += 15;
+  }
+
+
+  if (volumeGrowing) {
+    score += 15;
+  }
+
+
+  if (
+    tradeFrequencyGrowing
+  ) {
+    score += 15;
+  }
+
+
+  if (
+    w10.buyerRatio >= 55
+  ) {
+    score += 5;
+  }
+
+
+  if (
+    w30.buyerRatio >= 60
+  ) {
+    score += 5;
+  }
+
+
+  score =
+    Math.min(
+      score,
+      100
+    );
+
+
+  /*
+    SINYAL SINIFI
+  */
+
+  let status =
+    "İVME ZAYIF";
+
+
+  if (
+    score >= 80 &&
+    priceAcceleration &&
+    volumeGrowing &&
+    tradeFrequencyGrowing
+  ) {
+
+    status =
+      "GÜÇLÜ FİYAT İVMESİ";
+
+  } else if (
+    score >= 60
+  ) {
+
+    status =
+      "İVME HIZLANIYOR";
+
+  } else if (
+    score >= 40
+  ) {
+
+    status =
+      "İVME OLUŞUYOR";
+  }
+
+
+  /*
+    Fiyat çoktan aşırı
+    yükselmişse erken sinyal
+    olarak göstermiyoruz.
+  */
+
+  const lateMove =
+    w60.priceChange >= 3;
+
+
+  if (lateMove) {
+
+    status =
+      "GEÇ KALINDI";
+  }
+
+
+  const qualifies =
+    score >= 40;
+
+
+  return {
+
+    symbol,
+
+    source,
+
+    price:
+      currentPrice,
+
+    score,
+
+    status,
+
+    price5:
+      w5.priceChange,
+
+    price10:
+      w10.priceChange,
+
+    price30:
+      w30.priceChange,
+
+    price60:
+      w60.priceChange,
+
+    volume5:
+      w5.volume,
+
+    volume10:
+      w10.volume,
+
+    volume30:
+      w30.volume,
+
+    volume60:
+      w60.volume,
+
+    volumePerSecond5:
+      w5.volumePerSecond,
+
+    volumePerSecond10:
+      w10.volumePerSecond,
+
+    volumePerSecond30:
+      w30.volumePerSecond,
+
+    volumePerSecond60:
+      w60.volumePerSecond,
+
+    tradesPerSecond5:
+      w5.tradesPerSecond,
+
+    tradesPerSecond10:
+      w10.tradesPerSecond,
+
+    tradesPerSecond30:
+      w30.tradesPerSecond,
+
+    tradesPerSecond60:
+      w60.tradesPerSecond,
+
+    buyerRatio5:
+      w5.buyerRatio,
+
+    buyerRatio10:
+      w10.buyerRatio,
+
+    buyerRatio30:
+      w30.buyerRatio,
+
+    buyerRatio60:
+      w60.buyerRatio,
+
+    volumeAcceleration10,
+
+    volumeAcceleration30,
+
+    volumeAcceleration60,
+
+    tradeAcceleration10,
+
+    tradeAcceleration30,
+
+    tradeAcceleration60,
+
+    priceAcceleration,
+
+    volumeGrowing,
+
+    tradeFrequencyGrowing,
+
+    lateMove,
+
+    qualifies
+  };
+}
 let minuteRadarCache = {
 
   ok: true,
