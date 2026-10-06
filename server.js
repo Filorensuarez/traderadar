@@ -1463,7 +1463,7 @@ let scenarioCache = {
     ok: true,
     scanned: 0,
     rows: [],
-    error: null
+        error: null
 };
 }let minuteRadarCache = {
 
