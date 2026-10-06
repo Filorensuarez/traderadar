@@ -193,506 +193,806 @@ function updateMicroTrades(
    FİYAT İVMESİ BAŞLIYOR
 ========================= */
 
-function analyzeScenario3(
-  source,
-  symbol
+/* =========================
+   SENARYO 4
+   BÜYÜK TEYİT
+========================= */
+
+function analyzeScenario4(
+  symbol,
+  candles,
+  source
 ) {
 
-  const state =
-    getMicroState(
-      source,
-      symbol
-    );
-
-  const trades =
-    Array.isArray(state.trades)
-      ? state.trades
-      : [];
-
-  if (trades.length < 5) {
+  if (
+    !Array.isArray(candles) ||
+    candles.length < 55
+  ) {
     return null;
   }
 
 
-  const latestTrade =
-    trades.at(-1);
+  const data =
+    candles.slice(-60);
 
-  const now =
-    Number(
-      latestTrade.time
-    ) || Date.now();
 
-  const currentPrice =
-    Number(
-      latestTrade.price
+  const closes =
+    data.map(
+      c => Number(c.close)
     );
 
 
+  const highs =
+    data.map(
+      c => Number(c.high)
+    );
+
+
+  const lows =
+    data.map(
+      c => Number(c.low)
+    );
+
+
+  const volumes =
+    data.map(
+      c => Number(c.volume) || 0
+    );
+
+
+  const last =
+    data.at(-1);
+
+
+  const price =
+    Number(last.close);
+
+
   if (
-    !Number.isFinite(currentPrice) ||
-    currentPrice <= 0
+    !Number.isFinite(price) ||
+    price <= 0
   ) {
     return null;
   }
 
 
   /*
-    BELİRLİ SANİYE PENCERESİNİ
-    HESAPLAR
+    EMA
   */
 
-  function windowStats(
-    seconds
+  function localEMA(
+    values,
+    period
   ) {
 
-    const startTime =
-      now -
-      seconds * 1000;
-
-
-    const rows =
-      trades.filter(
-        trade =>
-          trade.time >=
-          startTime &&
-          trade.time <=
-          now
-      );
-
-
-    if (!rows.length) {
-
-      return {
-
-        seconds,
-
-        priceChange: 0,
-
-        volume: 0,
-
-        tradeCount: 0,
-
-        tradesPerSecond: 0,
-
-        volumePerSecond: 0,
-
-        buyerRatio: 0
-      };
+    if (!values.length) {
+      return 0;
     }
 
 
-    const firstPrice =
-      Number(
-        rows[0].price
-      );
+    const k =
+      2 /
+      (period + 1);
 
 
-    const lastPrice =
-      Number(
-        rows.at(-1).price
-      );
-
-
-    const priceChange =
-      firstPrice > 0
-        ? (
-            (
-              lastPrice -
-              firstPrice
-            ) /
-            firstPrice
-          ) * 100
-        : 0;
-
-
-    let volume = 0;
-
-    let buyVolume = 0;
+    let value =
+      values[0];
 
 
     for (
-      const trade
-      of rows
+      let i = 1;
+      i < values.length;
+      i++
     ) {
 
-      const value =
-        Number(
-          trade.value
-        ) || 0;
+      value =
+        values[i] * k +
+        value * (1 - k);
+    }
 
 
-      volume +=
-        value;
+    return value;
+  }
+
+
+  const ema20 =
+    localEMA(
+      closes,
+      20
+    );
+
+
+  const ema50 =
+    localEMA(
+      closes,
+      50
+    );
+
+
+  const emaBullish =
+    ema20 >
+    ema50;
+
+
+  /*
+    DİRENÇ
+
+    Son 20 mumdan önceki
+    20 mumdaki yerel tepeyi
+    referans alıyoruz.
+
+    Böylece mevcut kırılım
+    mumunu direncin içine
+    dahil etmiyoruz.
+  */
+
+  const resistanceWindow =
+    data.slice(
+      -40,
+      -5
+    );
+
+
+  const resistance =
+    Math.max(
+      ...resistanceWindow.map(
+        c => Number(c.high)
+      )
+    );
+
+
+  const breakout =
+    price >
+    resistance;
+
+
+  const breakoutPercent =
+    resistance > 0
+      ? (
+          (
+            price -
+            resistance
+          ) /
+          resistance
+        ) * 100
+      : 0;
+
+
+  /*
+    DİRENÇ ÜSTÜ KAPANIŞ
+
+    Son mum kapanışı direnç
+    üzerinde olmalı.
+  */
+
+  const closeAboveResistance =
+    Number(last.close) >
+    resistance;
+
+
+  /*
+    HACİM PATLAMASI
+
+    Son 3 mum ortalaması ile
+    önceki 20 mum karşılaştırılır.
+  */
+
+  const recentVolume =
+    volumes
+      .slice(-3)
+      .reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) / 3;
+
+
+  const oldVolumeValues =
+    volumes.slice(
+      -23,
+      -3
+    );
+
+
+  const oldVolume =
+    oldVolumeValues.length
+      ? oldVolumeValues.reduce(
+          (sum, value) =>
+            sum + value,
+          0
+        ) /
+        oldVolumeValues.length
+      : 0;
+
+
+  const volumeRatio =
+    oldVolume > 0
+      ? recentVolume /
+        oldVolume
+      : 0;
+
+
+  const volumeExplosion =
+    volumeRatio >= 1.8;
+
+
+  /*
+    VWAP
+
+    1 dakikalık son 30 mum.
+  */
+
+  const vwapWindow =
+    data.slice(-30);
+
+
+  let vwapValue = 0;
+
+  let vwapVolume = 0;
+
+
+  for (
+    const candle
+    of vwapWindow
+  ) {
+
+    const high =
+      Number(candle.high);
+
+    const low =
+      Number(candle.low);
+
+    const close =
+      Number(candle.close);
+
+    const volume =
+      Number(candle.volume) || 0;
+
+
+    const typical =
+      (
+        high +
+        low +
+        close
+      ) / 3;
+
+
+    vwapValue +=
+      typical *
+      volume;
+
+
+    vwapVolume +=
+      volume;
+  }
+
+
+  const vwap =
+    vwapVolume > 0
+      ? vwapValue /
+        vwapVolume
+      : 0;
+
+
+  const aboveVWAP =
+    price >
+    vwap;
+
+
+  /*
+    RSI
+  */
+
+  function localRSI(
+    values,
+    period = 14
+  ) {
+
+    if (
+      values.length <
+      period + 1
+    ) {
+      return 50;
+    }
+
+
+    const sample =
+      values.slice(
+        -(period + 1)
+      );
+
+
+    let gains = 0;
+    let losses = 0;
+
+
+    for (
+      let i = 1;
+      i < sample.length;
+      i++
+    ) {
+
+      const difference =
+        sample[i] -
+        sample[i - 1];
 
 
       if (
-        trade.side ===
-        "buy"
+        difference > 0
       ) {
 
-        buyVolume +=
-          value;
+        gains +=
+          difference;
+
+      } else {
+
+        losses +=
+          Math.abs(
+            difference
+          );
       }
     }
 
 
-    const buyerRatio =
-      volume > 0
-        ? (
-            buyVolume /
-            volume
-          ) * 100
-        : 0;
+    const averageGain =
+      gains /
+      period;
+
+
+    const averageLoss =
+      losses /
+      period;
+
+
+    if (
+      averageLoss === 0
+    ) {
+      return 100;
+    }
+
+
+    const rs =
+      averageGain /
+      averageLoss;
+
+
+    return (
+      100 -
+      100 /
+      (1 + rs)
+    );
+  }
+
+
+  const rsiNow =
+    localRSI(
+      closes,
+      14
+    );
+
+
+  const rsiPrevious =
+    localRSI(
+      closes.slice(
+        0,
+        -3
+      ),
+      14
+    );
+
+
+  const rsiRising =
+    rsiNow >
+    rsiPrevious;
+
+
+  const rsiBullish =
+    rsiNow > 50 &&
+    rsiRising;
+
+
+  /*
+    MACD
+  */
+
+  function localMACD(
+    values
+  ) {
+
+    const fast =
+      localEMA(
+        values,
+        12
+      );
+
+
+    const slow =
+      localEMA(
+        values,
+        26
+      );
+
+
+    return (
+      fast -
+      slow
+    );
+  }
+
+
+  const macd =
+    localMACD(
+      closes
+    );
+
+
+  const previousMacd =
+    localMACD(
+      closes.slice(
+        0,
+        -3
+      )
+    );
+
+
+  const macdBullish =
+    macd > 0 &&
+    macd >
+    previousMacd;
+
+
+  /*
+    BOLLINGER
+
+    Üst banda yaklaşma ve
+    bant genişlemesi.
+  */
+
+  function bollinger(
+    values
+  ) {
+
+    const sample =
+      values.slice(-20);
+
+
+    const middle =
+      sample.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) /
+      sample.length;
+
+
+    const variance =
+      sample.reduce(
+        (
+          sum,
+          value
+        ) => {
+
+          return (
+            sum +
+            Math.pow(
+              value -
+              middle,
+              2
+            )
+          );
+        },
+        0
+      ) /
+      sample.length;
+
+
+    const sd =
+      Math.sqrt(
+        variance
+      );
 
 
     return {
 
-      seconds,
+      middle,
 
-      priceChange,
+      upper:
+        middle +
+        2 * sd,
 
-      volume,
+      lower:
+        middle -
+        2 * sd,
 
-      tradeCount:
-        rows.length,
-
-      tradesPerSecond:
-        rows.length /
-        seconds,
-
-      volumePerSecond:
-        volume /
-        seconds,
-
-      buyerRatio
+      width:
+        middle > 0
+          ? (
+              (
+                4 * sd
+              ) /
+              middle
+            ) * 100
+          : 0
     };
   }
 
 
-  /*
-    5 / 10 / 30 / 60 SANİYE
-  */
-
-  const w5 =
-    windowStats(5);
-
-  const w10 =
-    windowStats(10);
-
-  const w30 =
-    windowStats(30);
-
-  const w60 =
-    windowStats(60);
-
-
-  /*
-    FİYAT İVMESİ
-
-    Hareket büyüdükçe daha uzun
-    pencerelerde toplam değişimin
-    artmasını bekliyoruz.
-  */
-
-  const priceAcceleration =
-    (
-      w10.priceChange >
-      w5.priceChange
-    ) &&
-    (
-      w30.priceChange >
-      w10.priceChange
-    ) &&
-    (
-      w60.priceChange >
-      w30.priceChange
+  const bollingerNow =
+    bollinger(
+      closes
     );
 
 
-  /*
-    HACİM İVMESİ
-
-    Ham toplam hacim yerine
-    hacim/saniye değerini de
-    karşılaştırıyoruz.
-  */
-
-  const volumeAcceleration5 =
-    w5.volumePerSecond;
-
-
-  const volumeAcceleration10 =
-    w5.volumePerSecond > 0
-      ? w10.volumePerSecond /
-        w5.volumePerSecond
-      : 0;
-
-
-  const volumeAcceleration30 =
-    w10.volumePerSecond > 0
-      ? w30.volumePerSecond /
-        w10.volumePerSecond
-      : 0;
-
-
-  const volumeAcceleration60 =
-    w30.volumePerSecond > 0
-      ? w60.volumePerSecond /
-        w30.volumePerSecond
-      : 0;
-
-
-  /*
-    HACİMİN GENEL OLARAK
-    GÜÇLENMESİ
-  */
-
-  const volumeGrowing =
-    (
-      w10.volume >
-      w5.volume
-    ) &&
-    (
-      w30.volume >
-      w10.volume
-    ) &&
-    (
-      w60.volume >
-      w30.volume
+  const bollingerPrevious =
+    bollinger(
+      closes.slice(
+        0,
+        -5
+      )
     );
 
 
-  /*
-    İŞLEM FREKANSI
-  */
-
-  const tradeAcceleration10 =
-    w5.tradesPerSecond > 0
-      ? w10.tradesPerSecond /
-        w5.tradesPerSecond
-      : 0;
+  const bollingerExpanding =
+    bollingerNow.width >
+    bollingerPrevious.width;
 
 
-  const tradeAcceleration30 =
-    w10.tradesPerSecond > 0
-      ? w30.tradesPerSecond /
-        w10.tradesPerSecond
-      : 0;
+  const nearUpperBand =
+    bollingerNow.upper > 0
+      ? (
+          (
+            bollingerNow.upper -
+            price
+          ) /
+          bollingerNow.upper
+        ) * 100 <= 1.5
+      : false;
 
 
-  const tradeAcceleration60 =
-    w30.tradesPerSecond > 0
-      ? w60.tradesPerSecond /
-        w30.tradesPerSecond
-      : 0;
+  const bollingerBullish =
+    bollingerExpanding &&
+    nearUpperBand;
 
 
   /*
-    Kısa pencere doğal olarak
-    daha oynak olduğu için burada
-    kusursuz doğrusal artış
-    aramıyoruz.
+    HIGHER HIGH
   */
 
-  const tradeFrequencyGrowing =
-    (
-      w10.tradesPerSecond >=
-      w5.tradesPerSecond * 0.75
-    ) &&
-    (
-      w30.tradesPerSecond >=
-      w10.tradesPerSecond * 0.75
-    ) &&
-    (
-      w60.tradesPerSecond >=
-      w30.tradesPerSecond * 0.65
+  const recentHigh =
+    Math.max(
+      ...highs.slice(-5)
     );
 
 
-  /*
-    ALICI BASKISI
-  */
-
-  const buyerStrengthening =
-    (
-      w10.buyerRatio >= 52
-    ) &&
-    (
-      w30.buyerRatio >= 55
+  const previousHigh =
+    Math.max(
+      ...highs.slice(
+        -10,
+        -5
+      )
     );
 
 
+  const higherHigh =
+    recentHigh >
+    previousHigh;
+
+
   /*
-    PUANLAMA
+    RETEST
+
+    Son 5 mum içinde fiyat
+    dirence geri geldiyse ve
+    kapanış tekrar direncin
+    üzerinde kaldıysa korunmuş
+    retest kabul ediyoruz.
+  */
+
+  let retestTouched =
+    false;
+
+  let retestHeld =
+    false;
+
+
+  const retestTolerance =
+    resistance *
+    0.005;
+
+
+  for (
+    const candle
+    of data.slice(-5)
+  ) {
+
+    const low =
+      Number(candle.low);
+
+    const close =
+      Number(candle.close);
+
+
+    if (
+      Math.abs(
+        low -
+        resistance
+      ) <=
+      retestTolerance
+    ) {
+
+      retestTouched =
+        true;
+
+
+      if (
+        close >=
+        resistance
+      ) {
+
+        retestHeld =
+          true;
+      }
+    }
+  }
+
+
+  /*
+    SAHTE KIRILIM
+
+    Mum direnç üzerine çıkmış
+    fakat kapanış tekrar direnç
+    altında kalmışsa.
+  */
+
+  const lastHigh =
+    Number(last.high);
+
+
+  const falseBreakout =
+    lastHigh >
+    resistance &&
+    Number(last.close) <
+    resistance;
+
+
+  /*
+    PUAN
   */
 
   let score = 0;
 
 
   /*
-    Fiyat
+    Kırılım ve hacim en
+    yüksek ağırlığa sahip.
   */
 
-  if (
-    w5.priceChange >= 0.05
-  ) {
-    score += 5;
-  }
-
-
-  if (
-    w5.priceChange >= 0.10
-  ) {
-    score += 5;
-  }
-
-
-  if (
-    w10.priceChange >= 0.15
-  ) {
-    score += 7;
-  }
-
-
-  if (
-    w10.priceChange >= 0.22
-  ) {
-    score += 5;
-  }
-
-
-  if (
-    w30.priceChange >= 0.35
-  ) {
-    score += 7;
-  }
-
-
-  if (
-    w30.priceChange >= 0.55
-  ) {
-    score += 5;
-  }
-
-
-  if (
-    w60.priceChange >= 0.60
-  ) {
-    score += 8;
-  }
-
-
-  if (
-    w60.priceChange >= 0.95
-  ) {
-    score += 5;
-  }
-
-
-  /*
-    Üçlü ivme teyidi
-  */
-
-  if (priceAcceleration) {
+  if (breakout) {
     score += 15;
   }
 
 
-  if (volumeGrowing) {
-    score += 12;
-  }
-
-
   if (
-    tradeFrequencyGrowing
+    closeAboveResistance
   ) {
-    score += 12;
+    score += 10;
+  }
+
+
+  if (volumeExplosion) {
+    score += 15;
   }
 
 
   if (
-    buyerStrengthening
+    breakout &&
+    volumeExplosion
   ) {
-    score += 7;
+    score += 10;
   }
 
 
-  /*
-    Çok güçlü kısa vadeli
-    alıcı baskısı.
-  */
+  if (aboveVWAP) {
+    score += 10;
+  }
+
+
+  if (emaBullish) {
+    score += 10;
+  }
+
+
+  if (rsiBullish) {
+    score += 10;
+  }
+
+
+  if (macdBullish) {
+    score += 10;
+  }
+
 
   if (
-    w10.buyerRatio >= 60
+    bollingerBullish
   ) {
     score += 5;
   }
 
 
-  score =
-    Math.min(
-      score,
-      100
-    );
+  if (higherHigh) {
+    score += 5;
+  }
+
+
+  if (retestHeld) {
+    score += 10;
+  }
 
 
   /*
-    GEÇ KALINDI KONTROLÜ
-
-    Senaryo 3'ün amacı hareketi
-    başlangıcında yakalamaktır.
+    Sahte kırılım cezası.
   */
 
-  const lateMove =
-    (
-      w60.priceChange >= 3
-    ) ||
-    (
-      w30.priceChange >= 2.5
+  if (falseBreakout) {
+    score -= 30;
+  }
+
+
+  score =
+    Math.max(
+      0,
+      Math.min(
+        score,
+        100
+      )
     );
 
 
   /*
-    DURUM
+    SINIFLANDIRMA
   */
 
   let status =
-    "İVME ZAYIF";
+    "KIRILIM DENEMESİ";
 
 
-  if (lateMove) {
+  if (falseBreakout) {
 
     status =
-      "GEÇ KALINDI";
+      "SAHTE KIRILIM RİSKİ";
 
   } else if (
-    score >= 80 &&
-    priceAcceleration &&
-    volumeGrowing &&
-    tradeFrequencyGrowing
+    score >= 85 &&
+    breakout &&
+    volumeExplosion &&
+    closeAboveResistance
   ) {
 
     status =
-      "GÜÇLÜ FİYAT İVMESİ";
+      "BÜYÜK TEYİT";
 
   } else if (
-    score >= 60
+    score >= 70 &&
+    breakout &&
+    closeAboveResistance
   ) {
 
     status =
-      "İVME HIZLANIYOR";
+      "KIRILIM TEYİDİ";
 
   } else if (
-    score >= 40
+    breakout
   ) {
 
     status =
-      "İVME OLUŞUYOR";
+      "KIRILIM";
   }
 
 
   const qualifies =
-    score >= 40;
+    score >= 40 ||
+    breakout ||
+    falseBreakout;
 
 
   return {
@@ -701,131 +1001,65 @@ function analyzeScenario3(
 
     source,
 
-    price:
-      currentPrice,
+    price,
 
     score,
 
     status,
 
+    resistance,
 
-    /*
-      FİYAT
-    */
+    breakout,
 
-    price5:
-      w5.priceChange,
+    breakoutPercent,
 
-    price10:
-      w10.priceChange,
+    closeAboveResistance,
 
-    price30:
-      w30.priceChange,
+    volumeRatio,
 
-    price60:
-      w60.priceChange,
+    volumeExplosion,
 
+    vwap,
 
-    /*
-      HACİM
-    */
+    aboveVWAP,
 
-    volume5:
-      w5.volume,
+    ema20,
 
-    volume10:
-      w10.volume,
+    ema50,
 
-    volume30:
-      w30.volume,
+    emaBullish,
 
-    volume60:
-      w60.volume,
+    rsi:
+      rsiNow,
 
-    volumePerSecond5:
-      w5.volumePerSecond,
+    rsiRising,
 
-    volumePerSecond10:
-      w10.volumePerSecond,
+    rsiBullish,
 
-    volumePerSecond30:
-      w30.volumePerSecond,
+    macd,
 
-    volumePerSecond60:
-      w60.volumePerSecond,
+    macdBullish,
 
+    bollingerWidth:
+      bollingerNow.width,
 
-    /*
-      İŞLEM FREKANSI
-    */
+    bollingerExpanding,
 
-    tradesPerSecond5:
-      w5.tradesPerSecond,
+    nearUpperBand,
 
-    tradesPerSecond10:
-      w10.tradesPerSecond,
+    bollingerBullish,
 
-    tradesPerSecond30:
-      w30.tradesPerSecond,
+    higherHigh,
 
-    tradesPerSecond60:
-      w60.tradesPerSecond,
+    retestTouched,
 
+    retestHeld,
 
-    /*
-      ALICI ORANI
-    */
-
-    buyerRatio5:
-      w5.buyerRatio,
-
-    buyerRatio10:
-      w10.buyerRatio,
-
-    buyerRatio30:
-      w30.buyerRatio,
-
-    buyerRatio60:
-      w60.buyerRatio,
-
-
-    /*
-      İVME ORANLARI
-    */
-
-    volumeAcceleration5,
-
-    volumeAcceleration10,
-
-    volumeAcceleration30,
-
-    volumeAcceleration60,
-
-    tradeAcceleration10,
-
-    tradeAcceleration30,
-
-    tradeAcceleration60,
-
-
-    /*
-      ÜÇ ANA KOŞUL
-    */
-
-    priceAcceleration,
-
-    volumeGrowing,
-
-    tradeFrequencyGrowing,
-
-    buyerStrengthening,
-
-    lateMove,
+    falseBreakout,
 
     qualifies
   };
-}
-let minuteRadarCache = {
+}let minuteRadarCache = {
 
   ok: true,
 
