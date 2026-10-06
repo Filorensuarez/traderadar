@@ -123,6 +123,9 @@ function openView(view) {
   const radar =
     view === "radar";
 
+  const scenario =
+    view === "scenario";
+
 
   dailySection.hidden =
     !daily;
@@ -132,6 +135,9 @@ function openView(view) {
 
   radarSection.hidden =
     !radar;
+
+  scenarioSection.hidden =
+    !scenario;
 
 
   dailyButton.classList.toggle(
@@ -149,11 +155,11 @@ function openView(view) {
     radar
   );
 
+  scenarioButton.classList.toggle(
+    "active",
+    scenario
+  );
 
-  /*
-    Radar ilk kez açılıyorsa
-    veriyi yükle.
-  */
 
   if (
     radar &&
@@ -162,8 +168,23 @@ function openView(view) {
 
     loadMinuteRadar();
   }
-}
 
+
+  /*
+    Yükseliş Senaryosu ilk kez
+    açıldığında dört senaryonun
+    verisini yükle.
+  */
+
+  if (
+    scenario &&
+    !scenarioData &&
+    !scenarioLoading
+  ) {
+
+    loadScenarios();
+  }
+}
 dailyButton.addEventListener(
   "click",
   () => openView("daily")
