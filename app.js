@@ -255,9 +255,13 @@ function openScenarioPanel(
         index ===
           number - 1
       );
-    }
+      if (scenarioData) {
+  renderScenarioPanel(
+    number
   );
 }
+    }
+ 
 
 
 scenario1Button.addEventListener(
