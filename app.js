@@ -211,6 +211,81 @@ scenarioButton.addEventListener(
       "scenario"
     )
 );
+
+function openScenarioPanel(
+  number
+) {
+
+  const panels = [
+    scenario1Panel,
+    scenario2Panel,
+    scenario3Panel,
+    scenario4Panel
+  ];
+
+  const buttons = [
+    scenario1Button,
+    scenario2Button,
+    scenario3Button,
+    scenario4Button
+  ];
+
+
+  panels.forEach(
+    (
+      panel,
+      index
+    ) => {
+
+      panel.hidden =
+        index !==
+        number - 1;
+    }
+  );
+
+
+  buttons.forEach(
+    (
+      button,
+      index
+    ) => {
+
+      button.classList.toggle(
+        "active",
+        index ===
+          number - 1
+      );
+    }
+  );
+}
+
+
+scenario1Button.addEventListener(
+  "click",
+  () =>
+    openScenarioPanel(1)
+);
+
+
+scenario2Button.addEventListener(
+  "click",
+  () =>
+    openScenarioPanel(2)
+);
+
+
+scenario3Button.addEventListener(
+  "click",
+  () =>
+    openScenarioPanel(3)
+);
+
+
+scenario4Button.addEventListener(
+  "click",
+  () =>
+    openScenarioPanel(4)
+);
 function selectExchange(exchange) {
 
   selectedExchange =
