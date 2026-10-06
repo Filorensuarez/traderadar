@@ -6677,6 +6677,9 @@ async function notifyScenarioChanges(
     }
   }
 }
+await notifyScenarioChanges(
+  scenarioCache
+);
     
     console.log(
       `Senaryolar: ${scanned} coin | S1 ${scenario1Rows.length} | S2 ${scenario2Rows.length} | S3 ${scenario3Rows.length} | S4 ${scenario4Rows.length}`
