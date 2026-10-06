@@ -1,5 +1,9 @@
 import express from "express";
+import webpush from "web-push";
+import fs from "fs";
 
+const app = express();
+const PORT = process.env.PORT || 3000;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
