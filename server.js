@@ -16,7 +16,225 @@ const KUCOIN =
 const GATE =
   "https://api.gateio.ws/api/v4";
 
-app.use(express.static("."));
+app.use(
+  express.json({
+    limit: "64kb"
+  })
+);
+
+app.use(
+  express.static(".")
+);
+
+
+/* =========================
+   WEB PUSH
+========================= */
+
+const VAPID_PUBLIC_KEY =
+  process.env.VAPID_PUBLIC_KEY || "";
+
+const VAPID_PRIVATE_KEY =
+  process.env.VAPID_PRIVATE_KEY || "";
+
+const VAPID_SUBJECT =
+  process.env.VAPID_SUBJECT ||
+  "mailto:traderadar@localhost";
+
+
+if (
+  VAPID_PUBLIC_KEY &&
+  VAPID_PRIVATE_KEY
+) {
+
+  webpush.setVapidDetails(
+    VAPID_SUBJECT,
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+}
+
+
+/*
+  Push aboneliklerini Railway
+  volume üzerinde saklayacağız.
+*/
+
+const PUSH_FILE =
+  "/data/push-subscriptions.json";
+
+
+let pushSubscriptions = [];
+
+
+/*
+  Aynı coin aynı senaryoda
+  kaldığı sürece tekrar bildirim
+  göndermemek için hafıza.
+*/
+
+const scenarioSeen =
+  new Map();
+
+
+try {
+
+  if (
+    fs.existsSync(
+      PUSH_FILE
+    )
+  ) {
+
+    pushSubscriptions =
+      JSON.parse(
+        fs.readFileSync(
+          PUSH_FILE,
+          "utf8"
+        )
+      );
+
+
+    if (
+      !Array.isArray(
+        pushSubscriptions
+      )
+    ) {
+
+      pushSubscriptions = [];
+    }
+  }
+
+} catch (error) {
+
+  console.error(
+    "Push abonelikleri okunamadı:",
+    error.message
+  );
+
+  pushSubscriptions = [];
+}
+
+
+/* =========================
+   PUSH ABONELİK KAYDI
+========================= */
+
+function savePushSubscriptions() {
+
+  try {
+
+    fs.mkdirSync(
+      "/data",
+      {
+        recursive: true
+      }
+    );
+
+
+    fs.writeFileSync(
+      PUSH_FILE,
+      JSON.stringify(
+        pushSubscriptions,
+        null,
+        2
+      )
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Push abonelikleri kaydedilemedi:",
+      error.message
+    );
+  }
+}
+
+
+/* =========================
+   PUSH GÖNDER
+========================= */
+
+async function sendPush(
+  payload
+) {
+
+  if (
+    !VAPID_PUBLIC_KEY ||
+    !VAPID_PRIVATE_KEY ||
+    !pushSubscriptions.length
+  ) {
+
+    return;
+  }
+
+
+  const body =
+    JSON.stringify(
+      payload
+    );
+
+
+  const activeSubscriptions = [];
+
+
+  for (
+    const subscription
+    of pushSubscriptions
+  ) {
+
+    try {
+
+      await webpush.sendNotification(
+        subscription,
+        body,
+        {
+          TTL: 120
+        }
+      );
+
+
+      activeSubscriptions.push(
+        subscription
+      );
+
+    } catch (error) {
+
+      /*
+        404 / 410:
+        Telefon artık bu aboneliği
+        kullanmıyor.
+      */
+
+      if (
+        error.statusCode !== 404 &&
+        error.statusCode !== 410
+      ) {
+
+        activeSubscriptions.push(
+          subscription
+        );
+
+
+        console.error(
+          "Push gönderilemedi:",
+          error.message
+        );
+      }
+    }
+  }
+
+
+  if (
+    activeSubscriptions.length !==
+    pushSubscriptions.length
+  ) {
+
+    pushSubscriptions =
+      activeSubscriptions;
+
+    savePushSubscriptions();
+  }
+}
 
 let scanning = false;
 /*
