@@ -14,3 +14,5 @@ Binance TR TRY paritelerini WebSocket üzerinden canlı izler. 5/10/30/60/120 sa
 Sınıflar: İZLENİYOR, ADAY, ERKEN UYARI, GÜÇLÜ ERKEN UYARI, GEÇ KALINDI.
 
 Bu sürüm otomatik emir vermez. Alarm puanları başlangıç eşikleridir; gerçek kullanım öncesinde geçmiş veri üzerinde backtest ve ileri dönem doğrulaması yapılmalıdır. Kesin yükseliş tahmini garanti edilemez.
+
+<!-- GitHub yazma erişimi doğrulama testi: 2026-10-08. Uygulama işlevlerini değiştirmez. -->
