@@ -420,3 +420,11 @@ footer {
   border-color: rgba(255, 90, 90, 0.50);
   color: #ff6b6b;
 }
+
+/* Günlük teyit fiyat planı */
+.daily-trade-plan { margin-top: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel2); }
+.daily-trade-plan h4 { margin: 0 0 10px; font-size: 14px; }
+.trade-levels { display: grid; gap: 8px; }
+.trade-levels span { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.trade-levels strong { font-variant-numeric: tabular-nums; }
+.daily-trade-plan small { display: block; margin-top: 10px; color: var(--muted); line-height: 1.45; }
