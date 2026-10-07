@@ -460,6 +460,22 @@ function escapeHTML(value) {
 }
 
 
+/* Günlük teyit: gösterim amaçlı alım/satım planı, emir göndermez. */
+function dailyTradePlan(row) {
+  const last = Number(row.price);
+  const atrPct = Number(row.atrPct);
+  const ema20 = Number(row.ema20);
+  if (!(last > 0) || !(atrPct > 0) || !Number.isFinite(atrPct)) return null;
+  const atr = last * atrPct / 100;
+  // Günlük trend teyidinde EMA20 üzerinde geri çekilme bölgesi.
+  const entry = ema20 > 0 && ema20 <= last && last - ema20 <= 2 * atr
+    ? ema20 : last - 0.5 * atr;
+  const stop = entry - 1.5 * atr;
+  const target = entry + 3 * atr;
+  if (!(stop > 0) || !(target > entry)) return null;
+  return { entry, stop, target, ratio: 2 };
+}
+
 /* =========================
    COİN KARTI
 ========================= */
@@ -473,6 +489,8 @@ function coinCard(row) {
       ? row.reasons
       : [];
 
+
+  const plan = row.confirmed ? dailyTradePlan(row) : null;
 
   const reasonText =
     reasons.length
@@ -601,6 +619,18 @@ function coinCard(row) {
       </div>
 
 
+      <div class="daily-trade-plan">
+        <h4>Alım / Satım Fiyat Planı</h4>
+        ${plan ? `
+          <div class="trade-levels">
+            <span>Alım için izlenecek fiyat <strong>${price(plan.entry)}</strong></span>
+            <span>Satış hedefi <strong>${price(plan.target)}</strong></span>
+            <span>Zarar-kes seviyesi <strong>${price(plan.stop)}</strong></span>
+          </div>
+          <small>ATR temelli örnek plan · Risk/ödül 1:2 · Otomatik emir verilmez.
+          Fiyatlar anlık değişebilir; işlem öncesi borsa fiyat adımını kontrol edin.</small>
+        ` : '<small>Fiyat planı için günlük yükseliş teyidi ve geçerli ATR verisi gerekli.</small>'}
+      </div>
       <div class="reasons">
 
         ${reasonText}
