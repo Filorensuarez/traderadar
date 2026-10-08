@@ -6318,7 +6318,6 @@ async function scanBinanceTrScenarios() {
 }
 
 async function scanScenarios() {
-  return scanBinanceTrScenarios();
 
   if (scenarioCache.scanning) {
     return;
