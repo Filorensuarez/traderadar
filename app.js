@@ -2371,27 +2371,47 @@ function xChartDraw(data) {
     ctx.fillRect(xx-step*.3,570-bar.volume/maxVol*68,Math.max(2,step*.6),bar.volume/maxVol*68);
   });
   const first=rows[0],last=rows.at(-1);
-  const base=rows.slice(0,Math.min(15,rows.length-5));
-  const baseHigh=Math.max(...base.map(x=>x.high)),baseLow=Math.min(...base.map(x=>x.low));
-  const breakoutIndex=rows.findIndex((bar,i)=>i>=base.length&&bar.close>baseHigh);
+  const compression=data.compression;
+  const supports=Array.isArray(data.supports)?data.supports:[];
+  const resistances=Array.isArray(data.resistances)?data.resistances:[];
   const peakIndex=rows.findIndex(x=>x.high===max);
-  const annotations=[];
-  if(baseLow>0&&(baseHigh/baseLow-1)*100<=12&&breakoutIndex>=0){
-    annotations.push({i:breakoutIndex,price:rows[breakoutIndex].high,label:"Sıkışma sonrası kırılım"});
+  const breakoutIndex=compression?.breakoutIndex ?? -1;
+
+  // Sıkışma yalnızca algoritmanın teyit ettiği gerçek mumlarda gösterilir.
+  if(compression && Number.isInteger(compression.start) && Number.isInteger(compression.end)){
+    const x1=left+compression.start*step,x2=left+(compression.end+1)*step;
+    const y1=y(compression.high),y2=y(compression.low);
+    ctx.fillStyle="rgba(245,195,72,0.12)";
+    ctx.fillRect(x1,y1,x2-x1,Math.max(2,y2-y1));
+    ctx.strokeStyle="#f5c348";ctx.lineWidth=2;ctx.setLineDash([5,4]);
+    ctx.strokeRect(x1,y1,x2-x1,Math.max(2,y2-y1));ctx.setLineDash([]);
+    ctx.fillStyle="#f5c348";ctx.font="bold 17px sans-serif";
+    ctx.fillText("Sıkışma: "+xPrice(compression.low)+" - "+xPrice(compression.high),Math.max(left,x1),Math.max(110,y1-10));
   }
-  const highestVolumeIndex=rows.findIndex(x=>x.volume===maxVol);
-  if(highestVolumeIndex>=0)annotations.push({i:highestVolumeIndex,price:rows[highestVolumeIndex].high,label:"Hacim zirvesi"});
-  if(peakIndex>=0)annotations.push({i:peakIndex,price:max,label:"Dönem zirvesi"});
-  const colors=["#f6c950","#2bd7a4","#77b8ff"];
-  annotations.slice(0,3).forEach((a,k)=>{
-    const xx=left+(a.i+.5)*step,yy=y(a.price);
-    ctx.strokeStyle=colors[k];ctx.lineWidth=2;ctx.beginPath();ctx.arc(xx,yy,7,0,Math.PI*2);ctx.stroke();
-    const bx=k===0?left+15:k===1?left+340:left+670;
-    const by=top+20+(k%2)*45;
-    ctx.beginPath();ctx.moveTo(xx,yy-9);ctx.lineTo(bx+15,by+8);ctx.stroke();
-    ctx.fillStyle="#102c40";ctx.fillRect(bx,by-22,Math.min(295,ctx.measureText(a.label).width+35),34);
-    ctx.fillStyle=colors[k];ctx.font="bold 17px sans-serif";ctx.fillText(a.label,bx+8,by);
-  });
+  // Grafikte yalnızca fiyatın geçtiği aralıktaki geçmiş seviyeleri çiz.
+  function drawLevel(price,label,color,offset){
+    if(!Number.isFinite(price)||price<min||price>max)return;
+    const yy=y(price);
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash([8,6]);
+    ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(right,yy);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle="#0b1729";ctx.fillRect(left+offset,yy-25,260,23);
+    ctx.fillStyle=color;ctx.font="bold 17px sans-serif";
+    ctx.fillText(label+" "+xPrice(price),left+offset+4,yy-8);
+  }
+  supports.forEach((v,i)=>drawLevel(v.price,"Destek "+(i+1),"#2bd7a4",i*245));
+  resistances.forEach((v,i)=>drawLevel(v.price,"Direnç "+(i+1),"#ffb85a",i*245));
+  if(!resistances.length){
+    ctx.fillStyle="#f5c451";ctx.font="bold 17px sans-serif";
+    ctx.fillText("Üst direnç: geçmiş veri aralığında teyit yok",left+320,110);
+  }
+  if(compression && breakoutIndex>=0 && breakoutIndex<rows.length){
+    const xx=left+(breakoutIndex+.5)*step,yy=y(rows[breakoutIndex].high);
+    ctx.strokeStyle="#f5c451";ctx.lineWidth=3;ctx.beginPath();ctx.arc(xx,yy,7,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle="#f5c451";ctx.font="bold 17px sans-serif";
+    ctx.fillText("Teyitli kırılım",Math.min(xx+12,right-180),Math.max(125,yy-18));
+  }
+  ctx.fillStyle="#83baff";ctx.font="bold 17px sans-serif";
+  ctx.fillText("Dönem zirvesi "+xPrice(max),Math.max(left,right-285),Math.max(110,y(max)-12));
   ctx.fillStyle=data.change>=0?"#2bd7a4":"#ff6178";ctx.font="bold 26px sans-serif";
   ctx.fillText("Dönem değişimi: "+(data.change>=0?"+":"")+data.change.toFixed(2)+"%",32,624);
   ctx.fillStyle="#e0ebf5";ctx.font="19px sans-serif";
@@ -2417,9 +2437,9 @@ function xChartDraw(data) {
     volumeStrong
       ? "Hacim: Son mum, önceki 20 mum ortalamasının " + data.volumeRatio.toFixed(2) + " katı."
       : "Hacim: Son mumda 1,5 katlık hacim teyidi yok (" + data.volumeRatio.toFixed(2) + "x).",
-    breakoutIndex >= 0
-      ? "Fiyat kırılımı: İlk dönem tepesinin üzerinde kapanış görüldü."
-      : "Fiyat kırılımı: İlk dönem tepesinin üzerinde kapanış görülmedi.",
+    compression && breakoutIndex >= 0
+      ? "Sıkışma ve sonraki kırılım, geçmiş mumlarla doğrulandı."
+      : "Sıkışma sonrası teyitli kırılım tespit edilmedi.",
     "Dönem zirvesinden geri çekilme: %" + peakPullback.toFixed(2) + "."
   ];
   ctx.fillStyle="#13263d";
