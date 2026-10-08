@@ -389,6 +389,27 @@
   </div>
 
 </section>
+  <section id="xmanager" hidden>
+    <div class="section-head"><div>
+      <h2>X Gönderi Hazırlama</h2>
+      <p class="description">TradeRadar sinyallerinden gönderi taslağı oluşturun, düzenleyin ve onaylayın.</p>
+    </div></div>
+    <div class="info-box">
+      <label for="xSignalSelect">Sinyal seçimi</label>
+      <select id="xSignalSelect" style="width:100%;padding:12px;margin:10px 0;background:#13223a;color:#fff;border:1px solid #345;border-radius:8px"></select>
+      <button type="button" class="refresh-button" id="xRefreshSignals">Sinyalleri Getir</button>
+      <button type="button" class="refresh-button" id="xGeneratePost">Taslak Oluştur</button>
+      <p id="xManagerStatus" aria-live="polite">Sinyaller yüklenmedi.</p>
+    </div>
+    <div class="info-box">
+      <label for="xPostText">Gönderi metni (en fazla 280 karakter)</label>
+      <textarea id="xPostText" maxlength="280" rows="7" style="width:100%;box-sizing:border-box;padding:12px;margin:10px 0;background:#0c172b;color:#fff;border:1px solid #345;border-radius:8px"></textarea>
+      <p><span id="xPostCount">0</span>/280 karakter</p>
+      <button type="button" class="refresh-button" id="xCopyPost">Metni Kopyala</button>
+      <button type="button" class="refresh-button" id="xOpenComposer">X'te Aç</button>
+    </div>
+    <p class="description">Gönderi X'te otomatik yayımlanmaz. Son kontrol ve paylaşım size aittir.</p>
+  </section>
   </main>
 
 
