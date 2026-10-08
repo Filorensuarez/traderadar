@@ -1888,6 +1888,44 @@ let minuteRadarCache = {
 };
 
 
+// Erken uyarılarda aynı coini sürekli bildirmemek için.
+const earlyAlertState = new Map();
+const EARLY_ALERT_COOLDOWN = 30 * 60 * 1000;
+let earlyAlertsInitialized = false;
+
+async function notifyEarlyMovement(rows) {
+  if (!Array.isArray(rows)) return;
+  const now = Date.now();
+  const active = rows.filter(row => row.earlyWatch && row.dataFresh &&
+    Number(row.earlyScore) >= 75 && Number(row.change5) < 2.5);
+  // İlk tam taramada mevcut sinyalleri başlangıç durumu kabul et.
+  // Böylece sunucu yeniden başladığında eski sinyaller yağmaz.
+  if (!earlyAlertsInitialized) {
+    for (const row of active) {
+      earlyAlertState.set(row.source + ":" + row.symbol, now);
+    }
+    earlyAlertsInitialized = true;
+    return;
+  }
+  for (const row of active) {
+    const key = row.source + ":" + row.symbol;
+    const lastAlert = earlyAlertState.get(key) || 0;
+    if (now - lastAlert < EARLY_ALERT_COOLDOWN) continue;
+    earlyAlertState.set(key, now);
+    await sendPush({
+      title: "TradeRadar • Erken Hareket",
+      body: row.symbol + " • " + row.source + " | Hazırlık " +
+        row.earlyScore + "/100 | Hacim " +
+        Number(row.volumeAcceleration).toFixed(2) + "x. Kesin yükseliş sinyali değildir.",
+      tag: "early-" + key.replace(/[^A-Za-z0-9_-]/g,"-"),
+      url: "/#radar"
+    });
+  }
+  for (const [key,time] of earlyAlertState) {
+    if (now - time > EARLY_ALERT_COOLDOWN * 2) earlyAlertState.delete(key);
+  }
+}
+
 let minuteRadarScanning =
   false;
 
@@ -7464,6 +7502,8 @@ async function scanMinuteRadar() {
 
 
     await notifyEarlyRadar(finalResults);
+
+    await notifyEarlyMovement(minuteRadarCache.rows);
 
     console.log(
       `Anlık radar: ${minuteRadarCache.scanned} tarama / ${finalResults.length} aktif sinyal`
