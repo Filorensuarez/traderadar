@@ -3500,6 +3500,40 @@ function analyzeMinuteRise(
 
 
   /* =========================
+     ERKEN HAREKET DEDEKTÖRÜ
+     Yalnız 1 dakikalık mumlardan ölçülür.
+     1 dakika sonra yükseliş garantisi yoktur.
+  ========================= */
+  const latestTimestamp = Number(last.time);
+  const freshnessMs = Date.now() - latestTimestamp;
+  const dataFresh = Number.isFinite(latestTimestamp) &&
+    freshnessMs >= -120000 && freshnessMs <= 180000;
+  const distanceToResistance = compressionHigh > 0
+    ? (compressionHigh - price) / compressionHigh * 100 : null;
+  const nearResistance = distanceToResistance !== null &&
+    distanceToResistance >= -0.2 && distanceToResistance <= 1.0;
+  const notExtended = change5 < 2.5 && change15 < 4 && change1 < 1.5;
+  const earlyVolume = volumeAcceleration >= 1.5 || lastVolumeRatio >= 1.8;
+  const momentumTurning = ema7Slope > 0 && emaSpreadAcceleration > 0;
+  const earlyWatch = dataFresh && wasCompressed && nearResistance &&
+    earlyVolume && momentumTurning && notExtended &&
+    rsiNow >= 45 && rsiNow <= 72;
+  const earlyReasons = [
+    wasCompressed ? "20 dakikalık fiyat aralığı dar" : null,
+    nearResistance ? "Sıkışma direncine yakın" : null,
+    earlyVolume ? "1 dakikalık mumlarda hacim artıyor" : null,
+    momentumTurning ? "EMA7 eğimi ve ayrışması pozitif" : null,
+    notExtended ? "Fiyat henüz aşırı yükselmemiş" : null
+  ].filter(Boolean);
+  const earlyScore = Math.round(
+    (wasCompressed ? 20 : 0) +
+    (nearResistance ? 20 : 0) +
+    (earlyVolume ? 25 : 0) +
+    (momentumTurning ? 20 : 0) +
+    (notExtended ? 15 : 0)
+  );
+
+  /* =========================
      HAREKETİN AŞAMASI
   ========================= */
 
@@ -3613,7 +3647,7 @@ function analyzeMinuteRise(
   */
 
   const qualifies =
-    stageNumber >= 1;
+    stageNumber >= 1 || earlyWatch;
 
 
   return {
@@ -3665,6 +3699,14 @@ function analyzeMinuteRise(
     stageNumber,
 
     signalLevel,
+
+    earlyWatch,
+    earlyScore,
+    earlyReasons,
+    distanceToResistance,
+    compressionHigh,
+    compressionLow,
+    dataFresh,
 
     lateMove,
     momentumWeakening,
