@@ -6368,50 +6368,83 @@ function analyzeEarlyMovement(symbol, exchange, candles) {
     volumeRatio,resistance,support,priceChange5:change5,priceChange1:change1,
     entry,stop,target,riskReward:2,qualifies:true};
 }
-async function scanScenarios() {
-  if(scenarioCache.scanning) return;
-  scenarioCache.scanning=true;
-  const results=[],errors=[],counts={};
+// Persistent rotating market scan: every eligible symbol is visited over successive batches.
+const marketScanState={universe:[],cursor:0,cycle:0,results:new Map(),scanned:0,failed:0,counts:{},errors:[],loadedAt:0};
+const MARKET_BATCH_LIMIT=90;
+const MARKET_UNIVERSE_TTL=30*60*1000;
+async function loadMarketUniverse(){
   const exchanges=[
     {name:"OKX",symbols:()=>getSymbols(),candles:getOKXMinuteCandles,pick:x=>x},
     {name:"KUCOIN",symbols:getKucoinSymbols,candles:getKucoinMinuteCandles,pick:x=>x.symbol},
     {name:"GATE.IO",symbols:getGateSymbols,candles:getGateMinuteCandles,pick:x=>x.symbol}
   ];
-  try {
-    for(const exchange of exchanges) {
-      let scanned=0;
-      try {
-        const symbols=(await exchange.symbols()).slice(0,45);
-        for(let i=0;i<symbols.length;i+=5) {
-          const batch=await Promise.allSettled(symbols.slice(i,i+5).map(async x=>{
-            const symbol=exchange.pick(x);
-            const candles=await exchange.candles(symbol);
-            if(!Array.isArray(candles)||candles.length<30)return null;
-            scanned++;
-            return analyzeEarlyMovement(symbol.replace(/[-_]USDT$/,"/USDT"),exchange.name,candles);
-          }));
-          for(const x of batch) {
-            if(x.status==="fulfilled" && x.value)results.push(x.value);
-          }
-          if(i+5<symbols.length)await new Promise(resolve=>setTimeout(resolve,180));
-        }
-        if(!scanned)errors.push(exchange.name+": geçerli mum verisi alınamadı");
-      }catch(error){errors.push(exchange.name+": "+error.message)}
-      counts[exchange.name]=scanned;
+  const loaded=await Promise.allSettled(exchanges.map(async e=>({exchange:e,symbols:await e.symbols()})));
+  const universe=[],errors=[];
+  for(let i=0;i<loaded.length;i++){
+    const r=loaded[i],exchange=exchanges[i];
+    if(r.status==="rejected"){errors.push(exchange.name+": "+r.reason?.message);continue;}
+    for(const item of r.value.symbols){
+      const symbol=exchange.pick(item);
+      if(symbol)universe.push({exchange:exchange.name,symbol,candles:exchange.candles});
     }
-    const scanned=Object.values(counts).reduce((a,b)=>a+b,0);
+  }
+  if(!universe.length)throw Error("Üç borsadan da uygun parite listesi alınamadı: "+errors.join(" | "));
+  return {universe,errors};
+}
+async function scanScenarios(){
+  if(scenarioCache.scanning)return;
+  scenarioCache.scanning=true;
+  try{
+    if(!marketScanState.universe.length || Date.now()-marketScanState.loadedAt>MARKET_UNIVERSE_TTL){
+      const loaded=await loadMarketUniverse();
+      marketScanState.universe=loaded.universe;
+      marketScanState.errors=loaded.errors;
+      marketScanState.cursor=0;
+      marketScanState.scanned=0;
+      marketScanState.failed=0;
+      marketScanState.counts={};
+      marketScanState.results.clear();
+      marketScanState.loadedAt=Date.now();
+      marketScanState.cycle++;
+    }
+    const state=marketScanState;
+    const start=state.cursor;
+    const end=Math.min(start+MARKET_BATCH_LIMIT,state.universe.length);
+    const batchItems=state.universe.slice(start,end);
+    for(let i=0;i<batchItems.length;i+=5){
+      const batch=await Promise.allSettled(batchItems.slice(i,i+5).map(async item=>{
+        const candles=await item.candles(item.symbol);
+        if(!Array.isArray(candles)||candles.length<30)throw Error("Eksik mum verisi");
+        return analyzeEarlyMovement(item.symbol.replace(/[-_]USDT$/,"/USDT"),item.exchange,candles);
+      }));
+      batch.forEach((result,j)=>{
+        const item=batchItems[i+j];
+        if(result.status==="rejected"){state.failed++;return;}
+        state.scanned++;
+        state.counts[item.exchange]=(state.counts[item.exchange]||0)+1;
+        const key=item.exchange+":"+item.symbol;
+        if(result.value)state.results.set(key,result.value);
+        else state.results.delete(key);
+      });
+      if(i+5<batchItems.length)await new Promise(resolve=>setTimeout(resolve,220));
+    }
+    state.cursor=end;
+    const complete=state.cursor>=state.universe.length;
+    const rows=[...state.results.values()].sort((a,b)=>b.score-a.score);
     const usdTryRate=await getUsdTryReference();
-    results.sort((a,b)=>b.score-a.score);
-    const part={ok:scanned>0,scanned,rows:results.slice(0,70),error:scanned?null:errors.join(" | ")};
-    const empty={ok:scanned>0,scanned,rows:[],error:scanned?null:errors.join(" | ")};
-    scenarioCache={updatedAt:Date.now(),scanning:false,exchange:"OKX + KUCOIN + GATE.IO",counts,errors,usdTryRate,fxBasis:"USD/TRY referans kuru; USDT/TRY işlem fiyatı değildir",
+    const part={ok:state.scanned>0,scanned:state.scanned,rows:rows.slice(0,30),error:state.scanned?null:state.errors.join(" | ")};
+    const empty={ok:state.scanned>0,scanned:state.scanned,rows:[],error:state.scanned?null:state.errors.join(" | ")};
+    scenarioCache={updatedAt:Date.now(),scanning:false,exchange:"OKX + KUCOIN + GATE.IO",
+      counts:{...state.counts},errors:[...state.errors],usdTryRate,failed:state.failed,
+      universeTotal:state.universe.length,processed:state.cursor,complete,cycle:state.cycle,
+      fxBasis:"USD/TRY referans kuru; USDT/TRY işlem fiyatı değildir",
       scenario1:part,scenario2:empty,scenario3:empty,scenario4:empty};
-    console.log("Erken hareket taraması:",JSON.stringify({counts,found:results.length,errors}));
+    console.log("Piyasa taraması",JSON.stringify({processed:state.cursor,total:state.universe.length,scanned:state.scanned,failed:state.failed,found:rows.length}));
   }catch(error){
     const part={ok:false,scanned:0,rows:[],error:error.message};
     scenarioCache={updatedAt:Date.now(),scanning:false,exchange:"OKX + KUCOIN + GATE.IO",
       scenario1:part,scenario2:part,scenario3:part,scenario4:part};
-  }finally{scenarioCache.scanning=false}
+  }finally{scenarioCache.scanning=false;}
 }
 async function scanScenariosLegacy() {
 
