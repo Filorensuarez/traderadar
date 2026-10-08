@@ -1778,14 +1778,14 @@ function renderScenarios(data) {
       const key = String(item.symbol || "").toUpperCase();
       if (!key) continue;
       const old = found.get(key) || { ...item, signals: [], score: 0 };
-      old.signals.push(labels[n - 1]);
+      old.signals = Array.isArray(item.signals) && item.signals.length ? [...new Set(item.signals)] : [...new Set([...old.signals, labels[n - 1]])];
       old.score = Math.max(old.score, Number(item.score || 0));
       found.set(key, old);
     }
   }
   const rows = [...found.values()].sort((a,b) => b.signals.length - a.signals.length || b.score - a.score);
-  const noScan = !scannedKnown || scanned === 0;
-  scenarioStatus.textContent = "Taranan: " + (scannedKnown ? scanned : "bilinmiyor") +
+  const noScan = !scannedKnown || scanned === 0 || errors.length > 0 && !found.size;
+  scenarioStatus.textContent = "Kaynak: " + (data.exchange || "bilinmiyor") + " | Taranan: " + (scannedKnown ? scanned : "bilinmiyor") +
     " | İzlenecek: " + rows.length + " | Son kontrol: " + new Date().toLocaleTimeString("tr-TR");
   if (noScan) {
     scenarioResults.innerHTML = '<div class="empty-card">Henüz coin taraması doğrulanamadı. Sonuç yok ifadesi geçerli değildir. Veri kaynağını ve sunucu kayıtlarını kontrol edin.</div>';
