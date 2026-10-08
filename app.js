@@ -1797,17 +1797,31 @@ function renderScenarios(data) {
     if (errors.length) scenarioStatus.textContent += " | Kısmi hata: " + errors.join(" • ");
     return;
   }
+  const rate=Number(data.usdTryRate);
+  const tryPrice = value => Number.isFinite(rate) && rate>0 && Number.isFinite(Number(value))
+    ? (Number(value)*rate).toLocaleString("tr-TR",{maximumFractionDigits:6})+" TL (yaklaşık)" : "Kur alınamadı";
   scenarioResults.innerHTML = rows.map(item => {
-    const signals = item.signals.join(" • ");
-    const late = Number(item.priceChange5 || 0) > 8 || Number(item.rsi || 0) > 80;
+    const signals = (item.signals||[]).join(" • ");
+    const entry=Number(item.entry),stop=Number(item.stop),target=Number(item.target);
+    const levelsValid=entry>0 && stop>0 && target>entry && stop<entry;
+    const late = Number(item.priceChange5 || 0) > 6 || Number(item.rsi || 0) > 80;
+    const levels = levelsValid
+      ? '<div class="daily-trade-plan"><h4>Örnek işlem planı (USDT / yaklaşık TL)</h4>' +
+        '<div class="trade-levels"><span>İzlenecek alım: <strong>'+price(entry)+' USDT · '+tryPrice(entry)+'</strong></span>' +
+        '<span>Hedef satış: <strong>'+price(target)+' USDT · '+tryPrice(target)+'</strong></span>' +
+        '<span>Zarar-kes: <strong>'+price(stop)+' USDT · '+tryPrice(stop)+'</strong></span></div>' +
+        '<small>Örnek 1:2 risk/ödül planı; otomatik emir verilmez. TL dönüşümü USD/TRY referans kurudur, gerçek USDT/TRY kotasyonu değildir.</small></div>'
+      : '<p>Geçerli işlem planı hesaplanamadı.</p>';
     return '<article class="coin-card"><div class="coin-top"><h3>' + escapeHTML(item.symbol) +
       '</h3><span class="score">' + number(item.score,0) + '/100</span></div>' +
-      '<p>' + escapeHTML(signals) + '</p><div class="metrics"><div>Fiyat <strong>' + price(item.price) +
-      '</strong></div><div>Hacim katsayısı <strong>' + number(item.volumeRatio,2) +
+      '<p>' + escapeHTML(signals) + '</p><p>Kaynak: ' + escapeHTML(item.exchange || data.exchange || 'bilinmiyor') + '</p>' +
+      '<div class="metrics"><div>Fiyat <strong>' + price(item.price) +
+      ' USDT</strong></div><div>Hacim katsayısı <strong>' + number(item.volumeRatio,2) +
       'x</strong></div><div>Direnç <strong>' + price(item.resistance) +
-      '</strong></div></div><p>' + (late ? 'Dikkat: Hızlı hareket sonrası geç giriş riski.' :
+      ' USDT</strong></div></div>' + levels +
+      '<p>' + (late ? 'Dikkat: Hızlı hareket sonrası geç giriş riski.' :
       'İzleme adayı: Hacim ve kırılım teyidi beklenmeli.') +
-      '</p><small>Bu puan istatistiksel başarı olasılığı değildir. Haber kaynaklı neden doğrulanmamıştır.</small></article>';
+      '</p><small>Hedef fiyat bir tahmindir; gerçekleşeceği garanti değildir. İşlem masrafları ve kayma hesaba katılmamıştır.</small></article>';
   }).join("");
   if (errors.length) scenarioStatus.textContent += " | Kısmi hata: " + errors.join(" • ");
 }
