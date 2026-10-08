@@ -2638,6 +2638,11 @@ document.querySelector("#xCopyPost").addEventListener("click",async()=>{
 });
 document.querySelector("#xOpenComposer").addEventListener("click",()=>{
   if(!xPostText.value.trim()){xManagerStatus.textContent="Önce taslak oluşturun.";return;}
+  if(!xChartPanel.hidden){
+    xManagerStatus.textContent="Grafiği de eklemek için 'Grafikle X'te Paylaş' düğmesini kullanın.";
+    document.querySelector("#xShareWithChart").scrollIntoView({behavior:"smooth",block:"center"});
+    return;
+  }
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(xFinalText()),"_blank","noopener,noreferrer");
 });
 
@@ -2658,13 +2663,14 @@ document.querySelector("#xShareWithChart").addEventListener("click", async () =>
         if(error.name==="AbortError"){xManagerStatus.textContent="Paylaşım iptal edildi.";return;}
       }
     }
+    // Görsel aktarımı desteklenmiyorsa X metin ekranını otomatik açma.
+    // Önce görseli indir; kullanıcı X uygulamasında görseli seçsin.
     const link=document.createElement("a");
     link.href=xChartCanvas.toDataURL("image/png");
     link.download="TradeRadar-USDT.png";
     link.click();
     try {await navigator.clipboard.writeText(message);} catch {}
-    window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(message),"_blank","noopener,noreferrer");
-    xManagerStatus.textContent="Grafik indirildi, X metin ekranı açıldı. PNG görselini gönderiye ekleyin.";
+    xManagerStatus.textContent="Bu tarayıcı görseli X’e doğrudan aktaramıyor. Grafik indirildi, metin kopyalandı. X uygulamasında görseli ekleyip metni yapıştırın.";
   } catch(error) {
     xManagerStatus.textContent="Grafik paylaşımı başarısız: "+error.message;
   } finally {
