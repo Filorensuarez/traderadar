@@ -390,26 +390,48 @@
 
 </section>
   <section id="xmanager" hidden>
-    <div class="section-head"><div>
-      <h2>X Gönderi Hazırlama</h2>
-      <p class="description">TradeRadar sinyallerinden gönderi taslağı oluşturun, düzenleyin ve onaylayın.</p>
-    </div></div>
-    <div class="info-box">
-      <label for="xSignalSelect">Sinyal seçimi</label>
-      <select id="xSignalSelect" style="width:100%;padding:12px;margin:10px 0;background:#13223a;color:#fff;border:1px solid #345;border-radius:8px"></select>
-      <button type="button" class="refresh-button" id="xRefreshSignals">Sinyalleri Getir</button>
-      <button type="button" class="refresh-button" id="xGeneratePost">Taslak Oluştur</button>
-      <p id="xManagerStatus" aria-live="polite">Sinyaller yüklenmedi.</p>
-    </div>
-    <div class="info-box">
-      <label for="xPostText">Gönderi metni (en fazla 280 karakter)</label>
-      <textarea id="xPostText" maxlength="280" rows="7" style="width:100%;box-sizing:border-box;padding:12px;margin:10px 0;background:#0c172b;color:#fff;border:1px solid #345;border-radius:8px"></textarea>
-      <p><span id="xPostCount">0</span>/280 karakter</p>
-      <button type="button" class="refresh-button" id="xCopyPost">Metni Kopyala</button>
-      <button type="button" class="refresh-button" id="xOpenComposer">X'te Aç</button>
-    </div>
-    <p class="description">Gönderi X'te otomatik yayımlanmaz. Son kontrol ve paylaşım size aittir.</p>
-  </section>
+  <h2>X Manager – Gönderi Stüdyosu</h2>
+  <p class="description">Taslaklar otomatik hazırlanır. Paylaşmadan önce kontrol edin.</p>
+  <div class="scenario-tabs" id="xModeTabs">
+    <button type="button" class="scenario-button active" data-xmode="general">1. Genel Yorum</button>
+    <button type="button" class="scenario-button" data-xmode="signal">2. Sinyal Grafiği</button>
+    <button type="button" class="scenario-button" data-xmode="lookup">3. Yükseliş Analizi</button>
+  </div>
+  <div id="xGeneralPanel" class="info-box">
+    <h3>Genel Kripto Yorumları</h3>
+    <p class="description">Farklı piyasa gözlemlerinden özgün metin taslağı oluşturur. Güncel veri kullanmadığında kesin piyasa iddiası kurmaz.</p>
+    <button type="button" class="refresh-button" id="xGenerateGeneral">Otomatik Metin Hazırla</button>
+  </div>
+  <div id="xSignalPanel" class="info-box" hidden>
+    <h3>Sinyal Grafikleri</h3>
+    <select id="xSignalSelect" class="x-field" aria-label="Sinyal seçimi"></select>
+    <button type="button" class="refresh-button" id="xRefreshSignals">Sinyalleri Getir</button>
+    <button type="button" class="refresh-button" id="xGeneratePost">Metin ve Grafik Oluştur</button>
+  </div>
+  <div id="xLookupPanel" class="info-box" hidden>
+    <h3>Yükseliş Analizi</h3>
+    <label for="xCoinInput">Coin adı (örnek: BTC, W, ETH)</label>
+    <input id="xCoinInput" class="x-field" maxlength="18" placeholder="BTC" autocomplete="off">
+    <label for="xExchangeSelect">USDT veri kaynağı</label>
+    <select id="xExchangeSelect" class="x-field"><option value="OKX">OKX</option><option value="KUCOIN">KuCoin</option><option value="GATE.IO">Gate.io</option></select>
+    <button type="button" class="refresh-button" id="xAnalyzeCoin">Grafiği ve Yorumu Hazırla</button>
+  </div>
+  <p id="xManagerStatus" aria-live="polite">Bir bölüm seçin.</p>
+  <div id="xChartPanel" class="info-box" hidden>
+    <h3>Gerçek USDT Günlük Grafiği</h3>
+    <canvas id="xChartCanvas" width="1100" height="720" style="display:block;width:100%;max-width:1100px;background:#0c172b;border-radius:12px"></canvas>
+    <button type="button" class="refresh-button" id="xDownloadChart">Grafiği PNG Kaydet</button>
+    <p class="description">X'te Aç düğmesi yalnız metni aktarır. Grafik dosyasını X gönderisine ayrıca ekleyin.</p>
+  </div>
+  <div class="info-box">
+    <label for="xPostText">Otomatik gönderi metni</label>
+    <textarea id="xPostText" maxlength="280" rows="7" class="x-field" style="min-height:150px"></textarea>
+    <p><span id="xPostCount">0</span>/280 karakter</p>
+    <button type="button" class="refresh-button" id="xCopyPost">Metni Kopyala</button>
+    <button type="button" class="refresh-button" id="xOpenComposer">X'te Aç</button>
+  </div>
+  <p class="description">Paylaşımlar sizin onayınızla yapılır. Teknik analiz kesin kazanç veya fiyat hareketinin kesin nedeni değildir.</p>
+</section>
   </main>
 
 
