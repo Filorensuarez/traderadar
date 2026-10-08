@@ -6318,6 +6318,19 @@ async function scanBinanceTrScenarios() {
 }
 
 
+let usdTryCache={rate:null,updatedAt:0};
+async function getUsdTryReference() {
+  if(usdTryCache.rate && Date.now()-usdTryCache.updatedAt<60*60*1000)return usdTryCache.rate;
+  try {
+    const response=await fetch("https://open.er-api.com/v6/latest/USD",{signal:AbortSignal.timeout(8000)});
+    if(!response.ok)throw Error("Kur HTTP "+response.status);
+    const data=await response.json();
+    const rate=Number(data?.rates?.TRY);
+    if(!(rate>0))throw Error("Kur verisi yok");
+    usdTryCache={rate,updatedAt:Date.now()};
+    return rate;
+  }catch(error){console.error("USD/TRY referans kuru:",error.message);return null;}
+}
 function analyzeEarlyMovement(symbol, exchange, candles) {
   const valid = candles.filter(c => [c.time,c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite) && c.low>0 && c.volume>=0);
   if(valid.length<30) return null;
@@ -6346,9 +6359,14 @@ function analyzeEarlyMovement(symbol, exchange, candles) {
   ].filter(Boolean);
   if(!notLate || !activeVolume || signals.length<2) return null;
   const score=Math.min(95,Math.round(22+signals.length*14+Math.min(volumeRatio,4)*5));
+  const entry=breakout ? resistance : Math.min(last.close,resistance*0.995);
+  const stop=Math.min(support,entry*0.975);
+  const risk=entry-stop;
+  if(!(risk>0))return null;
+  const target=entry+2*risk;
   return {symbol,source:exchange,exchange,price:last.close,score,signals,
     volumeRatio,resistance,support,priceChange5:change5,priceChange1:change1,
-    stop:Math.min(support,last.close*0.975),qualifies:true};
+    entry,stop,target,riskReward:2,qualifies:true};
 }
 async function scanScenarios() {
   if(scenarioCache.scanning) return;
@@ -6382,10 +6400,11 @@ async function scanScenarios() {
       counts[exchange.name]=scanned;
     }
     const scanned=Object.values(counts).reduce((a,b)=>a+b,0);
+    const usdTryRate=await getUsdTryReference();
     results.sort((a,b)=>b.score-a.score);
     const part={ok:scanned>0,scanned,rows:results.slice(0,70),error:scanned?null:errors.join(" | ")};
     const empty={ok:scanned>0,scanned,rows:[],error:scanned?null:errors.join(" | ")};
-    scenarioCache={updatedAt:Date.now(),scanning:false,exchange:"OKX + KUCOIN + GATE.IO",counts,errors,
+    scenarioCache={updatedAt:Date.now(),scanning:false,exchange:"OKX + KUCOIN + GATE.IO",counts,errors,usdTryRate,fxBasis:"USD/TRY referans kuru; USDT/TRY işlem fiyatı değildir",
       scenario1:part,scenario2:empty,scenario3:empty,scenario4:empty};
     console.log("Erken hareket taraması:",JSON.stringify({counts,found:results.length,errors}));
   }catch(error){
