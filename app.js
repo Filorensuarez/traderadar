@@ -2497,7 +2497,6 @@ function xSelectMode(mode) {
   );
   xChartPanel.hidden = true;
   document.querySelector("#xDraftPanel").hidden = true;
-  document.querySelector("#xShareWithChart").hidden = true;
   xManagerStatus.textContent = "Bölüm hazır.";
 }
 document.querySelectorAll("[data-xmode]").forEach(button => button.addEventListener("click", () => xSelectMode(button.dataset.xmode)));
@@ -2606,7 +2605,6 @@ async function xMakeChart(symbol,exchange) {
   if(!response.ok)throw Error(data.error||"Grafik verisi alınamadı");
   xChartDraw(data);
   xChartPanel.hidden=false;
-  document.querySelector("#xShareWithChart").hidden = false;
   const coinTag="#"+data.symbol.split("/")[0].replace(/[^A-Z0-9]/g,"");
   const notes=data.notes.slice(0,2).join(" ");
   xSetText("TradeRadar | "+data.symbol+"\n"+data.exchange+" günlük USDT grafiği: "+(data.change>=0?"+":"")+data.change.toFixed(2)+"%.\n"+notes+"\nTeknik gözlemdir, yatırım tavsiyesi değildir.\n"+coinTag);
@@ -2638,42 +2636,6 @@ document.querySelector("#xCopyPost").addEventListener("click",async()=>{
 });
 document.querySelector("#xOpenComposer").addEventListener("click",()=>{
   if(!xPostText.value.trim()){xManagerStatus.textContent="Önce taslak oluşturun.";return;}
-  if(!xChartPanel.hidden){
-    xManagerStatus.textContent="Grafiği de eklemek için 'Grafikle X'te Paylaş' düğmesini kullanın.";
-    document.querySelector("#xShareWithChart").scrollIntoView({behavior:"smooth",block:"center"});
-    return;
-  }
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(xFinalText()),"_blank","noopener,noreferrer");
 });
 
-document.querySelector("#xShareWithChart").addEventListener("click", async () => {
-  const button=document.querySelector("#xShareWithChart");
-  button.disabled=true;
-  try {
-    const blob=await new Promise(resolve=>xChartCanvas.toBlob(resolve,"image/png"));
-    if(!blob)throw Error("Grafik dosyası oluşturulamadı.");
-    const file=new File([blob],"TradeRadar-USDT.png",{type:"image/png"});
-    const message=xFinalText();
-    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-      try {
-        await navigator.share({files:[file],text:message,title:"TradeRadar Teknik Analiz"});
-        xManagerStatus.textContent="Paylaşım menüsü açıldı. X'i seçip gönderiyi kontrol edin.";
-        return;
-      } catch(error) {
-        if(error.name==="AbortError"){xManagerStatus.textContent="Paylaşım iptal edildi.";return;}
-      }
-    }
-    // Görsel aktarımı desteklenmiyorsa X metin ekranını otomatik açma.
-    // Önce görseli indir; kullanıcı X uygulamasında görseli seçsin.
-    const link=document.createElement("a");
-    link.href=xChartCanvas.toDataURL("image/png");
-    link.download="TradeRadar-USDT.png";
-    link.click();
-    try {await navigator.clipboard.writeText(message);} catch {}
-    xManagerStatus.textContent="Bu tarayıcı görseli X’e doğrudan aktaramıyor. Grafik indirildi, metin kopyalandı. X uygulamasında görseli ekleyip metni yapıştırın.";
-  } catch(error) {
-    xManagerStatus.textContent="Grafik paylaşımı başarısız: "+error.message;
-  } finally {
-    button.disabled=false;
-  }
-});
