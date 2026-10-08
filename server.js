@@ -7318,6 +7318,59 @@ app.get(
     );
   }
 );
+
+/* =========================
+   X MANAGER GERÇEK USDT GRAFİĞİ
+========================= */
+const xChartRequests = new Map();
+app.get("/api/x/chart", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const raw = String(req.query.symbol || "").trim().toUpperCase();
+  const exchange = String(req.query.exchange || "OKX").toUpperCase();
+  const base = raw.replace(/[-_/]?(USDT|USD|TRY)$/i, "").replace(/[^A-Z0-9]/g, "");
+  if (!/^[A-Z0-9]{2,18}$/.test(base) || !["OKX", "KUCOIN", "GATE.IO"].includes(exchange)) {
+    return res.status(400).json({ error: "Geçerli coin ve borsa seçin." });
+  }
+  const ip = req.ip || "unknown";
+  const now = Date.now();
+  const last = xChartRequests.get(ip) || 0;
+  if (now - last < 2500) return res.status(429).json({ error: "Yeni grafik için birkaç saniye bekleyin." });
+  xChartRequests.set(ip, now);
+  if (xChartRequests.size > 2000) xChartRequests.clear();
+  try {
+    const pair = exchange === "GATE.IO" ? base + "_USDT" : base + "-USDT";
+    const candles = exchange === "OKX"
+      ? await getCandles(pair)
+      : exchange === "KUCOIN"
+        ? await getKucoinCandles(pair)
+        : await getGateCandles(pair);
+    const rows = candles.filter(x => [x.time,x.open,x.high,x.low,x.close,x.volume].every(Number.isFinite) && x.low > 0).slice(-65);
+    if (rows.length < 25) return res.status(404).json({ error: "Bu borsada yeterli USDT mum verisi bulunamadı." });
+    const closes = rows.map(x => x.close);
+    const volumes = rows.map(x => x.volume);
+    const first = closes[0], lastPrice = closes.at(-1);
+    const high = Math.max(...rows.map(x => x.high));
+    const low = Math.min(...rows.map(x => x.low));
+    const previousVolume = average(volumes.slice(-21, -1));
+    const volumeRatio = previousVolume > 0 ? volumes.at(-1) / previousVolume : 0;
+    const ema7 = ema(closes,7), ema25 = ema(closes,25);
+    const change = (lastPrice / first - 1) * 100;
+    const technicalNotes = [];
+    if (ema7 > ema25) technicalNotes.push("EMA7, EMA25 üzerinde: kısa vadeli eğilim pozitif.");
+    else technicalNotes.push("EMA7, EMA25 altında: kısa vadeli eğilim zayıf.");
+    if (volumeRatio >= 1.5) technicalNotes.push("Son mum hacmi önceki 20 mum ortalamasının " + volumeRatio.toFixed(1) + " katı.");
+    else technicalNotes.push("Son mumda belirgin hacim sıçraması doğrulanmadı.");
+    if (change > 0) technicalNotes.push("İncelenen dönemde fiyat %" + change.toFixed(2) + " yükseldi.");
+    else technicalNotes.push("İncelenen dönemde fiyat %" + Math.abs(change).toFixed(2) + " geriledi.");
+    res.json({ ok:true, symbol:base+"/USDT", exchange, timeframe:"1D", candles:rows,
+      price:lastPrice, change, high, low, ema7, ema25, volumeRatio, notes:technicalNotes,
+      disclaimer:"Teknik gözlemdir; kesin neden veya yatırım önerisi değildir." });
+  } catch (error) {
+    console.error("X grafik veri hatası:", error.message);
+    res.status(502).json({ error:"Borsa verisi alınamadı: " + error.message });
+  }
+});
+
 /* =========================
    PUSH BİLDİRİM API
 ========================= */
