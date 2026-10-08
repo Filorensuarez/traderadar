@@ -400,7 +400,10 @@
   <div id="xGeneralPanel" class="info-box">
     <h3>Genel Kripto Yorumları</h3>
     <p class="description">Farklı piyasa gözlemlerinden özgün metin taslağı oluşturur. Güncel veri kullanmadığında kesin piyasa iddiası kurmaz.</p>
-    <button type="button" class="refresh-button" id="xGenerateGeneral">Otomatik Metin Hazırla</button>
+    <label for="xGeneralTopic">Yorum konusu</label>
+    <input id="xGeneralTopic" class="x-field" maxlength="160" placeholder="Örnek: Bitcoin neden düşüyor?" autocomplete="off">
+    <button type="button" class="refresh-button" id="xGenerateGeneral">Konuya Özel Metin Hazırla</button>
+    <p class="description">Güncel haberler doğrulanamıyorsa metin bunu açıkça belirtir. <a id="xTopicNews" href="#" target="_blank" rel="noopener noreferrer" hidden style="color:#8bbcff">Konuyla ilgili güncel haberleri incele</a></p>
   </div>
   <div id="xSignalPanel" class="info-box" hidden>
     <h3>Sinyal Grafikleri</h3>
