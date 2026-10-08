@@ -2501,10 +2501,25 @@ function xSelectMode(mode) {
 }
 document.querySelectorAll("[data-xmode]").forEach(button => button.addEventListener("click", () => xSelectMode(button.dataset.xmode)));
 document.querySelector("#xGenerateGeneral").addEventListener("click", () => {
-  const text = xThemes[xGeneralIndex++ % xThemes.length];
-  xSetText("TradeRadar | Piyasa Notu\n\n" + text + "\n\nYatırım tavsiyesi değildir.");
+  const topic = document.querySelector("#xGeneralTopic")?.value.trim() || "";
+  if (!topic) {
+    xManagerStatus.textContent = "Lütfen önce yorum konusunu yazın.";
+    return;
+  }
+  const news = document.querySelector("#xTopicNews");
+  if (news) {
+    news.href = "https://news.google.com/search?q=" + encodeURIComponent(topic) + "&hl=tr&gl=TR&ceid=TR:tr";
+    news.hidden = false;
+  }
+  const draft = [
+    "TradeRadar | " + topic,
+    "Bu konuyu değerlendirirken güncel haber akışı, işlem hacmi, fiyat eğilimi ve önemli teknik seviyeler birlikte incelenmelidir. Tek bir haber veya gösterge kesin yön tayin etmez.",
+    "Güncel gelişmeler bu taslakta doğrulanmamıştır. Paylaşmadan önce ilgili haberleri ve piyasa verilerini kontrol edin.",
+    "Yatırım tavsiyesi değildir."
+  ].join("\n\n");
+  xSetText(draft);
   xChartPanel.hidden = true;
-  xManagerStatus.textContent = "Genel yorum taslağı oluşturuldu.";
+  xManagerStatus.textContent = "Konuya özel taslak hazır. Canlı haber doğrulaması yapılmadı.";
 });
 async function loadXSignals() {
   xManagerStatus.textContent = "Sinyaller alınıyor...";
