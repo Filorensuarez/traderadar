@@ -21,45 +21,9 @@ const scenarioSection =
     "#scenario"
   );
 
-const scenario1Button =
-  document.querySelector(
-    "#scenario1Button"
-  );
-
-const scenario2Button =
-  document.querySelector(
-    "#scenario2Button"
-  );
-
-const scenario3Button =
-  document.querySelector(
-    "#scenario3Button"
-  );
-
-const scenario4Button =
-  document.querySelector(
-    "#scenario4Button"
-  );
-
-const scenario1Panel =
-  document.querySelector(
-    "#scenario1"
-  );
-
-const scenario2Panel =
-  document.querySelector(
-    "#scenario2"
-  );
-
-const scenario3Panel =
-  document.querySelector(
-    "#scenario3"
-  );
-
-const scenario4Panel =
-  document.querySelector(
-    "#scenario4"
-  );
+const scenarioResults = document.querySelector("#scenarioResults");
+const scenarioStatus = document.querySelector("#scenarioStatus");
+const scenarioRefreshButton = document.querySelector("#scenarioRefreshButton");
 const enableNotificationsButton =
   document.querySelector(
     "#enableNotificationsButton"
@@ -229,86 +193,6 @@ scenarioButton.addEventListener(
     )
 );
 
-function openScenarioPanel(
-  number
-) {
-
-  const panels = [
-    scenario1Panel,
-    scenario2Panel,
-    scenario3Panel,
-    scenario4Panel
-  ];
-
-  const buttons = [
-    scenario1Button,
-    scenario2Button,
-    scenario3Button,
-    scenario4Button
-  ];
-
-
-  panels.forEach(
-    (
-      panel,
-      index
-    ) => {
-
-      panel.hidden =
-        index !==
-        number - 1;
-    }
-  );
-
-
-  buttons.forEach(
-    (
-      button,
-      index
-    ) => {
-
-      button.classList.toggle(
-        "active",
-        index ===
-          number - 1
-      );
-    }
-  );
-
-
-  if (scenarioData) {
-
-    renderScenarioPanel(
-      number
-    );
-  }
-}
-scenario1Button.addEventListener(
-  "click",
-  () =>
-    openScenarioPanel(1)
-);
-
-
-scenario2Button.addEventListener(
-  "click",
-  () =>
-    openScenarioPanel(2)
-);
-
-
-scenario3Button.addEventListener(
-  "click",
-  () =>
-    openScenarioPanel(3)
-);
-
-
-scenario4Button.addEventListener(
-  "click",
-  () =>
-    openScenarioPanel(4)
-);
 function selectExchange(exchange) {
 
   selectedExchange =
@@ -1868,134 +1752,63 @@ function scenarioCard(
    SENARYO PANELİNİ GÖSTER
 ========================= */
 
-function renderScenarioPanel(
-  number
-) {
-
-  if (!scenarioData) {
-    return;
-  }
-
-
-  const key =
-    `scenario${number}`;
-
-
-  const data =
-    scenarioData[key];
-
-
-  const panel =
-    [
-      scenario1Panel,
-      scenario2Panel,
-      scenario3Panel,
-      scenario4Panel
-    ][number - 1];
-
-
-  if (
-    !data ||
-    !panel
-  ) {
-    return;
-  }
-
-
-  const rows =
-    Array.isArray(data.rows)
-      ? data.rows
-      : [];
-
-
-  if (data.error) {
-
-    panel.innerHTML = `
-      <h3>
-        Senaryo ${number}
-      </h3>
-
-      <div class="empty-card">
-        ${data.error}
-      </div>
-    `;
-
-    return;
-  }
-
-
-  if (!rows.length) {
-
-    panel.innerHTML = `
-      <h3>
-        Senaryo ${number}
-      </h3>
-
-      <div class="empty-card">
-        Şu anda bu senaryonun
-        koşullarını sağlayan coin
-        bulunamadı.
-      </div>
-    `;
-
-    return;
-  }
-
-
-  panel.innerHTML = `
-    <h3>
-      Senaryo ${number}
-    </h3>
-
-    <div class="updated-line">
-      Taranan:
-      ${Number(
-        data.scanned || 0
-      )}
-      coin |
-      Bulunan:
-      ${rows.length}
-    </div>
-
-    <div class="cards">
-      ${
-        rows
-          .map(
-            item =>
-              scenarioCard(
-                item,
-                number
-              )
-          )
-          .join("")
-      }
-    </div>
-  `;
-}
-
-
 /* =========================
    SENARYOLARI GÖSTER
 ========================= */
 
-function renderScenarios(
-  data
-) {
-
-  scenarioData =
-    data;
-
-
-  renderScenarioPanel(1);
-
-  renderScenarioPanel(2);
-
-  renderScenarioPanel(3);
-
-  renderScenarioPanel(4);
+function renderScenarios(data) {
+  scenarioData = data;
+  const found = new Map();
+  let scanned = 0;
+  for (let n = 1; n <= 4; n++) {
+    const part = data["scenario" + n] || {};
+    scanned = Math.max(scanned, Number(part.scanned || 0));
+    for (const item of (Array.isArray(part.rows) ? part.rows : [])) {
+      const key = String(item.symbol || "").toUpperCase();
+      if (!key) continue;
+      const old = found.get(key) || { ...item, signals: [], score: 0 };
+      const labels = ["Birikim / sıkışma", "Alıcı baskısı", "Hacimli kırılım", "Trend devamı"];
+      old.signals.push(labels[n - 1]);
+      old.score = Math.max(old.score, Number(item.score || 0));
+      found.set(key, old);
+    }
+  }
+  const rows = [...found.values()].sort((a,b) => b.signals.length - a.signals.length || b.score - a.score);
+  scenarioStatus.textContent = "Taranan: " + scanned + " | İzlenecek: " + rows.length + " | Son kontrol: " + new Date().toLocaleTimeString("tr-TR");
+  if (!rows.length) {
+    scenarioResults.innerHTML = '<div class="empty-card">Mevcut tarama koşullarını sağlayan coin bulunamadı. Bu sonuç piyasanın yükselmeyeceği anlamına gelmez.</div>';
+    return;
+  }
+  scenarioResults.innerHTML = rows.map(item => {
+    const signals = item.signals.join(" • ");
+    const late = Number(item.priceChange5 || 0) > 8 || Number(item.rsi || 0) > 80;
+    return '<article class="coin-card"><div class="coin-top"><h3>' + escapeHTML(item.symbol) +
+      '</h3><span class="score">' + number(item.score,0) + '/100</span></div>' +
+      '<p>' + escapeHTML(signals) + '</p><div class="metrics"><div>Fiyat <strong>' + price(item.price) +
+      '</strong></div><div>Hacim katsayısı <strong>' + number(item.volumeRatio,2) +
+      'x</strong></div><div>Direnç <strong>' + price(item.resistance) +
+      '</strong></div></div><p>' + (late ? 'Dikkat: Hızlı hareket sonrası geç giriş riski.' :
+      'İzleme adayı: Hacim ve kırılım teyidi beklenmeli.') +
+      '</p><small>Bu puan istatistiksel başarı olasılığı değildir. Fiyat hareketinin haber kaynaklı nedeni doğrulanmamıştır.</small></article>';
+  }).join("");
 }
-
-
+async function loadScenarios() {
+  if (scenarioLoading) return;
+  scenarioLoading = true;
+  scenarioRefreshButton.disabled = true;
+  scenarioStatus.textContent = "Piyasa taranıyor...";
+  try {
+    const response = await fetch("/api/scenarios", {cache:"no-store"});
+    if (!response.ok) throw Error("HTTP " + response.status);
+    renderScenarios(await response.json());
+  } catch (error) {
+    scenarioStatus.textContent = "Tarama hatası: " + error.message;
+  } finally {
+    scenarioLoading = false;
+    scenarioRefreshButton.disabled = false;
+  }
+}
+scenarioRefreshButton.addEventListener("click",loadScenarios);
 /* =========================
    SENARYO VERİSİNİ AL
 ========================= */
