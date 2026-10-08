@@ -6317,7 +6317,84 @@ async function scanBinanceTrScenarios() {
   } finally {scenarioCache.scanning=false;}
 }
 
+
+function analyzeEarlyMovement(symbol, exchange, candles) {
+  const valid = candles.filter(c => [c.time,c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite) && c.low>0 && c.volume>=0);
+  if(valid.length<30) return null;
+  const last=valid.at(-1), previous=valid.slice(-26,-6), recent=valid.slice(-6);
+  const old=recent[0];
+  if(!previous.length || !(old.close>0)) return null;
+  const resistance=Math.max(...previous.map(c=>c.high));
+  const support=Math.min(...previous.map(c=>c.low));
+  const avgVolume=previous.reduce((n,c)=>n+c.volume,0)/previous.length;
+  if(!(avgVolume>0)) return null;
+  const volumeRatio=recent.reduce((n,c)=>n+c.volume,0)/recent.length/avgVolume;
+  const change5=(last.close/old.close-1)*100;
+  const change1=(last.close/valid.at(-2).close-1)*100;
+  const rangePct=(resistance/support-1)*100;
+  const nearResistance=last.close>=resistance*0.985;
+  const breakout=last.close>resistance && volumeRatio>=1.5;
+  const compression=rangePct<=5 && rangePct>0;
+  const acceleration=change1>=0.35 && change5>=0.8 && volumeRatio>=1.4;
+  const activeVolume=volumeRatio>=1.4;
+  const notLate=change5<=6 && change5>=-1;
+  const signals=[
+    compression && nearResistance && "Birikim / direnç yakınlığı",
+    activeVolume && "Hacim artışı",
+    breakout && "Hacimli kırılım",
+    acceleration && "Fiyat ivmesi"
+  ].filter(Boolean);
+  if(!notLate || !activeVolume || signals.length<2) return null;
+  const score=Math.min(95,Math.round(22+signals.length*14+Math.min(volumeRatio,4)*5));
+  return {symbol,source:exchange,exchange,price:last.close,score,signals,
+    volumeRatio,resistance,support,priceChange5:change5,priceChange1:change1,
+    stop:Math.min(support,last.close*0.975),qualifies:true};
+}
 async function scanScenarios() {
+  if(scenarioCache.scanning) return;
+  scenarioCache.scanning=true;
+  const results=[],errors=[],counts={};
+  const exchanges=[
+    {name:"OKX",symbols:()=>getSymbols(),candles:getOKXMinuteCandles,pick:x=>x},
+    {name:"KUCOIN",symbols:getKucoinSymbols,candles:getKucoinMinuteCandles,pick:x=>x.symbol},
+    {name:"GATE.IO",symbols:getGateSymbols,candles:getGateMinuteCandles,pick:x=>x.symbol}
+  ];
+  try {
+    for(const exchange of exchanges) {
+      let scanned=0;
+      try {
+        const symbols=(await exchange.symbols()).slice(0,45);
+        for(let i=0;i<symbols.length;i+=5) {
+          const batch=await Promise.allSettled(symbols.slice(i,i+5).map(async x=>{
+            const symbol=exchange.pick(x);
+            const candles=await exchange.candles(symbol);
+            if(!Array.isArray(candles)||candles.length<30)return null;
+            scanned++;
+            return analyzeEarlyMovement(symbol.replace(/[-_]USDT$/,"/USDT"),exchange.name,candles);
+          }));
+          for(const x of batch) {
+            if(x.status==="fulfilled" && x.value)results.push(x.value);
+          }
+          if(i+5<symbols.length)await new Promise(resolve=>setTimeout(resolve,180));
+        }
+        if(!scanned)errors.push(exchange.name+": geçerli mum verisi alınamadı");
+      }catch(error){errors.push(exchange.name+": "+error.message)}
+      counts[exchange.name]=scanned;
+    }
+    const scanned=Object.values(counts).reduce((a,b)=>a+b,0);
+    results.sort((a,b)=>b.score-a.score);
+    const part={ok:scanned>0,scanned,rows:results.slice(0,70),error:scanned?null:errors.join(" | ")};
+    const empty={ok:scanned>0,scanned,rows:[],error:scanned?null:errors.join(" | ")};
+    scenarioCache={updatedAt:Date.now(),scanning:false,exchange:"OKX + KUCOIN + GATE.IO",counts,errors,
+      scenario1:part,scenario2:empty,scenario3:empty,scenario4:empty};
+    console.log("Erken hareket taraması:",JSON.stringify({counts,found:results.length,errors}));
+  }catch(error){
+    const part={ok:false,scanned:0,rows:[],error:error.message};
+    scenarioCache={updatedAt:Date.now(),scanning:false,exchange:"OKX + KUCOIN + GATE.IO",
+      scenario1:part,scenario2:part,scenario3:part,scenario4:part};
+  }finally{scenarioCache.scanning=false}
+}
+async function scanScenariosLegacy() {
 
   if (scenarioCache.scanning) {
     return;
