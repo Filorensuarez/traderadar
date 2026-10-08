@@ -2595,6 +2595,43 @@ function xChartDraw(data) {
   ctx.fillText("EMA7 "+xPrice(data.ema7)+"  |  EMA25 "+xPrice(data.ema25)+"  |  Son mum hacmi "+data.volumeRatio.toFixed(2)+"x",32,662);
   ctx.fillStyle="#9eb3c8";ctx.font="16px sans-serif";
   ctx.fillText("İşaretler teknik gözlemdir; yükselişin kesin nedeni veya yatırım tavsiyesi değildir.",32,701);
+
+  // Her grafikte veriye dayalı teknik açıklama paneli.
+  const periodUp = data.change > 0;
+  const emaPositive = Number(data.ema7) > Number(data.ema25);
+  const volumeStrong = Number(data.volumeRatio) >= 1.5;
+  const peakPullback = max > 0 ? (1 - rows.at(-1).close / max) * 100 : 0;
+  const heading = periodUp
+    ? "YÜKSELİŞİ DESTEKLEYEN TEKNİK GELİŞMELER"
+    : "OLASI YÜKSELİŞ İÇİN İZLENECEK KOŞULLAR";
+  const explanations = [
+    periodUp
+      ? "Fiyat: İncelenen dönemde %" + data.change.toFixed(2) + " yükseldi."
+      : "Fiyat: İncelenen dönemde %" + Math.abs(data.change).toFixed(2) + " geriledi.",
+    emaPositive
+      ? "EMA7 > EMA25: Kısa vadeli fiyat eğilimi pozitif."
+      : "EMA7 <= EMA25: Yukarı yönlü ortalama teyidi henüz yok.",
+    volumeStrong
+      ? "Hacim: Son mum, önceki 20 mum ortalamasının " + data.volumeRatio.toFixed(2) + " katı."
+      : "Hacim: Son mumda 1,5 katlık hacim teyidi yok (" + data.volumeRatio.toFixed(2) + "x).",
+    breakoutIndex >= 0
+      ? "Fiyat kırılımı: İlk dönem tepesinin üzerinde kapanış görüldü."
+      : "Fiyat kırılımı: İlk dönem tepesinin üzerinde kapanış görülmedi.",
+    "Dönem zirvesinden geri çekilme: %" + peakPullback.toFixed(2) + "."
+  ];
+  ctx.fillStyle="#13263d";
+  ctx.fillRect(25,725,w-50,174);
+  ctx.fillStyle="#f5c451";
+  ctx.font="bold 22px sans-serif";
+  ctx.fillText(heading,42,755);
+  ctx.font="18px sans-serif";
+  explanations.forEach((line,i)=>{
+    ctx.fillStyle=i===0?"#eaf3fc":"#bfd1e5";
+    ctx.fillText("• "+line,42,785+i*26);
+  });
+  ctx.fillStyle="#91a9c1";
+  ctx.font="15px sans-serif";
+  ctx.fillText("Geçmiş verilerden çıkarılan teknik yorumdur; haber veya kesin yükseliş nedeni değildir.",30,927);
 }
 async function xMakeChart(symbol,exchange) {
   xManagerStatus.textContent="Gerçek USDT mumları yükleniyor...";
