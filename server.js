@@ -6232,7 +6232,7 @@ const BINANCE_TR_NEXT = "https://cloudme-tr.2meta.app";
 let binanceTrLastError = null;
 async function trFetch(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(11000), headers: { Accept: "application/json" } });
-  if (!response.ok) throw Error("Binance TR HTTP " + response.status);
+  if (!response.ok) throw Error("Binance TR HTTP " + response.status + (response.status === 451 ? " — sunucu IP adresinden erişim kısıtlandı; farklı veri kaynağı izinsiz kullanılmayacak" : ""));
   const body = await response.json();
   if (body.code !== 0 || !body.data) throw Error("Binance TR API: " + (body.msg || body.message || "geçersiz yanıt"));
   return body.data;
@@ -6241,7 +6241,7 @@ async function trSymbols() {
   const data = await trFetch(BINANCE_TR + "/open/v1/common/symbols");
   if (!Array.isArray(data.list)) throw Error("Binance TR sembol listesi eksik");
   const list = data.list.filter(x => String(x.quoteAsset).toUpperCase() === "TRY" &&
-    x.spotTradingEnable !== 0 && [1,3].includes(Number(x.type)) &&
+    x.spotTradingEnable !== false && x.spotTradingEnable !== 0 && [1,3].includes(Number(x.type)) &&
     /^[A-Z0-9]+_TRY$/.test(String(x.symbol).toUpperCase()));
   if (!list.length) throw Error("Binance TR üzerinde aktif TRY paritesi bulunamadı");
   return list;
@@ -6250,7 +6250,7 @@ async function trCandles(item) {
   const kind = Number(item.type);
   const base = kind === 1 ? BINANCE_TR_MAIN : BINANCE_TR_NEXT;
   const symbol = kind === 1 ? item.symbol.replaceAll("_","") : item.symbol;
-  const raw = await trFetch(base + "/api/v1/klines?symbol=" + encodeURIComponent(symbol) + "&interval=1m&limit=90");
+  const raw = await trFetch(base + (kind === 1 ? "/api/v1/klines" : "/api/v1/klines") + "?symbol=" + encodeURIComponent(symbol) + "&interval=1m&limit=90");
   if (!Array.isArray(raw)) throw Error("Mum verisi geçersiz");
   return raw.map(row => ({
     time: Number(row[0]), open: Number(row[1]), high: Number(row[2]),
