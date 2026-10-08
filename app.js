@@ -2459,107 +2459,161 @@ enableNotificationsButton
 checkNotificationStatus();
 
 /* =========================
-   X MANAGER - GÖNDERİ TASLAKLARI
+   X MANAGER - ÜÇ BÖLÜM
 ========================= */
 const xSignalSelect = document.querySelector("#xSignalSelect");
 const xPostText = document.querySelector("#xPostText");
 const xManagerStatus = document.querySelector("#xManagerStatus");
 const xPostCount = document.querySelector("#xPostCount");
+const xChartPanel = document.querySelector("#xChartPanel");
+const xChartCanvas = document.querySelector("#xChartCanvas");
 let xSignals = [];
-
-function xSafeText(value) {
-  return String(value ?? "").replace(/[\r\n]+/g, " ").trim();
+let xMode = "general";
+let xGeneralIndex = 0;
+const xHashtags = "#TradeRadar #Kripto";
+const xThemes = [
+  "Kriptoda güçlü bir mum tek başına trend değildir. Hacim, fiyat yapısı ve devam eden alıcı ilgisi birlikte incelenmelidir.",
+  "Yükselişten önceki sıkışma dikkat çekicidir. Ancak her sıkışma yukarı kırılmaz; kırılım sonrası teyit önemlidir.",
+  "RSI tek başına alım sinyali değildir. EMA eğimi, hacim ve piyasa koşullarıyla birlikte değerlendirmek gerekir.",
+  "Hızlı yükselen bir coinde asıl soru yalnızca ne kadar arttığı değil, hareketin ne kadarının geride kaldığıdır.",
+  "MACD'nin pozitif olması tek başına yükseliş garantisi vermez. Momentumun güçlenmesi ve fiyatın teyidi birlikte aranmalıdır.",
+  "Bir coin zirveye yaklaştığında yüksek puan bile geç giriş riskini ortadan kaldırmaz. Risk yönetimi her zaman önceliklidir.",
+  "Düşük hacimli kırılımlarda yanıltıcı hareket riski yüksektir. Hacmin sürekliliğini takip etmek önemlidir."
+];
+function xSetText(text) {
+  const tail = "\n" + xHashtags;
+  const limit = 280 - tail.length;
+  xPostText.value = text.slice(0, limit).trimEnd() + tail;
+  xPostCount.textContent = String(xPostText.value.length);
 }
-
+function xSelectMode(mode) {
+  xMode = mode;
+  for (const [name, id] of [["general","xGeneralPanel"],["signal","xSignalPanel"],["lookup","xLookupPanel"]]) {
+    document.getElementById(id).hidden = name !== mode;
+  }
+  document.querySelectorAll("[data-xmode]").forEach(button =>
+    button.classList.toggle("active", button.dataset.xmode === mode)
+  );
+  xChartPanel.hidden = true;
+  xManagerStatus.textContent = "Bölüm hazır.";
+}
+document.querySelectorAll("[data-xmode]").forEach(button => button.addEventListener("click", () => xSelectMode(button.dataset.xmode)));
+document.querySelector("#xGenerateGeneral").addEventListener("click", () => {
+  const text = xThemes[xGeneralIndex++ % xThemes.length];
+  xSetText("TradeRadar | Piyasa Notu\n\n" + text + "\n\nYatırım tavsiyesi değildir.");
+  xChartPanel.hidden = true;
+  xManagerStatus.textContent = "Genel yorum taslağı oluşturuldu.";
+});
 async function loadXSignals() {
-  xManagerStatus.textContent = "Sinyaller yükleniyor...";
+  xManagerStatus.textContent = "Sinyaller alınıyor...";
   xSignals = [];
-  const urls = [
-    ["/api/daily-confirmations", "Günlük"],
-    ["/api/minute-radar", "Anlık"],
-    ["/api/scenarios", "Senaryo"]
-  ];
-  const results = await Promise.allSettled(urls.map(async ([url, label]) => {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(label + ": HTTP " + response.status);
-    return { label, data: await response.json() };
+  const sources = [["/api/daily-confirmations","Günlük"],["/api/minute-radar","Anlık"],["/api/scenarios","Senaryo"]];
+  const responses = await Promise.allSettled(sources.map(async ([url,label]) => {
+    const response = await fetch(url,{cache:"no-store"});
+    if (!response.ok) throw Error(label + " HTTP " + response.status);
+    return {label,data:await response.json()};
   }));
-  for (const result of results) {
+  for (const result of responses) {
     if (result.status !== "fulfilled") continue;
-    const { label, data } = result.value;
+    const {label,data} = result.value;
     let rows = [];
     if (label === "Günlük") {
-      for (const name of ["okx", "kucoin", "gate"]) {
+      for (const name of ["okx","kucoin","gate"]) {
         const group = data[name];
-        if (Array.isArray(group?.rows)) rows.push(...group.rows.map(item => ({...item, source: item.source || name.toUpperCase()})));
+        if (Array.isArray(group?.rows)) rows.push(...group.rows.map(item => ({...item,source:item.source || name.toUpperCase()})));
       }
     } else if (label === "Anlık") {
       rows = Array.isArray(data.rows) ? data.rows : [];
     } else {
-      for (let n = 1; n <= 4; n++) {
-        const group = data["scenario" + n];
-        if (Array.isArray(group?.rows)) rows.push(...group.rows.map(item => ({...item, scenarioNumber: n})));
+      for (let n=1;n<=4;n++) {
+        const group = data["scenario"+n];
+        if (Array.isArray(group?.rows)) rows.push(...group.rows.map(item=>({...item,scenarioNumber:n})));
       }
     }
-    for (const item of rows) {
-      if (!item?.symbol || !Number.isFinite(Number(item.price)) || Number(item.price) <= 0) continue;
-      xSignals.push({ ...item, origin: label });
-    }
+    xSignals.push(...rows.filter(item => item.symbol && Number(item.price)>0).map(item=>({...item,origin:label})));
   }
-  xSignals.sort((a,b) => Number(b.score || 0) - Number(a.score || 0));
-  xSignals = xSignals.slice(0, 100);
+  xSignals.sort((a,b)=>Number(b.score||0)-Number(a.score||0));
+  xSignals=xSignals.slice(0,100);
   xSignalSelect.replaceChildren();
-  if (!xSignals.length) {
-    xSignalSelect.add(new Option("Uygun sinyal bulunamadı", ""));
-  } else {
-    xSignals.forEach((item, i) => {
-      const label = [item.symbol, item.source || "", item.origin, item.scenarioNumber ? "S" + item.scenarioNumber : "", Math.round(Number(item.score || 0)) + "/100"].filter(Boolean).join(" | ");
-      xSignalSelect.add(new Option(label, String(i)));
-    });
-  }
-  const failures = results.filter(r => r.status === "rejected").length;
-  xManagerStatus.textContent = xSignals.length + " sinyal yüklendi." + (failures ? " " + failures + " veri kaynağına erişilemedi." : "");
+  xSignals.forEach((item,i)=>xSignalSelect.add(new Option([item.symbol,item.source,item.origin,item.scenarioNumber?"S"+item.scenarioNumber:""].filter(Boolean).join(" | "),String(i))));
+  if (!xSignals.length) xSignalSelect.add(new Option("Sinyal bulunamadı",""));
+  xManagerStatus.textContent = xSignals.length+" sinyal bulundu.";
 }
-
-function generateXPost() {
-  const item = xSignals[Number(xSignalSelect.value)];
-  if (!item) {
-    xManagerStatus.textContent = "Önce bir sinyal seçin.";
-    return;
-  }
-  const symbol = xSafeText(item.symbol).slice(0, 30);
-  const source = xSafeText(item.source || "Borsa").slice(0, 20);
-  const score = Math.round(Number(item.score || 0));
-  const stage = xSafeText(item.stage || item.signalType || (item.scenarioNumber ? "Senaryo " + item.scenarioNumber : "Teknik izleme")).slice(0, 48);
-  const price = Number(item.price).toLocaleString("tr-TR", { maximumSignificantDigits: 8 });
-  const lines = [
-    "TradeRadar | " + symbol,
-    "Borsa: " + source + " | Fiyat: " + price,
-    "Durum: " + stage + " | Radar: " + score + "/100",
-    "Teknik tarama sinyalidir; kesin yükseliş veya alım önerisi değildir.",
-    "#TradeRadar"
-  ];
-  xPostText.value = lines.join("\n").slice(0, 280);
-  xPostCount.textContent = String(xPostText.value.length);
-  xManagerStatus.textContent = "Taslak hazır. Kontrol edip düzenleyebilirsiniz.";
+const xPrice = value => Number(value).toLocaleString("en-US",{maximumSignificantDigits:7});
+function xChartDraw(data) {
+  const canvas=xChartCanvas, ctx=canvas.getContext("2d");
+  const w=canvas.width,h=canvas.height, rows=data.candles;
+  ctx.fillStyle="#0c172b";ctx.fillRect(0,0,w,h);
+  const min=Math.min(...rows.map(x=>x.low)), max=Math.max(...rows.map(x=>x.high));
+  const range=Math.max(max-min,max*0.001), left=65,right=w-50,top=135,bottom=510;
+  const y=v=>bottom-(v-min)/range*(bottom-top);
+  const step=(right-left)/rows.length;
+  ctx.fillStyle="#e9f3ff";ctx.font="bold 35px sans-serif";
+  ctx.fillText("TradeRadar | "+data.symbol+" | "+data.exchange,35,52);
+  ctx.font="23px sans-serif";ctx.fillStyle="#b9c9dd";
+  ctx.fillText("1 Günlük Mumlar | USDT | "+new Date().toLocaleString("tr-TR"),35,92);
+  ctx.strokeStyle="#304158";ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const yy=top+i*(bottom-top)/4;ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(right,yy);ctx.stroke();ctx.fillStyle="#9fb4c9";ctx.font="17px sans-serif";ctx.fillText(xPrice(max-i*range/4),right-115,yy-6);}
+  const maxVol=Math.max(...rows.map(x=>x.volume),1);
+  rows.forEach((bar,i)=>{
+    const xx=left+(i+.5)*step;
+    const up=bar.close>=bar.open;
+    ctx.strokeStyle=up?"#28c79a":"#ff6075";
+    ctx.fillStyle=ctx.strokeStyle;
+    ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(xx,y(bar.high));ctx.lineTo(xx,y(bar.low));ctx.stroke();
+    const a=y(Math.max(bar.open,bar.close)),b=y(Math.min(bar.open,bar.close));
+    ctx.fillRect(xx-step*.31,a,Math.max(2,step*.62),Math.max(2,b-a));
+    ctx.fillRect(xx-step*.31,590-(bar.volume/maxVol)*68,Math.max(2,step*.62),(bar.volume/maxVol)*68);
+  });
+  const first=rows[0],last=rows.at(-1);
+  ctx.strokeStyle="#f3c84b";ctx.lineWidth=3;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(left,y(first.close));ctx.lineTo(right,y(first.close));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle="#f3c84b";ctx.font="bold 20px sans-serif";ctx.fillText("Başlangıç: "+xPrice(first.close),left,top-12);
+  ctx.fillStyle="#eaf5ff";ctx.fillText("Son fiyat: "+xPrice(last.close),right-300,top-12);
+  ctx.fillStyle=data.change>=0?"#2bd7a4":"#ff6075";ctx.font="bold 26px sans-serif";
+  ctx.fillText("Değişim: "+data.change.toFixed(2)+"%",35,645);
+  ctx.fillStyle="#d2dfed";ctx.font="20px sans-serif";
+  ctx.fillText("EMA7: "+xPrice(data.ema7)+" | EMA25: "+xPrice(data.ema25)+" | Hacim: "+data.volumeRatio.toFixed(2)+"x",35,682);
+  ctx.font="16px sans-serif";ctx.fillStyle="#a7b8cc";ctx.fillText("Teknik gözlem; yükselişin kesin nedeni veya yatırım tavsiyesi değildir.",35,709);
 }
-
-document.querySelector("#xRefreshSignals").addEventListener("click", () => {
-  loadXSignals().catch(error => { xManagerStatus.textContent = "Yükleme hatası: " + error.message; });
+async function xMakeChart(symbol,exchange) {
+  xManagerStatus.textContent="Gerçek USDT mumları yükleniyor...";
+  xChartPanel.hidden=true;
+  const params=new URLSearchParams({symbol,exchange});
+  const response=await fetch("/api/x/chart?"+params,{cache:"no-store"});
+  const data=await response.json();
+  if(!response.ok)throw Error(data.error||"Grafik verisi alınamadı");
+  xChartDraw(data);
+  xChartPanel.hidden=false;
+  const coinTag="#"+data.symbol.split("/")[0].replace(/[^A-Z0-9]/g,"");
+  const notes=data.notes.slice(0,2).join(" ");
+  xSetText("TradeRadar | "+data.symbol+"\n"+data.exchange+" günlük USDT grafiği: "+(data.change>=0?"+":"")+data.change.toFixed(2)+"%.\n"+notes+"\nTeknik gözlemdir, yatırım tavsiyesi değildir.\n"+coinTag);
+  xManagerStatus.textContent="Gerçek verilerle grafik ve taslak hazır. PNG dosyasını X'e ayrıca ekleyin.";
+}
+document.querySelector("#xRefreshSignals").addEventListener("click",()=>loadXSignals().catch(e=>xManagerStatus.textContent=e.message));
+document.querySelector("#xGeneratePost").addEventListener("click",()=>{
+  const item=xSignals[Number(xSignalSelect.value)];
+  if(!item){xManagerStatus.textContent="Önce sinyal seçin.";return;}
+  const source=String(item.source||"OKX").toUpperCase().replace("GATE","GATE.IO");
+  xMakeChart(item.symbol,["OKX","KUCOIN","GATE.IO"].includes(source)?source:"OKX").catch(e=>xManagerStatus.textContent=e.message);
 });
-document.querySelector("#xGeneratePost").addEventListener("click", generateXPost);
-xPostText.addEventListener("input", () => { xPostCount.textContent = String(xPostText.value.length); });
-document.querySelector("#xCopyPost").addEventListener("click", async () => {
-  if (!xPostText.value.trim()) return;
-  try {
-    await navigator.clipboard.writeText(xPostText.value);
-    xManagerStatus.textContent = "Metin kopyalandı.";
-  } catch (error) {
-    xManagerStatus.textContent = "Kopyalama başarısız: " + error.message;
-  }
+document.querySelector("#xAnalyzeCoin").addEventListener("click",()=>{
+  xMakeChart(document.querySelector("#xCoinInput").value,document.querySelector("#xExchangeSelect").value).catch(e=>xManagerStatus.textContent=e.message);
 });
-document.querySelector("#xOpenComposer").addEventListener("click", () => {
-  const message = xPostText.value.trim();
-  if (!message) { xManagerStatus.textContent = "Önce gönderi hazırlayın."; return; }
-  window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(message), "_blank", "noopener,noreferrer");
+document.querySelector("#xDownloadChart").addEventListener("click",()=>{
+  const a=document.createElement("a");a.href=xChartCanvas.toDataURL("image/png");a.download="TradeRadar-USDT-grafik.png";a.click();
+});
+xPostText.addEventListener("input",()=>{xPostCount.textContent=String(xPostText.value.length);});
+function xFinalText(){
+  const t=xPostText.value.trim();
+  const tags=[...new Set((t.match(/#[A-Za-z0-9_ğüşöçıİĞÜŞÖÇ]+/g)||[]).map(x=>x.toLowerCase()))];
+  const missing=["#TradeRadar","#Kripto"].filter(x=>!tags.includes(x.toLowerCase()));
+  return (t.slice(0,280-missing.join(" ").length-(missing.length?1:0)).trimEnd()+(missing.length?"\n"+missing.join(" "):"")).slice(0,280);
+}
+document.querySelector("#xCopyPost").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(xFinalText());xManagerStatus.textContent="Metin etiketleriyle kopyalandı.";}
+  catch(e){xManagerStatus.textContent="Kopyalanamadı: "+e.message;}
+});
+document.querySelector("#xOpenComposer").addEventListener("click",()=>{
+  if(!xPostText.value.trim()){xManagerStatus.textContent="Önce taslak oluşturun.";return;}
+  window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(xFinalText()),"_blank","noopener,noreferrer");
 });
