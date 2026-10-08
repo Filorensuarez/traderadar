@@ -6395,7 +6395,7 @@ async function scanScenarios(){
   if(scenarioCache.scanning)return;
   scenarioCache.scanning=true;
   try{
-    if(!marketScanState.universe.length || Date.now()-marketScanState.loadedAt>MARKET_UNIVERSE_TTL){
+    if(!marketScanState.universe.length || (marketScanState.cursor>=marketScanState.universe.length && Date.now()-marketScanState.loadedAt>MARKET_UNIVERSE_TTL)){
       const loaded=await loadMarketUniverse();
       marketScanState.universe=loaded.universe;
       marketScanState.errors=loaded.errors;
