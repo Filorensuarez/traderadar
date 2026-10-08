@@ -1813,69 +1813,6 @@ scenarioRefreshButton.addEventListener("click",loadScenarios);
    SENARYO VERİSİNİ AL
 ========================= */
 
-async function loadScenarios() {
-
-  if (scenarioLoading) {
-    return;
-  }
-
-
-  scenarioLoading =
-    true;
-
-
-  try {
-
-    const response =
-      await fetch(
-        "/api/scenarios",
-        {
-          cache:
-            "no-store"
-        }
-      );
-
-
-    if (!response.ok) {
-
-      throw new Error(
-        `HTTP ${response.status}`
-      );
-    }
-
-
-    const data =
-      await response.json();
-
-
-    renderScenarios(
-      data
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "Yükseliş Senaryoları:",
-      error
-    );
-
-
-    scenario1Panel.innerHTML = `
-      <div class="empty-card">
-        Senaryo verileri alınamadı.
-        ${error.message}
-      </div>
-    `;
-
-
-  } finally {
-
-    scenarioLoading =
-      false;
-  }
-}
-
 /* =========================
    PUSH BİLDİRİMLERİ
 ========================= */
