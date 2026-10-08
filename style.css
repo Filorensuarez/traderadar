@@ -428,3 +428,18 @@ footer {
 .trade-levels span { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
 .trade-levels strong { font-variant-numeric: tabular-nums; }
 .daily-trade-plan small { display: block; margin-top: 10px; color: var(--muted); line-height: 1.45; }
+
+/* X Manager mobil gönderi düzenleyici */
+#xmanager .info-box { margin: 16px 0; }
+#xmanager .x-field {
+  display:block; width:100%; box-sizing:border-box; min-width:0;
+  background:#111f35; color:#f1f6ff; border:1px solid #354d6b;
+  border-radius:10px; padding:12px; margin:10px 0 14px;
+  font:inherit; line-height:1.5;
+}
+#xmanager textarea.x-field { resize:vertical; min-height:150px; }
+#xmanager .scenario-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; }
+#xmanager .scenario-button { flex:1 1 135px; padding:12px 8px; border-radius:10px; background:#14233a; color:#e5eef9; border:1px solid #35506d; cursor:pointer; }
+#xmanager .scenario-button.active { background:#367bd0; color:#fff; }
+#xmanager .refresh-button { margin:6px 6px 6px 0; }
+#xmanager [hidden] { display:none !important; }
