@@ -7420,10 +7420,10 @@ async function scanMinuteRadar() {
         exchangeStatus.gate.scanned,
 
       rows:
-        finalResults.slice(
-          0,
-          50
-        ),
+        [...finalResults].sort((a,b) =>
+          Number(Boolean(b.earlyWatch)) - Number(Boolean(a.earlyWatch)) ||
+          Number(b.score||0) - Number(a.score||0)
+        ).slice(0,50),
 
       exchanges:
         exchangeStatus
