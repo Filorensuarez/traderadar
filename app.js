@@ -1759,24 +1759,42 @@ function scenarioCard(
 function renderScenarios(data) {
   scenarioData = data;
   const found = new Map();
+  const errors = [];
   let scanned = 0;
+  let scannedKnown = false;
   for (let n = 1; n <= 4; n++) {
-    const part = data["scenario" + n] || {};
-    scanned = Math.max(scanned, Number(part.scanned || 0));
+    const part = data["scenario" + n];
+    if (!part) {
+      errors.push("Tarama " + n + ": veri dönmedi");
+      continue;
+    }
+    if (part.error) errors.push("Tarama " + n + ": " + String(part.error));
+    if (Number.isFinite(Number(part.scanned)) && part.scanned !== null && part.scanned !== undefined) {
+      scannedKnown = true;
+      scanned = Math.max(scanned, Number(part.scanned));
+    }
+    const labels = ["Birikim / sıkışma", "Alıcı baskısı", "Hacimli kırılım", "Trend devamı"];
     for (const item of (Array.isArray(part.rows) ? part.rows : [])) {
       const key = String(item.symbol || "").toUpperCase();
       if (!key) continue;
       const old = found.get(key) || { ...item, signals: [], score: 0 };
-      const labels = ["Birikim / sıkışma", "Alıcı baskısı", "Hacimli kırılım", "Trend devamı"];
       old.signals.push(labels[n - 1]);
       old.score = Math.max(old.score, Number(item.score || 0));
       found.set(key, old);
     }
   }
   const rows = [...found.values()].sort((a,b) => b.signals.length - a.signals.length || b.score - a.score);
-  scenarioStatus.textContent = "Taranan: " + scanned + " | İzlenecek: " + rows.length + " | Son kontrol: " + new Date().toLocaleTimeString("tr-TR");
+  const noScan = !scannedKnown || scanned === 0;
+  scenarioStatus.textContent = "Taranan: " + (scannedKnown ? scanned : "bilinmiyor") +
+    " | İzlenecek: " + rows.length + " | Son kontrol: " + new Date().toLocaleTimeString("tr-TR");
+  if (noScan) {
+    scenarioResults.innerHTML = '<div class="empty-card">Henüz coin taraması doğrulanamadı. Sonuç yok ifadesi geçerli değildir. Veri kaynağını ve sunucu kayıtlarını kontrol edin.</div>';
+    if (errors.length) scenarioStatus.textContent += " | " + errors.join(" • ");
+    return;
+  }
   if (!rows.length) {
-    scenarioResults.innerHTML = '<div class="empty-card">Mevcut tarama koşullarını sağlayan coin bulunamadı. Bu sonuç piyasanın yükselmeyeceği anlamına gelmez.</div>';
+    scenarioResults.innerHTML = '<div class="empty-card">Taranan coinlerde mevcut teknik koşulları sağlayan aday bulunamadı.</div>';
+    if (errors.length) scenarioStatus.textContent += " | Kısmi hata: " + errors.join(" • ");
     return;
   }
   scenarioResults.innerHTML = rows.map(item => {
@@ -1789,8 +1807,9 @@ function renderScenarios(data) {
       'x</strong></div><div>Direnç <strong>' + price(item.resistance) +
       '</strong></div></div><p>' + (late ? 'Dikkat: Hızlı hareket sonrası geç giriş riski.' :
       'İzleme adayı: Hacim ve kırılım teyidi beklenmeli.') +
-      '</p><small>Bu puan istatistiksel başarı olasılığı değildir. Fiyat hareketinin haber kaynaklı nedeni doğrulanmamıştır.</small></article>';
+      '</p><small>Bu puan istatistiksel başarı olasılığı değildir. Haber kaynaklı neden doğrulanmamıştır.</small></article>';
   }).join("");
+  if (errors.length) scenarioStatus.textContent += " | Kısmi hata: " + errors.join(" • ");
 }
 async function loadScenarios() {
   if (scenarioLoading) return;
