@@ -1172,10 +1172,17 @@ function renderMinuteRadar(data) {
   }
 
 
-  radarCards.innerHTML =
-    rows
-      .map(minuteRadarCard)
-      .join("");
+  const early = rows.filter(item => item.earlyWatch && item.dataFresh);
+  const earlyHtml = '<div class="info-box"><h3>Erken Hareket Uyarısı ('+early.length+')</h3>'+
+    '<p class="description">1 dakikalık mumlarla hazırlık koşulları aranır. Kesin yükseliş tahmini değildir.</p>'+
+    (early.length ? early.map(item =>
+      '<div class="coin-card"><h3>'+String(item.symbol).replace(/[<>&"]/g,"")+
+      ' • '+String(item.source||"").replace(/[<>&"]/g,"")+'</h3>'+
+      '<p>Hazırlık puanı: '+Number(item.earlyScore||0)+'/100</p>'+
+      '<p>'+item.earlyReasons.map(s=>String(s).replace(/[<>&"]/g,"")).join(" • ")+'</p>'+
+      '<p>Dirence uzaklık: %'+Number(item.distanceToResistance||0).toFixed(2)+'</p></div>'
+      ).join("") : '<p>Şu anda hazırlık koşullarını sağlayan coin yok.</p>')+'</div>';
+  radarCards.innerHTML = earlyHtml + rows.map(minuteRadarCard).join("");
 }
 
 
