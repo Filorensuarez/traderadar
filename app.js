@@ -135,6 +135,8 @@ function openView(view) {
   const scenario =
     view === "scenario";
 
+  const xmanager = view === "xmanager";
+
 
   dailySection.hidden =
     !daily;
@@ -147,6 +149,8 @@ function openView(view) {
 
   scenarioSection.hidden =
     !scenario;
+
+  document.querySelector("#xmanager").hidden = !xmanager;
 
 
   dailyButton.classList.toggle(
@@ -168,6 +172,8 @@ function openView(view) {
     "active",
     scenario
   );
+
+  document.querySelector("#xManagerButton").classList.toggle("active", xmanager);
 
 
   if (
@@ -194,6 +200,8 @@ function openView(view) {
     loadScenarios();
   }
 }
+document.querySelector("#xManagerButton").addEventListener("click", () => openView("xmanager"));
+
 dailyButton.addEventListener(
   "click",
   () => openView("daily")
@@ -2449,3 +2457,109 @@ enableNotificationsButton
 */
 
 checkNotificationStatus();
+
+/* =========================
+   X MANAGER - GÖNDERİ TASLAKLARI
+========================= */
+const xSignalSelect = document.querySelector("#xSignalSelect");
+const xPostText = document.querySelector("#xPostText");
+const xManagerStatus = document.querySelector("#xManagerStatus");
+const xPostCount = document.querySelector("#xPostCount");
+let xSignals = [];
+
+function xSafeText(value) {
+  return String(value ?? "").replace(/[\r\n]+/g, " ").trim();
+}
+
+async function loadXSignals() {
+  xManagerStatus.textContent = "Sinyaller yükleniyor...";
+  xSignals = [];
+  const urls = [
+    ["/api/daily-confirmations", "Günlük"],
+    ["/api/minute-radar", "Anlık"],
+    ["/api/scenarios", "Senaryo"]
+  ];
+  const results = await Promise.allSettled(urls.map(async ([url, label]) => {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(label + ": HTTP " + response.status);
+    return { label, data: await response.json() };
+  }));
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+    const { label, data } = result.value;
+    let rows = [];
+    if (label === "Günlük") {
+      for (const name of ["okx", "kucoin", "gate"]) {
+        const group = data[name];
+        if (Array.isArray(group?.rows)) rows.push(...group.rows.map(item => ({...item, source: item.source || name.toUpperCase()})));
+      }
+    } else if (label === "Anlık") {
+      rows = Array.isArray(data.rows) ? data.rows : [];
+    } else {
+      for (let n = 1; n <= 4; n++) {
+        const group = data["scenario" + n];
+        if (Array.isArray(group?.rows)) rows.push(...group.rows.map(item => ({...item, scenarioNumber: n})));
+      }
+    }
+    for (const item of rows) {
+      if (!item?.symbol || !Number.isFinite(Number(item.price)) || Number(item.price) <= 0) continue;
+      xSignals.push({ ...item, origin: label });
+    }
+  }
+  xSignals.sort((a,b) => Number(b.score || 0) - Number(a.score || 0));
+  xSignals = xSignals.slice(0, 100);
+  xSignalSelect.replaceChildren();
+  if (!xSignals.length) {
+    xSignalSelect.add(new Option("Uygun sinyal bulunamadı", ""));
+  } else {
+    xSignals.forEach((item, i) => {
+      const label = [item.symbol, item.source || "", item.origin, item.scenarioNumber ? "S" + item.scenarioNumber : "", Math.round(Number(item.score || 0)) + "/100"].filter(Boolean).join(" | ");
+      xSignalSelect.add(new Option(label, String(i)));
+    });
+  }
+  const failures = results.filter(r => r.status === "rejected").length;
+  xManagerStatus.textContent = xSignals.length + " sinyal yüklendi." + (failures ? " " + failures + " veri kaynağına erişilemedi." : "");
+}
+
+function generateXPost() {
+  const item = xSignals[Number(xSignalSelect.value)];
+  if (!item) {
+    xManagerStatus.textContent = "Önce bir sinyal seçin.";
+    return;
+  }
+  const symbol = xSafeText(item.symbol).slice(0, 30);
+  const source = xSafeText(item.source || "Borsa").slice(0, 20);
+  const score = Math.round(Number(item.score || 0));
+  const stage = xSafeText(item.stage || item.signalType || (item.scenarioNumber ? "Senaryo " + item.scenarioNumber : "Teknik izleme")).slice(0, 48);
+  const price = Number(item.price).toLocaleString("tr-TR", { maximumSignificantDigits: 8 });
+  const lines = [
+    "TradeRadar | " + symbol,
+    "Borsa: " + source + " | Fiyat: " + price,
+    "Durum: " + stage + " | Radar: " + score + "/100",
+    "Teknik tarama sinyalidir; kesin yükseliş veya alım önerisi değildir.",
+    "#TradeRadar"
+  ];
+  xPostText.value = lines.join("\n").slice(0, 280);
+  xPostCount.textContent = String(xPostText.value.length);
+  xManagerStatus.textContent = "Taslak hazır. Kontrol edip düzenleyebilirsiniz.";
+}
+
+document.querySelector("#xRefreshSignals").addEventListener("click", () => {
+  loadXSignals().catch(error => { xManagerStatus.textContent = "Yükleme hatası: " + error.message; });
+});
+document.querySelector("#xGeneratePost").addEventListener("click", generateXPost);
+xPostText.addEventListener("input", () => { xPostCount.textContent = String(xPostText.value.length); });
+document.querySelector("#xCopyPost").addEventListener("click", async () => {
+  if (!xPostText.value.trim()) return;
+  try {
+    await navigator.clipboard.writeText(xPostText.value);
+    xManagerStatus.textContent = "Metin kopyalandı.";
+  } catch (error) {
+    xManagerStatus.textContent = "Kopyalama başarısız: " + error.message;
+  }
+});
+document.querySelector("#xOpenComposer").addEventListener("click", () => {
+  const message = xPostText.value.trim();
+  if (!message) { xManagerStatus.textContent = "Önce gönderi hazırlayın."; return; }
+  window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(message), "_blank", "noopener,noreferrer");
+});
