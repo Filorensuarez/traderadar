@@ -5377,6 +5377,50 @@ function analyze(
 
 
   /* =========================
+     W/TRY TİPİ KIRILIM KONTROLÜ
+     Günlük mumlardan hesaplanır.
+     15 dakikalık verilerle karıştırılmaz.
+  ========================= */
+
+  const ema7Daily = ema(closes, 7);
+  const ema25Daily = ema(closes, 25);
+  const ema7PrevDaily = ema(closes.slice(0, -3), 7);
+  const ema25PrevDaily = ema(closes.slice(0, -3), 25);
+  const emaSeparation =
+    ema25Daily > 0 ? (ema7Daily / ema25Daily - 1) * 100 : 0;
+  const emaSeparationBefore =
+    ema25PrevDaily > 0 ? (ema7PrevDaily / ema25PrevDaily - 1) * 100 : 0;
+  const emaOpening = emaSeparation > emaSeparationBefore;
+
+  const baseWindow = candles.slice(-16, -5);
+  const baseHigh = Math.max(...baseWindow.map(c => c.high));
+  const baseLow = Math.min(...baseWindow.map(c => c.low));
+  const baseRangePct = baseLow > 0
+    ? (baseHigh / baseLow - 1) * 100 : 0;
+  const compressedBefore = baseRangePct > 0 && baseRangePct <= 12;
+
+  const recentVolumeAvg = average(volumes.slice(-3));
+  const earlierVolumeAvg = average(volumes.slice(-23, -3));
+  const sustainedVolumeRatio = earlierVolumeAvg > 0
+    ? recentVolumeAvg / earlierVolumeAvg : 0;
+
+  const last5 = candles.slice(-5);
+  const positiveCandles = last5.filter(c => c.close > c.open).length;
+  const breakoutFromBase = baseHigh > 0 && price > baseHigh;
+  const dailyBreakoutSetup =
+    compressedBefore &&
+    breakoutFromBase &&
+    ema7Daily > ema25Daily &&
+    emaOpening &&
+    sustainedVolumeRatio >= 1.4 &&
+    positiveCandles >= 3;
+
+  if (dailyBreakoutSetup) {
+    score += 8;
+    reasons.push("W tipi: sıkışma sonrası hacimli EMA7/25 kırılımı");
+  }
+
+  /* =========================
      RİSK CEZALARI
   ========================= */
 
@@ -5565,6 +5609,14 @@ if (extended) {
       null,
 
     change3,
+
+    dailyBreakoutSetup,
+    compressedBefore,
+    baseRangePct,
+    sustainedVolumeRatio,
+    ema7Daily,
+    ema25Daily,
+    emaOpening,
 
     confirmed,
 
