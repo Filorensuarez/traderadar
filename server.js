@@ -7328,7 +7328,7 @@ app.get("/api/x/chart", async (req, res) => {
   const raw = String(req.query.symbol || "").trim().toUpperCase();
   const exchange = String(req.query.exchange || "OKX").toUpperCase();
   const base = raw.replace(/[-_/]?(USDT|USD|TRY)$/i, "").replace(/[^A-Z0-9]/g, "");
-  if (!/^[A-Z0-9]{2,18}$/.test(base) || !["OKX", "KUCOIN", "GATE.IO"].includes(exchange)) {
+  if (!/^[A-Z0-9]{1,18}$/.test(base) || !["OKX", "KUCOIN", "GATE.IO"].includes(exchange)) {
     return res.status(400).json({ error: "Geçerli coin ve borsa seçin." });
   }
   const ip = req.ip || "unknown";
