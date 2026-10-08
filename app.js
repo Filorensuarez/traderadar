@@ -2481,6 +2481,7 @@ const xThemes = [
   "Düşük hacimli kırılımlarda yanıltıcı hareket riski yüksektir. Hacmin sürekliliğini takip etmek önemlidir."
 ];
 function xSetText(text) {
+  document.querySelector("#xDraftPanel").hidden = false;
   const tail = "\n" + xHashtags;
   const limit = 280 - tail.length;
   xPostText.value = text.slice(0, limit).trimEnd() + tail;
@@ -2495,6 +2496,8 @@ function xSelectMode(mode) {
     button.classList.toggle("active", button.dataset.xmode === mode)
   );
   xChartPanel.hidden = true;
+  document.querySelector("#xDraftPanel").hidden = true;
+  document.querySelector("#xShareWithChart").hidden = true;
   xManagerStatus.textContent = "Bölüm hazır.";
 }
 document.querySelectorAll("[data-xmode]").forEach(button => button.addEventListener("click", () => xSelectMode(button.dataset.xmode)));
@@ -2541,39 +2544,58 @@ async function loadXSignals() {
 }
 const xPrice = value => Number(value).toLocaleString("en-US",{maximumSignificantDigits:7});
 function xChartDraw(data) {
-  const canvas=xChartCanvas, ctx=canvas.getContext("2d");
-  const w=canvas.width,h=canvas.height, rows=data.candles;
-  ctx.fillStyle="#0c172b";ctx.fillRect(0,0,w,h);
-  const min=Math.min(...rows.map(x=>x.low)), max=Math.max(...rows.map(x=>x.high));
-  const range=Math.max(max-min,max*0.001), left=65,right=w-50,top=135,bottom=510;
-  const y=v=>bottom-(v-min)/range*(bottom-top);
-  const step=(right-left)/rows.length;
-  ctx.fillStyle="#e9f3ff";ctx.font="bold 35px sans-serif";
-  ctx.fillText("TradeRadar | "+data.symbol+" | "+data.exchange,35,52);
-  ctx.font="23px sans-serif";ctx.fillStyle="#b9c9dd";
-  ctx.fillText("1 Günlük Mumlar | USDT | "+new Date().toLocaleString("tr-TR"),35,92);
-  ctx.strokeStyle="#304158";ctx.lineWidth=1;
-  for(let i=0;i<=4;i++){const yy=top+i*(bottom-top)/4;ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(right,yy);ctx.stroke();ctx.fillStyle="#9fb4c9";ctx.font="17px sans-serif";ctx.fillText(xPrice(max-i*range/4),right-115,yy-6);}
+  const canvas=xChartCanvas,ctx=canvas.getContext("2d");
+  const w=canvas.width,h=canvas.height,rows=data.candles;
+  const min=Math.min(...rows.map(x=>x.low)),max=Math.max(...rows.map(x=>x.high));
+  const range=Math.max(max-min,max*.001),left=70,right=w-60,top=120,bottom=475;
+  const y=v=>bottom-(v-min)/range*(bottom-top),step=(right-left)/rows.length;
+  ctx.fillStyle="#0b1729";ctx.fillRect(0,0,w,h);
+  ctx.fillStyle="#f1f6ff";ctx.font="bold 34px sans-serif";
+  ctx.fillText("TradeRadar | "+data.symbol+" | "+data.exchange,32,45);
+  ctx.fillStyle="#b5c7d9";ctx.font="21px sans-serif";
+  ctx.fillText("Günlük USDT mumları • "+new Date().toLocaleDateString("tr-TR"),32,82);
+  ctx.strokeStyle="#34445c";ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const yy=top+(bottom-top)*i/4;ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(right,yy);ctx.stroke();
+    ctx.fillStyle="#afc0d1";ctx.font="16px sans-serif";ctx.fillText(xPrice(max-range*i/4),right-115,yy-6);
+  }
   const maxVol=Math.max(...rows.map(x=>x.volume),1);
   rows.forEach((bar,i)=>{
-    const xx=left+(i+.5)*step;
-    const up=bar.close>=bar.open;
-    ctx.strokeStyle=up?"#28c79a":"#ff6075";
-    ctx.fillStyle=ctx.strokeStyle;
+    const xx=left+(i+.5)*step,up=bar.close>=bar.open;
+    ctx.strokeStyle=ctx.fillStyle=up?"#24c79c":"#ff6178";
     ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(xx,y(bar.high));ctx.lineTo(xx,y(bar.low));ctx.stroke();
     const a=y(Math.max(bar.open,bar.close)),b=y(Math.min(bar.open,bar.close));
-    ctx.fillRect(xx-step*.31,a,Math.max(2,step*.62),Math.max(2,b-a));
-    ctx.fillRect(xx-step*.31,590-(bar.volume/maxVol)*68,Math.max(2,step*.62),(bar.volume/maxVol)*68);
+    ctx.fillRect(xx-step*.3,a,Math.max(2,step*.6),Math.max(2,b-a));
+    ctx.fillRect(xx-step*.3,570-bar.volume/maxVol*68,Math.max(2,step*.6),bar.volume/maxVol*68);
   });
   const first=rows[0],last=rows.at(-1);
-  ctx.strokeStyle="#f3c84b";ctx.lineWidth=3;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(left,y(first.close));ctx.lineTo(right,y(first.close));ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle="#f3c84b";ctx.font="bold 20px sans-serif";ctx.fillText("Başlangıç: "+xPrice(first.close),left,top-12);
-  ctx.fillStyle="#eaf5ff";ctx.fillText("Son fiyat: "+xPrice(last.close),right-300,top-12);
-  ctx.fillStyle=data.change>=0?"#2bd7a4":"#ff6075";ctx.font="bold 26px sans-serif";
-  ctx.fillText("Değişim: "+data.change.toFixed(2)+"%",35,645);
-  ctx.fillStyle="#d2dfed";ctx.font="20px sans-serif";
-  ctx.fillText("EMA7: "+xPrice(data.ema7)+" | EMA25: "+xPrice(data.ema25)+" | Hacim: "+data.volumeRatio.toFixed(2)+"x",35,682);
-  ctx.font="16px sans-serif";ctx.fillStyle="#a7b8cc";ctx.fillText("Teknik gözlem; yükselişin kesin nedeni veya yatırım tavsiyesi değildir.",35,709);
+  const base=rows.slice(0,Math.min(15,rows.length-5));
+  const baseHigh=Math.max(...base.map(x=>x.high)),baseLow=Math.min(...base.map(x=>x.low));
+  const breakoutIndex=rows.findIndex((bar,i)=>i>=base.length&&bar.close>baseHigh);
+  const peakIndex=rows.findIndex(x=>x.high===max);
+  const annotations=[];
+  if(baseLow>0&&(baseHigh/baseLow-1)*100<=12&&breakoutIndex>=0){
+    annotations.push({i:breakoutIndex,price:rows[breakoutIndex].high,label:"Sıkışma sonrası kırılım"});
+  }
+  const highestVolumeIndex=rows.findIndex(x=>x.volume===maxVol);
+  if(highestVolumeIndex>=0)annotations.push({i:highestVolumeIndex,price:rows[highestVolumeIndex].high,label:"Hacim zirvesi"});
+  if(peakIndex>=0)annotations.push({i:peakIndex,price:max,label:"Dönem zirvesi"});
+  const colors=["#f6c950","#2bd7a4","#77b8ff"];
+  annotations.slice(0,3).forEach((a,k)=>{
+    const xx=left+(a.i+.5)*step,yy=y(a.price);
+    ctx.strokeStyle=colors[k];ctx.lineWidth=2;ctx.beginPath();ctx.arc(xx,yy,7,0,Math.PI*2);ctx.stroke();
+    const bx=k===0?left+15:k===1?left+340:left+670;
+    const by=top+20+(k%2)*45;
+    ctx.beginPath();ctx.moveTo(xx,yy-9);ctx.lineTo(bx+15,by+8);ctx.stroke();
+    ctx.fillStyle="#102c40";ctx.fillRect(bx,by-22,Math.min(295,ctx.measureText(a.label).width+35),34);
+    ctx.fillStyle=colors[k];ctx.font="bold 17px sans-serif";ctx.fillText(a.label,bx+8,by);
+  });
+  ctx.fillStyle=data.change>=0?"#2bd7a4":"#ff6178";ctx.font="bold 26px sans-serif";
+  ctx.fillText("Dönem değişimi: "+(data.change>=0?"+":"")+data.change.toFixed(2)+"%",32,624);
+  ctx.fillStyle="#e0ebf5";ctx.font="19px sans-serif";
+  ctx.fillText("EMA7 "+xPrice(data.ema7)+"  |  EMA25 "+xPrice(data.ema25)+"  |  Son mum hacmi "+data.volumeRatio.toFixed(2)+"x",32,662);
+  ctx.fillStyle="#9eb3c8";ctx.font="16px sans-serif";
+  ctx.fillText("İşaretler teknik gözlemdir; yükselişin kesin nedeni veya yatırım tavsiyesi değildir.",32,701);
 }
 async function xMakeChart(symbol,exchange) {
   xManagerStatus.textContent="Gerçek USDT mumları yükleniyor...";
@@ -2584,6 +2606,7 @@ async function xMakeChart(symbol,exchange) {
   if(!response.ok)throw Error(data.error||"Grafik verisi alınamadı");
   xChartDraw(data);
   xChartPanel.hidden=false;
+  document.querySelector("#xShareWithChart").hidden = false;
   const coinTag="#"+data.symbol.split("/")[0].replace(/[^A-Z0-9]/g,"");
   const notes=data.notes.slice(0,2).join(" ");
   xSetText("TradeRadar | "+data.symbol+"\n"+data.exchange+" günlük USDT grafiği: "+(data.change>=0?"+":"")+data.change.toFixed(2)+"%.\n"+notes+"\nTeknik gözlemdir, yatırım tavsiyesi değildir.\n"+coinTag);
@@ -2616,4 +2639,35 @@ document.querySelector("#xCopyPost").addEventListener("click",async()=>{
 document.querySelector("#xOpenComposer").addEventListener("click",()=>{
   if(!xPostText.value.trim()){xManagerStatus.textContent="Önce taslak oluşturun.";return;}
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(xFinalText()),"_blank","noopener,noreferrer");
+});
+
+document.querySelector("#xShareWithChart").addEventListener("click", async () => {
+  const button=document.querySelector("#xShareWithChart");
+  button.disabled=true;
+  try {
+    const blob=await new Promise(resolve=>xChartCanvas.toBlob(resolve,"image/png"));
+    if(!blob)throw Error("Grafik dosyası oluşturulamadı.");
+    const file=new File([blob],"TradeRadar-USDT.png",{type:"image/png"});
+    const message=xFinalText();
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      try {
+        await navigator.share({files:[file],text:message,title:"TradeRadar Teknik Analiz"});
+        xManagerStatus.textContent="Paylaşım menüsü açıldı. X'i seçip gönderiyi kontrol edin.";
+        return;
+      } catch(error) {
+        if(error.name==="AbortError"){xManagerStatus.textContent="Paylaşım iptal edildi.";return;}
+      }
+    }
+    const link=document.createElement("a");
+    link.href=xChartCanvas.toDataURL("image/png");
+    link.download="TradeRadar-USDT.png";
+    link.click();
+    try {await navigator.clipboard.writeText(message);} catch {}
+    window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(message),"_blank","noopener,noreferrer");
+    xManagerStatus.textContent="Grafik indirildi, X metin ekranı açıldı. PNG görselini gönderiye ekleyin.";
+  } catch(error) {
+    xManagerStatus.textContent="Grafik paylaşımı başarısız: "+error.message;
+  } finally {
+    button.disabled=false;
+  }
 });
