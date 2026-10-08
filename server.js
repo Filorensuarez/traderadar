@@ -7029,6 +7029,39 @@ await notifyScenarioChanges(
       false;
   }
 }
+/* =========================
+   ERKEN HAREKET PUSH BİLDİRİMİ
+========================= */
+const earlyAlertSeen = new Map();
+let earlyAlertPrimed = false;
+async function notifyEarlyRadar(rows) {
+  const now = Date.now();
+  const active = Array.isArray(rows)
+    ? rows.filter(row => row.earlyWatch && row.dataFresh && Number(row.earlyScore) >= 80)
+    : [];
+  // İlk taramada mevcut sinyalleri kaydet; eski sinyallerle bildirim yağdırma.
+  for (const row of active) {
+    const key = String(row.source || "") + ":" + String(row.symbol || "");
+    const lastSent = earlyAlertSeen.get(key) || 0;
+    if (earlyAlertPrimed && now - lastSent >= 30 * 60 * 1000) {
+      await sendPush({
+        title: "TradeRadar • Erken Hareket",
+        body: row.symbol + " • " + row.source +
+          " • Hazırlık " + row.earlyScore + "/100" +
+          " • Hacim " + Number(row.volumeAcceleration || 0).toFixed(2) + "x" +
+          " • Kırılım öncesi izleme, garanti değildir.",
+        tag: "early-" + key,
+        url: "/#radar"
+      });
+    }
+    earlyAlertSeen.set(key, now);
+  }
+  earlyAlertPrimed = true;
+  for (const [key, timestamp] of earlyAlertSeen) {
+    if (now - timestamp > 2 * 60 * 60 * 1000) earlyAlertSeen.delete(key);
+  }
+}
+
 async function scanMinuteRadar() {
 
   if (minuteRadarScanning) {
@@ -7429,6 +7462,8 @@ async function scanMinuteRadar() {
         exchangeStatus
     };
 
+
+    await notifyEarlyRadar(finalResults);
 
     console.log(
       `Anlık radar: ${minuteRadarCache.scanned} tarama / ${finalResults.length} aktif sinyal`
@@ -7927,3 +7962,21 @@ setInterval(
   },
   2 * 60 * 1000
 );
+
+/* Sunucuda otomatik erken hareket taraması.
+   Tam piyasa REST taraması uzun sürebileceği için üst üste başlatılmaz.
+   Bir sonraki tur, önceki tur bittikten sonra planlanır. */
+let backgroundMinuteRadarEnabled = true;
+async function backgroundMinuteRadarLoop() {
+  if (!backgroundMinuteRadarEnabled) return;
+  try {
+    if (!minuteRadarScanning) await scanMinuteRadar();
+  } catch (error) {
+    console.error("Erken hareket arka plan taraması:", error.message);
+  } finally {
+    if (backgroundMinuteRadarEnabled) {
+      setTimeout(backgroundMinuteRadarLoop, 3 * 60 * 1000);
+    }
+  }
+}
+setTimeout(backgroundMinuteRadarLoop, 45 * 1000);
