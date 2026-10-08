@@ -1787,6 +1787,11 @@ function renderScenarios(data) {
   const noScan = !scannedKnown || scanned === 0 || errors.length > 0 && !found.size;
   scenarioStatus.textContent = "Kaynak: " + (data.exchange || "bilinmiyor") + " | Taranan: " + (scannedKnown ? scanned : "bilinmiyor") +
     " | İzlenecek: " + rows.length + " | Son kontrol: " + new Date().toLocaleTimeString("tr-TR");
+  if (Number.isFinite(Number(data.universeTotal)) && data.universeTotal > 0) {
+    scenarioStatus.textContent += " | İlerleme: " + Number(data.processed || 0) + "/" + Number(data.universeTotal) +
+      " | Başarısız: " + Number(data.failed || 0) +
+      (data.complete ? " | Tur tamamlandı" : " | Tarama devam ediyor");
+  }
   if (noScan) {
     scenarioResults.innerHTML = '<div class="empty-card">Henüz coin taraması doğrulanamadı. Sonuç yok ifadesi geçerli değildir. Veri kaynağını ve sunucu kayıtlarını kontrol edin.</div>';
     if (errors.length) scenarioStatus.textContent += " | " + errors.join(" • ");
