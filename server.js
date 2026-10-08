@@ -7577,6 +7577,49 @@ app.get("/api/x/chart", async (req, res) => {
     const volumeRatio = previousVolume > 0 ? volumes.at(-1) / previousVolume : 0;
     const ema7 = ema(closes,7), ema25 = ema(closes,25);
     const change = (lastPrice / first - 1) * 100;
+    // Yalnızca geçmiş mumlardan türetilmiş teyitli salınım seviyeleri.
+    const pivotHighs = [], pivotLows = [];
+    for (let i = 2; i < rows.length - 2; i++) {
+      const window = rows.slice(i - 2, i + 3);
+      if (rows[i].high === Math.max(...window.map(v => v.high))) pivotHighs.push({ index:i, price:rows[i].high });
+      if (rows[i].low === Math.min(...window.map(v => v.low))) pivotLows.push({ index:i, price:rows[i].low });
+    }
+    const currentPrice = lastPrice;
+    const clusterLevels = (pivots) => {
+      const sorted = [...pivots].sort((a,b) => a.price - b.price);
+      const clusters = [];
+      for (const pivot of sorted) {
+        const near = clusters.find(g => Math.abs(g.price-pivot.price)/pivot.price < 0.012);
+        if (near) {
+          near.price = (near.price * near.count + pivot.price)/(near.count+1);
+          near.count++;
+        } else clusters.push({price:pivot.price,count:1});
+      }
+      return clusters;
+    };
+    const supports = clusterLevels(pivotLows).filter(v => v.price < currentPrice).sort((a,b)=>b.price-a.price).slice(0,2);
+    const resistances = clusterLevels(pivotHighs).filter(v => v.price > currentPrice).sort((a,b)=>a.price-b.price).slice(0,2);
+    // Son 6-20 mum içinde, önceki 20 mumluk aralığa göre daralan ve
+    // ardından yukarı kırılan en güncel bölgeyi seç.
+    let compression = null;
+    for (let end = rows.length - 4; end >= 9; end--) {
+      for (let length = 6; length <= 16 && end-length >= 0; length++) {
+        const segment = rows.slice(end-length,end);
+        const segmentHigh = Math.max(...segment.map(v=>v.high));
+        const segmentLow = Math.min(...segment.map(v=>v.low));
+        const pct = (segmentHigh/segmentLow-1)*100;
+        const prior = rows.slice(Math.max(0,end-length-15),end-length);
+        const priorRange = prior.length >= 6
+          ? (Math.max(...prior.map(v=>v.high))/Math.min(...prior.map(v=>v.low))-1)*100 : null;
+        const after = rows.slice(end,Math.min(rows.length,end+6));
+        const broke = after.some(v=>v.close > segmentHigh);
+        if (pct <= 9 && priorRange !== null && pct < priorRange*.75 && broke) {
+          compression = {start:end-length,end:end-1,low:segmentLow,high:segmentHigh,breakoutIndex:end+after.findIndex(v=>v.close>segmentHigh)};
+          break;
+        }
+      }
+      if(compression) break;
+    }
     const technicalNotes = [];
     if (ema7 > ema25) technicalNotes.push("EMA7, EMA25 üzerinde: kısa vadeli eğilim pozitif.");
     else technicalNotes.push("EMA7, EMA25 altında: kısa vadeli eğilim zayıf.");
@@ -7584,7 +7627,7 @@ app.get("/api/x/chart", async (req, res) => {
     else technicalNotes.push("Son mumda belirgin hacim sıçraması doğrulanmadı.");
     if (change > 0) technicalNotes.push("İncelenen dönemde fiyat %" + change.toFixed(2) + " yükseldi.");
     else technicalNotes.push("İncelenen dönemde fiyat %" + Math.abs(change).toFixed(2) + " geriledi.");
-    res.json({ ok:true, symbol:base+"/USDT", exchange, timeframe:"1D", candles:rows,
+    res.json({ ok:true, symbol:base+"/USDT", exchange, timeframe:"1D", candles:rows, supports, resistances, compression,
       price:lastPrice, change, high, low, ema7, ema25, volumeRatio, notes:technicalNotes,
       disclaimer:"Teknik gözlemdir; kesin neden veya yatırım önerisi değildir." });
   } catch (error) {
