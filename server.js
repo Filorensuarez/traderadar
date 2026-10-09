@@ -3,6 +3,7 @@ import webpush from "web-push";
 import fs from "fs";
 import { detectMinutePatterns } from "./minute-patterns.js";
 import { buildDecisionPlans } from "./decision-engine.js";
+import { analyzeMediumTrend } from "./medium-trend.js";
 import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 const app = express();
@@ -7579,6 +7580,29 @@ async function scanMinuteRadar() {
 app.get("/api/signal-statistics", (req,res)=>{
   res.set("Cache-Control","no-store");
   res.json(getSignalStatistics());
+});
+
+// Medium-term research uses completed UTC daily candles and existing public exchange APIs.
+app.get("/api/medium-trend",async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  const raw=String(req.query.symbol||"").toUpperCase().trim();
+  const source=String(req.query.exchange||"OKX").toUpperCase();
+  const symbol=raw.replace(/[-_/](USDT|TRY)$/,"").replace(/[^A-Z0-9]/g,"");
+  if(!/^[A-Z0-9]{2,20}$/.test(symbol)||!["OKX","KUCOIN","GATE"].includes(source))
+    return res.status(400).json({ok:false,error:"Geçersiz coin veya borsa."});
+  try{
+    const pair=source==="GATE"?symbol+"_USDT":symbol+"-USDT";
+    const candles=source==="OKX"?await getCandles(pair):
+      source==="KUCOIN"?await getKucoinCandles(pair):await getGateCandles(pair);
+    // Exclude today's unfinished UTC daily candle.
+    const utcStart=Math.floor(Date.now()/86400000)*86400000;
+    const closed=candles.filter(x=>Number(x.time)<utcStart);
+    const result=analyzeMediumTrend(closed);
+    if(!result)return res.json({ok:true,symbol:symbol+"/USDT",exchange:source,
+      status:"VERİ YETERSİZ",reason:"En az 105 tamamlanmış günlük mum gerekli."});
+    return res.json({ok:true,symbol:symbol+"/USDT",exchange:source,...result,
+      note:"Geçmiş tamamlanmış mumların teknik yorumu; kesin yükseliş tahmini değildir."});
+  }catch(e){return res.status(502).json({ok:false,error:"Borsa verisi alınamadı.",detail:e.message});}
 });
 
 app.get("/api/decision-plans",(req,res)=>{
