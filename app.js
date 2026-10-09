@@ -2555,6 +2555,16 @@ async function loadSignalStatistics(){
     const response=await fetch("/api/signal-statistics",{cache:"no-store"});
     if(!response.ok)throw Error("HTTP "+response.status);
     const data=await response.json();
+    const prep=data.groups?.prepump;
+    const prepEl=document.querySelector("#prepumpStats");
+    if(prepEl){
+      prepEl.textContent=prep?.evaluated?
+        "Başarı: %"+prep.accuracyPercent+" | Ölçülen: "+prep.evaluated+
+        " | Başarılı: "+prep.successful+" | Başarısız: "+prep.failed+
+        " | Bekleyen: "+prep.pending+
+        " | Ortalama 15 dk değişim: %"+prep.averageReturnPercent:
+        "Henüz sonuçlanmış erken formasyon sinyali yok. Bekleyen: "+(prep?.pending||0);
+    }
     const fmt=n=>Number.isFinite(Number(n))?Number(n).toLocaleString("tr-TR",{maximumFractionDigits:2}):"-";
     statsCards.innerHTML=["daily","radar","scenario"].map(key=>{
       const g=data.groups?.[key]||{};
