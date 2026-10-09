@@ -100,6 +100,7 @@ function openView(view) {
     view === "scenario";
 
   const xmanager = view === "xmanager";
+  const decision = view === "decision";
 
 
   dailySection.hidden =
@@ -115,6 +116,7 @@ function openView(view) {
     !scenario;
 
   document.querySelector("#xmanager").hidden = !xmanager;
+  document.querySelector("#decision").hidden = !decision;
 
 
   dailyButton.classList.toggle(
@@ -138,6 +140,8 @@ function openView(view) {
   );
 
   document.querySelector("#xManagerButton").classList.toggle("active", xmanager);
+  document.querySelector("#decisionButton").classList.toggle("active", decision);
+  if (decision) loadDecisionPlans();
 
 
   if (long) loadSignalStatistics();
@@ -167,6 +171,7 @@ function openView(view) {
   }
 }
 document.querySelector("#xManagerButton").addEventListener("click", () => openView("xmanager"));
+document.querySelector("#decisionButton").addEventListener("click",()=>openView("decision"));
 
 dailyButton.addEventListener(
   "click",
@@ -2551,3 +2556,40 @@ async function loadSignalStatistics(){
   finally{statsLoading=false;statsRefreshButton.disabled=false;}
 }
 statsRefreshButton.addEventListener("click",loadSignalStatistics);
+
+/* SANAL ALIM KARAR MOTORU */
+let decisionBusy=false;
+async function loadDecisionPlans(){
+  if(decisionBusy)return;
+  decisionBusy=true;
+  const status=document.querySelector("#decisionStatus");
+  const cards=document.querySelector("#decisionCards");
+  const btn=document.querySelector("#decisionRefresh");
+  btn.disabled=true;status.textContent="Güncel sinyal eşleşmeleri kontrol ediliyor...";
+  try {
+    const r=await fetch("/api/decision-plans",{cache:"no-store"});
+    if(!r.ok)throw Error("HTTP "+r.status);
+    const d=await r.json();
+    const fmt=n=>Number(n).toLocaleString("en-US",{maximumSignificantDigits:8});
+    status.textContent=d.reason||d.status;
+    cards.replaceChildren();
+    if(!d.rows?.length){
+      const p=document.createElement("p");p.className="empty-card";
+      p.textContent="Şu anda bütün koşulları sağlayan sanal işlem planı yok. Sinyal yokken beklemek normaldir.";
+      cards.append(p);
+    }
+    for(const x of d.rows||[]){
+      const card=document.createElement("article");card.className="coin-card";
+      const heading=document.createElement("h3");heading.textContent=x.symbol+" • "+x.source;
+      const p=document.createElement("p");
+      p.textContent="Sanal giriş: "+fmt(x.entry)+" USDT | Zarar-kes: "+fmt(x.stop)+" | Hedef: "+fmt(x.target);
+      const q=document.createElement("p");
+      q.textContent="Risk: %"+x.riskPercent+" | Risk/getiri: 1:"+x.riskReward+" | Günlük: "+x.dailyScore+"/100 | Anlık: "+x.radarScore+"/100";
+      const warning=document.createElement("p");
+      warning.textContent=x.status+" • "+(x.warnings||[]).join(" ");
+      card.append(heading,p,q,warning);cards.append(card);
+    }
+  } catch(e){status.textContent="Planlar alınamadı: "+e.message;}
+  finally{decisionBusy=false;btn.disabled=false;}
+}
+document.querySelector("#decisionRefresh").addEventListener("click",loadDecisionPlans);
