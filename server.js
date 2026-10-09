@@ -7565,6 +7565,11 @@ async function scanMinuteRadar() {
 
     await notifyEarlyMovement(minuteRadarCache.rows);
 
+    // Ölçüm: yalnız kırılım öncesi hazırlık sinyalleri, geç gelen teyitler değil.
+    recordSignals("prepump", finalResults.filter(row =>
+      row.dataFresh && row.setupPhase === "PRE_BREAKOUT" &&
+      Number(row.setupScore)>=70 && !row.lateMove));
+
     recordSignals("radar", finalResults.filter(row => row.dataFresh && !row.lateMove && (row.earlyWatch || (row.stageNumber >= 2 && row.score >= 70))));
 
     console.log(
