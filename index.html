@@ -329,6 +329,13 @@
       <button type="button" class="refresh-button" id="decisionRefresh">Planları Yenile</button>
     </div>
     <div class="info-box">
+      <h3>Otomatik Yükseliş Öncesi Tarama</h3>
+      <p>Tüm borsalarda geçmiş sıkışma, azalan hacim, EMA dönüşü ve direnç yakınlığı aranır. Güncel anlık radar teyidi varsa YÜKSELİŞ BAŞLIYOR gösterilir.</p>
+      <button type="button" id="mediumWatchRefresh" class="refresh-button">Tarama Sonuçlarını Yenile</button>
+      <p id="mediumWatchStatus" aria-live="polite">Sonuçlar yükleniyor...</p>
+      <div id="mediumWatchCards" class="coin-grid"></div>
+    </div>
+    <div class="info-box">
       <label for="mediumSymbol">Coin (USDT)</label>
       <input id="mediumSymbol" type="text" value="OGN" maxlength="20" placeholder="OGN" style="max-width:180px;padding:10px;margin:8px"/>
       <select id="mediumExchange" style="padding:10px;margin:8px">
