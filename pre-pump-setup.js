@@ -42,10 +42,15 @@ export function detectPrePumpSetup(input, now=Date.now()) {
   const prevEma7=ema(closes.slice(0,-3),7);
   const prevEma25=ema(closes.slice(0,-3),25);
   const emaTurn=ema7>prevEma7&&ema7>=ema25*.995&&ema25>=prevEma25;
+  // Momentum is measured before a large price extension, not after RSI becomes overbought.
+  const ema12=ema(closes,12),ema26=ema(closes,26);
+  const macdNow=ema12-ema26;
+  const macdBefore=ema(closes.slice(0,-3),12)-ema(closes.slice(0,-3),26);
+  const macdImproving=macdNow>macdBefore;
   const green=recent.filter(c=>c.close>c.open).length;
   const risingLows=recent.at(-1).low>Math.min(...recent.slice(0,-1).map(c=>c.low));
-  const nearResistance=distancePct>=-0.25&&distancePct<=1.5;
-  const compression=oldRangePct<=3.5;
+  const nearResistance=distancePct>=-0.25&&distancePct<=2.0;
+  const compression=oldRangePct<=4.0;
   const accumulation=compression&&green>=3&&risingLows;
   const closeLocation=(last.close-last.low)/Math.max(last.high-last.low,last.close*.000001);
   const breakout=last.close>oldHigh*1.001&&closeLocation>=.65;
@@ -54,13 +59,14 @@ export function detectPrePumpSetup(input, now=Date.now()) {
   const change15=(last.close/candles.at(-16).close-1)*100;
   const extended=change5>=3||change15>=7;
   const sellPressure=last.close<last.open&&volNow>=2&&closeLocation<.3;
-  const score=(compression?20:0)+(accumulation?15:0)+(emaTurn?20:0)+
-    (volumeRatio>=1.5?20:0)+(nearResistance?15:0)+(breakout?10:0);
+  const score=(compression?20:0)+(accumulation?15:0)+(emaTurn?15:0)+
+    (volumeRatio>=1.4?20:0)+(nearResistance?15:0)+(macdImproving?10:0)+(breakout?5:0);
   const reasons=[
     compression?"30 dakikalık sıkışma":null,
     accumulation?"Yükselen dipler ve pozitif mum dizilimi":null,
     emaTurn?"EMA7 yukarı dönüyor, EMA25 destekliyor":null,
-    volumeRatio>=1.5?"Son 3 dakikada hacim artışı":null,
+    volumeRatio>=1.4?"Son 3 dakikada hacim artışı":null,
+    macdImproving?"MACD ivmesi pozitife dönüyor":null,
     nearResistance?"Geçmiş direnç yakınında":null,
     breakout?"Direnç üzerinde güçlü mum kapanışı":null
   ].filter(Boolean);
@@ -73,13 +79,14 @@ export function detectPrePumpSetup(input, now=Date.now()) {
   let setup="BEKLE",setupPhase="NONE";
   if(extended||falseBreakout||sellPressure){
     setup="RİSK YÜKSEK";setupPhase="RISK";
-  }else if(compression&&emaTurn&&volumeRatio>=1.5&&nearResistance&&score>=70){
+  }else if(compression&&emaTurn&&macdImproving&&volumeRatio>=1.4&&nearResistance&&score>=70){
     setup=breakout?"YÜKSELİŞ BAŞLIYOR":"YÜKSELİŞ HAZIRLIĞI";
     setupPhase=breakout?"BREAKOUT":"PRE_BREAKOUT";
   }else if(score>=50){setup="İZLE";setupPhase="WATCH";}
   return {setup,setupPhase,setupScore:score,setupReasons:reasons,setupWarnings:warnings,
     setupResistance:oldHigh,setupDistancePct:Number(distancePct.toFixed(3)),
-    setupVolumeRatio:Number(volumeRatio.toFixed(2)),setupChange5:Number(change5.toFixed(2)),
+    setupVolumeRatio:Number(volumeRatio.toFixed(2)),setupMacdImproving:macdImproving,
+    setupChange5:Number(change5.toFixed(2)),
     setupChange15:Number(change15.toFixed(2)),setupAction:"BEKLE",
     // No 5-minute countdown: OHLCV cannot guarantee the timing of a jump.
     predictedMinutes:null,asOf:last.time};
