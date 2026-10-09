@@ -45,15 +45,17 @@ const pairs=all.filter(x=>String(x.currency_pair).endsWith("_USDT")&&
   .slice(0,maxSymbols).map(x=>x.currency_pair);
 const events=[],controls=[],errors=[];
 const seen=new Set();
+let scannedPairs=0;
 for(let index=0;index<pairs.length;index++){
   const pair=pairs[index];
+  scannedPairs++;
   try{
     const hours=await candles(pair,"1h",START,END-3600000);
     for(const h of hours){
       if(h.time<START||h.time>=END)continue;
       // Coarse filter: the 1-hour high must exceed its opening by >=30%.
       if((h.high/h.open-1)*100<30)continue;
-      const eventId=pair+":"+h.time;
+      const eventId=pair; // require distinct coins, not repeated events from one coin
       if(seen.has(eventId))continue;
       seen.add(eventId);
       const minute=await candles(pair,"1m",h.time-45*60000,h.time+65*60000);
@@ -80,7 +82,7 @@ for(let index=0;index<pairs.length;index++){
 // Controls are needed for false-positive estimates; never equate event-only recall to precision.
 const report={generatedAt:new Date().toISOString(),exchange:"GATE.IO",
   from:new Date(START).toISOString(),to:new Date(END).toISOString(),
-  scannedPairs:Math.min(pairs.length,Math.max(0,errors.length)+pairs.length),
+  scannedPairs,distinctCoins:events.length,
   eventCount:events.length,target,complete:events.length>=target,
   fiveMinuteEarlyAlCount:events.filter(e=>e.mode==="AL").length,
   warning:"Event-only recall is not accuracy. Negative controls and out-of-sample validation required.",
