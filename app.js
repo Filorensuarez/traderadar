@@ -141,7 +141,7 @@ function openView(view) {
 
   document.querySelector("#xManagerButton").classList.toggle("active", xmanager);
   document.querySelector("#decisionButton").classList.toggle("active", decision);
-  if (decision) loadDecisionPlans();
+  if (decision) { loadMediumWatch(); }
 
 
   if (long) loadSignalStatistics();
@@ -2639,3 +2639,47 @@ mediumButton.addEventListener("click",async()=>{
   }catch(e){result.textContent="Analiz yapılamadı: "+e.message;}
   finally{mediumButton.disabled=false;}
 });
+
+/* OTOMATİK ORTA VADELİ FORMASYON TARAMASI */
+let mediumWatchBusy=false;
+async function loadMediumWatch(){
+  if(mediumWatchBusy)return;
+  mediumWatchBusy=true;
+  const status=document.querySelector("#mediumWatchStatus");
+  const cards=document.querySelector("#mediumWatchCards");
+  const button=document.querySelector("#mediumWatchRefresh");
+  button.disabled=true;
+  status.textContent="Son tarama sonuçları alınıyor...";
+  try{
+    const response=await fetch("/api/medium-watch",{cache:"no-store"});
+    if(!response.ok)throw Error("HTTP "+response.status);
+    const data=await response.json();
+    cards.replaceChildren();
+    status.textContent=data.updatedAt?
+      "Son tarama: "+new Date(data.updatedAt).toLocaleString("tr-TR")+
+      " • İncelenen: "+data.scanned+" • Hazırlık adayı: "+data.rows.length:
+      "İlk tam piyasa taraması henüz tamamlanmadı.";
+    for(const item of data.rows||[]){
+      const card=document.createElement("article");card.className="coin-card";
+      const heading=document.createElement("h3");
+      heading.textContent=item.symbol+" • "+item.source+" • "+item.status;
+      const summary=document.createElement("p");
+      summary.textContent="Hazırlık: "+item.score+"/100 | Dirence uzaklık: %"+
+        item.distToResistance+" | Günlük sıkışma: %"+item.rangePct;
+      const detail=document.createElement("p");
+      detail.textContent=(item.reasons||[]).join(" • ");
+      const minute=document.createElement("p");
+      minute.textContent=item.intradayConfirmed?
+        "Güncel dakikalık hacim ve hareket teyidi mevcut.":
+        "Dakikalık hareket teyidi yok; yalnız hazırlık.";
+      card.append(heading,summary,detail,minute);
+      cards.append(card);
+    }
+    if(!data.rows?.length){
+      const p=document.createElement("p");p.textContent="Şu anda uygun hazırlık adayı bulunamadı.";
+      cards.append(p);
+    }
+  }catch(e){status.textContent="Tarama sonuçları alınamadı: "+e.message;}
+  finally{mediumWatchBusy=false;button.disabled=false;}
+}
+document.querySelector("#mediumWatchRefresh").addEventListener("click",loadMediumWatch);
