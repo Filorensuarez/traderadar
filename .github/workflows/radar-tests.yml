@@ -1,0 +1,25 @@
+name: Radar Pattern Tests
+on:
+  push:
+    paths:
+      - 'pre-pump-setup.js'
+      - 'server.js'
+      - 'app.js'
+      - 'tests/pre-pump.test.js'
+      - '.github/workflows/radar-tests.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate syntax
+        run: |
+          node --check pre-pump-setup.js
+          node --check server.js
+          node --check app.js
+      - name: Run tests
+        run: node tests/pre-pump.test.js
