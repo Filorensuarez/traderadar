@@ -2,9 +2,10 @@ import fs from "node:fs";
 const FILE="/data/traderadar-signal-stats-v2.json";
 // v1 kayıtları farklı sinyal türlerini karıştırdığı için korunur ancak v2 istatistiğine katılmaz.
 const WINDOW=36*60*60*1000;
-const HORIZONS={daily:60*60*1000,radar:15*60*1000,scenario:60*60*1000};
+const HORIZONS={daily:60*60*1000,radar:15*60*1000,scenario:60*60*1000,prepump:15*60*1000};
 const GRACE=20*60*1000;
 const COOLDOWN=60*60*1000;
+const PREPUMP_COOLDOWN=60*60*1000;
 let records=[];
 let running=false;
 let lastPriceCheck=0;
@@ -31,17 +32,18 @@ function normBase(v){
   return /^[A-Z0-9]{1,20}$/.test(s)?s:null;
 }
 export function recordSignals(group,rows,when=Date.now()){
-  if(!["daily","radar","scenario"].includes(group)||!Array.isArray(rows))return;
+  if(!["daily","radar","scenario","prepump"].includes(group)||!Array.isArray(rows))return;
   let changed=false;
-  for(const row of rows.slice(0,80)){
+  for(const row of rows.slice(0,group==="prepump"?300:80)){
     const source=normSource(row.source||row.exchange);
     const base=normBase(row.symbol||row.pair);
     const price=Number(row.price);
     if(!source||!base||!Number.isFinite(price)||price<=0)continue;
     const key=group+":"+source+":"+base;
-    if(records.some(x=>x.key===key&&when-x.time<COOLDOWN))continue;
+    if(records.some(x=>x.key===key&&when-x.time<(group==="prepump"?PREPUMP_COOLDOWN:COOLDOWN)))continue;
     records.push({key,group,source,base,time:when,entry:price,
-      score:Number.isFinite(Number(row.score))?Number(row.score):null,
+      score:Number.isFinite(Number(group==="prepump"?row.setupScore:row.score))?Number(group==="prepump"?row.setupScore:row.score):null,
+      signalType:group==="prepump"?row.setupPhase:null,
       result:null,exit:null,exitTime:null,status:"pending"});
     changed=true;
   }
@@ -106,8 +108,8 @@ export async function updateOutcomes(){
 }
 export function getSignalStatistics(){
   const now=Date.now(),since=now-WINDOW;
-  const groups=["daily","radar","scenario"];
-  const result={windowHours:36,horizonMinutesByGroup:{daily:60,radar:15,scenario:60},successThresholdPercent:0.5,
+  const groups=["daily","radar","scenario","prepump"];
+  const result={windowHours:36,horizonMinutesByGroup:{daily:60,radar:15,scenario:60,prepump:15},successThresholdPercent:0.5,
     generatedAt:now,lastPriceCheck,lastError,startedAt:records.length?Math.min(...records.map(x=>x.time)):null,groups:{}};
   for(const group of groups){
     const all=records.filter(x=>x.group===group&&x.time>=since);
