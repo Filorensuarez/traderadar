@@ -73,6 +73,7 @@
     Yükseliş Senaryosu
   </button>
 
+  <button id="decisionButton" class="tab" type="button" data-view="decision">Alım Karar Motoru</button>
   <button id="longButton" class="tab" data-view="long" type="button">36 Saatlik Başarı İstatistikleri</button>
 </nav>
     <main class="container">
@@ -320,6 +321,16 @@
       <p>Başarı oranı yalnız sonucu doğrulanmış sinyaller üzerinden hesaplanır. İlgili değerlendirme süresi dolmayan veya fiyatı doğrulanamayan sinyaller başarı/başarısızlık hesabına katılmaz.</p>
       <p>Bu ölçüm işlem getirisi veya bir sonraki sinyalin kazanma olasılığı değildir. Ölçüm, kayıt sistemi kurulduktan sonra oluşan sinyallerle başlar ve son 36 saati kapsar.</p>
     </div>
+  </section>
+  <section id="decision" hidden>
+    <div class="section-head">
+      <div><h2>Alım Karar Motoru – Sanal İşlem</h2>
+      <p class="description">Günlük teyit ve anlık radar aynı coinde uyuşursa varsayımsal giriş, zarar-kes ve hedef hesaplanır. Gerçek emir verilmez.</p></div>
+      <button type="button" class="refresh-button" id="decisionRefresh">Planları Yenile</button>
+    </div>
+    <p id="decisionStatus" aria-live="polite">Sanal işlem planları henüz yüklenmedi.</p>
+    <div id="decisionCards" class="coin-grid"></div>
+    <div class="info-box">Fiyatlar gerçek alış/satış teklifi değildir. Komisyon, kayma ve emir defteri teyidi bulunmadığı için burada görülen planlar doğrudan alım emri sayılmaz.</div>
   </section>
   </main>
 
