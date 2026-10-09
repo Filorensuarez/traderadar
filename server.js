@@ -3,7 +3,7 @@ import webpush from "web-push";
 import fs from "fs";
 import { detectMinutePatterns } from "./minute-patterns.js";
 import { buildDecisionPlans } from "./decision-engine.js";
-import { analyzeMediumTrend } from "./medium-trend.js";
+import { analyzeMediumTrend, detectMediumPreBreakout } from "./medium-trend.js";
 import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 const app = express();
@@ -5745,6 +5745,8 @@ reasons
    PİYASA TARAMASI
 ========================= */
 
+let mediumWatchCache={updatedAt:0,scanned:0,rows:[]};
+
 async function scanMarket() {
 
   if (scanning) {
@@ -5752,6 +5754,19 @@ async function scanMarket() {
   }
 
   scanning = true;
+  const mediumCandidates=[];
+  let mediumScanned=0;
+  const utcDayStart=Math.floor(Date.now()/86400000)*86400000;
+  function collectMedium(symbol,source,candles){
+    const closed=candles.filter(x=>Number(x.time)<utcDayStart);
+    const setup=detectMediumPreBreakout(closed);
+    if(!setup)return;
+    mediumScanned++;
+    if(setup.score>=50 && setup.status!=="GEÇ KALINDI"){
+      mediumCandidates.push({symbol:String(symbol).replace(/[-_]USDT$/,"/USDT"),
+        source,...setup});
+    }
+  }
 
   console.log(
     "Bağımsız borsa taraması başladı."
@@ -5796,6 +5811,7 @@ async function scanMarket() {
                   await getCandles(
                     symbol
                   );
+                collectMedium(symbol,"OKX",candles);
 
                 const result =
                   analyze(
@@ -5902,6 +5918,7 @@ try {
               await getKucoinCandles(
                 item.symbol
               );
+                collectMedium(item.symbol,"KUCOIN",candles);
 
             const base =
               item.symbol.replace(
@@ -6014,6 +6031,7 @@ try {
               await getGateCandles(
                 item.symbol
               );
+                collectMedium(item.symbol,"GATE",candles);
 
             const base =
               item.symbol.replace(
@@ -6181,6 +6199,11 @@ const gateCandidates =
     /* =========================
        CACHE
     ========================= */
+
+    mediumWatchCache={
+      updatedAt:Date.now(),scanned:mediumScanned,
+      rows:mediumCandidates.sort((a,b)=>b.score-a.score).slice(0,100)
+    };
 
     recordSignals("daily", [...okxResults, ...kucoinResults, ...gateResults].filter(row => row.confirmed));
 
@@ -7580,6 +7603,12 @@ async function scanMinuteRadar() {
 app.get("/api/signal-statistics", (req,res)=>{
   res.set("Cache-Control","no-store");
   res.json(getSignalStatistics());
+});
+
+app.get("/api/medium-watch",(req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json({ok:mediumWatchCache.updatedAt>0,...mediumWatchCache,
+    note:"Tamamlanmış günlük mumlarla hazırlık taraması; yükseliş garantisi değildir."});
 });
 
 // Medium-term research uses completed UTC daily candles and existing public exchange APIs.
