@@ -6153,7 +6153,7 @@ const gateCandidates =
        CACHE
     ========================= */
 
-    recordSignals("daily", [...okxResults, ...kucoinResults, ...gateResults]);
+    recordSignals("daily", [...okxResults, ...kucoinResults, ...gateResults].filter(row => row.confirmed));
 
     cache = {
 
@@ -7010,7 +7010,7 @@ await notifyScenarioChanges(
   scenarioCache
 );
     
-    recordSignals("scenario", [...scenario1Rows, ...scenario2Rows, ...scenario3Rows, ...scenario4Rows]);
+    recordSignals("scenario", [...scenario1Rows, ...scenario2Rows, ...scenario3Rows, ...scenario4Rows].filter(row => Number(row.score) >= 70));
 
     console.log(
       `Senaryolar: ${scanned} coin | S1 ${scenario1Rows.length} | S2 ${scenario2Rows.length} | S3 ${scenario3Rows.length} | S4 ${scenario4Rows.length}`
@@ -7510,7 +7510,7 @@ async function scanMinuteRadar() {
 
     await notifyEarlyMovement(minuteRadarCache.rows);
 
-    recordSignals("radar", minuteRadarCache.rows);
+    recordSignals("radar", finalResults.filter(row => row.dataFresh && !row.lateMove && (row.earlyWatch || (row.stageNumber >= 2 && row.score >= 70))));
 
     console.log(
       `Anlık radar: ${minuteRadarCache.scanned} tarama / ${finalResults.length} aktif sinyal`
