@@ -44,14 +44,7 @@
     Günlük Yükseliş Teyidi
   </button>
 
-  <button
-    id="longButton"
-    class="tab"
-    data-view="long"
-    type="button"
-  >
-    Uzun Vadeli Yükseliş
-  </button>
+
 
   <button
     id="radarButton"
@@ -80,6 +73,7 @@
     Yükseliş Senaryosu
   </button>
 
+  <button id="longButton" class="tab" data-view="long" type="button">36 Saatlik Başarı İstatistikleri</button>
 </nav>
     <main class="container">
 
@@ -177,36 +171,6 @@
 
     </section>
 
-
-    <!-- =========================
-         2. BÖLÜM
-         UZUN VADELİ YÜKSELİŞ
-    ========================== -->
-
-    <section
-      id="long"
-      hidden
-    >
-
-      <h2>
-        Uzun Vadeli Yükseliş
-      </h2>
-
-      <div class="coming-soon">
-
-        <h3>
-          Hazırlanıyor
-        </h3>
-
-        <p>
-          Bu bölümde uzun vadeli
-          yükseliş potansiyeli bulunan
-          coinler ayrıca analiz edilecek.
-        </p>
-
-      </div>
-
-    </section>
 
     <!-- =========================
      ANLIK YÜKSELİŞ RADARI
@@ -342,6 +306,21 @@
   </div>
   <p class="description">Paylaşımlar sizin onayınızla yapılır. Teknik analiz kesin kazanç veya fiyat hareketinin kesin nedeni değildir.</p>
 </section>
+  <section id="long" hidden>
+    <div class="section-head">
+      <div>
+        <h2>36 Saatlik Sinyal Başarı İstatistikleri</h2>
+        <p class="description">Üç sistemin gerçek sinyalleri ayrı ölçülür. Sonuç, sinyalden yaklaşık 60 dakika sonraki fiyatın en az %0,5 yükselmesine göre hesaplanır.</p>
+      </div>
+      <button type="button" id="statsRefreshButton" class="refresh-button">İstatistikleri Yenile</button>
+    </div>
+    <p id="statsStatus" class="updated" aria-live="polite">İstatistikler yükleniyor...</p>
+    <div id="statsCards" class="coin-grid"></div>
+    <div class="info-box">
+      <p>Başarı oranı yalnız sonucu doğrulanmış sinyaller üzerinden hesaplanır. Henüz 60 dakika geçmeyen veya fiyatı doğrulanamayan sinyaller başarı/başarısızlık hesabına katılmaz.</p>
+      <p>Bu istatistik bir sonraki sinyalin kazanma olasılığı değildir. Ölçüm, kayıt sistemi kurulduktan sonra oluşan sinyallerle başlar ve son 36 saati kapsar.</p>
+    </div>
+  </section>
   </main>
 
 
