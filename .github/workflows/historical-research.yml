@@ -1,5 +1,9 @@
 name: Historical 30pct Event Research
 on:
+  push:
+    paths:
+      - 'research/collect-gate-events.js'
+      - '.github/workflows/historical-research.yml'
   workflow_dispatch:
     inputs:
       max_symbols:
@@ -28,8 +32,8 @@ jobs:
           node --check minute-patterns.js
       - name: Download historical candles and analyze
         env:
-          MAX_SYMBOLS: ${{ inputs.max_symbols }}
-          EVENT_TARGET: ${{ inputs.event_target }}
+          MAX_SYMBOLS: ${{ inputs.max_symbols || '250' }}
+          EVENT_TARGET: ${{ inputs.event_target || '100' }}
         run: node research/collect-gate-events.js
       - name: Upload verified research results
         uses: actions/upload-artifact@v4
