@@ -864,6 +864,15 @@ function minuteRadarCard(item) {
 
 
       <div class="info-box" style="margin:12px 0">
+        <p>GMT/OGN Erken Formasyon: ${String(item.setup || "BEKLE").replace(/[<>&"]/g,"")}</p>
+        <p>Formasyon hazırlığı: ${number(item.setupScore || 0,0)}/100 • Hacim oranı: ${number(item.setupVolumeRatio || 0,2)}x</p>
+        <p>Dirence uzaklık: ${Number.isFinite(Number(item.setupDistancePct)) ? number(item.setupDistancePct,2)+"%" : "Veri yok"}</p>
+        <p>${(Array.isArray(item.setupReasons)?item.setupReasons:[]).map(x=>String(x).replace(/[<>&"]/g,"")).join(" • ") || "Hazırlık koşulları henüz yeterli değil."}</p>
+        <p>${(Array.isArray(item.setupWarnings)?item.setupWarnings:[]).map(x=>String(x).replace(/[<>&"]/g,"")).join(" • ")}</p>
+        <small>YÜKSELİŞ HAZIRLIĞI, kırılım öncesi izleme durumudur. Garanti veya alım emri değildir.</small>
+      </div>
+
+      <div class="info-box" style="margin:12px 0">
         <p>Erken Hareket: ${item.earlyWatch && item.dataFresh ? "HAZIRLIK TESPİT EDİLDİ" : "Hazırlık teyidi yok"}</p>
         <p>Hazırlık puanı: ${number(item.earlyScore || 0,0)}/100 • Formasyon puanı: ${number(item.patternScore || 0,0)}/100</p>
         <p>${(Array.isArray(item.earlyReasons)?item.earlyReasons:[]).map(x=>String(x).replace(/[<>&"]/g,"")).join(" • ") || "Hazırlık koşulları tamamlanmadı"}</p>
@@ -1198,6 +1207,8 @@ function renderMinuteRadar(data) {
   // Her coin/borsa tek kartta: hazırlık, formasyon ve teknik mod birlikte.
   // Aynı coin farklı borsadaysa farklı likidite/fiyat nedeniyle ayrı tutulur.
   const ordered = [...rows].sort((a,b) =>
+    Number(b.setupPhase === "PRE_BREAKOUT" || b.setupPhase === "BREAKOUT") -
+    Number(a.setupPhase === "PRE_BREAKOUT" || a.setupPhase === "BREAKOUT") ||
     Number(Boolean(b.earlyWatch && b.dataFresh)) -
     Number(Boolean(a.earlyWatch && a.dataFresh)) ||
     Number(b.score || 0) - Number(a.score || 0)
