@@ -73,7 +73,7 @@
     Yükseliş Senaryosu
   </button>
 
-  <button id="decisionButton" class="tab" type="button" data-view="decision">Alım Karar Motoru</button>
+  <button id="decisionButton" class="tab" type="button" data-view="decision">Orta Vadeli Yükseliş</button>
   <button id="longButton" class="tab" data-view="long" type="button">36 Saatlik Başarı İstatistikleri</button>
 </nav>
     <main class="container">
@@ -324,9 +324,18 @@
   </section>
   <section id="decision" hidden>
     <div class="section-head">
-      <div><h2>Alım Karar Motoru – Sanal İşlem</h2>
-      <p class="description">Günlük teyit ve anlık radar aynı coinde uyuşursa varsayımsal giriş, zarar-kes ve hedef hesaplanır. Gerçek emir verilmez.</p></div>
+      <div><h2>Orta Vadeli Yükseliş</h2>
+      <p class="description">OGN benzeri birikim, EMA uyumu, hacim artışı ve direnç kırılımı aranır. Yükselişin başlangıcı yalnızca teknik koşullarla sınıflandırılır.</p></div>
       <button type="button" class="refresh-button" id="decisionRefresh">Planları Yenile</button>
+    </div>
+    <div class="info-box">
+      <label for="mediumSymbol">Coin (USDT)</label>
+      <input id="mediumSymbol" type="text" value="OGN" maxlength="20" placeholder="OGN" style="max-width:180px;padding:10px;margin:8px"/>
+      <select id="mediumExchange" style="padding:10px;margin:8px">
+        <option value="OKX">OKX</option><option value="KUCOIN">KuCoin</option><option value="GATE">Gate.io</option>
+      </select>
+      <button type="button" id="mediumAnalyze" class="refresh-button">Orta Vadeyi Analiz Et</button>
+      <div id="mediumResult" aria-live="polite">Coin seçerek tamamlanmış günlük mumları analiz edin.</div>
     </div>
     <p id="decisionStatus" aria-live="polite">Sanal işlem planları henüz yüklenmedi.</p>
     <div id="decisionCards" class="coin-grid"></div>
