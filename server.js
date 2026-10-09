@@ -3545,18 +3545,25 @@ function analyzeMinuteRise(
   ========================= */
   const latestTimestamp = Number(last.time);
   const freshnessMs = Date.now() - latestTimestamp;
+  // Mum açılış zamanı veya kapanış zamanı sağlayan borsalar için
+  // 1 dakikalık pencere toleransı; eski veriden erken uyarı üretme.
   const dataFresh = Number.isFinite(latestTimestamp) &&
-    freshnessMs >= -120000 && freshnessMs <= 180000;
+    freshnessMs >= -65000 && freshnessMs <= 125000;
   const distanceToResistance = compressionHigh > 0
     ? (compressionHigh - price) / compressionHigh * 100 : null;
   const nearResistance = distanceToResistance !== null &&
     distanceToResistance >= -0.2 && distanceToResistance <= 1.0;
-  const notExtended = change5 < 2.5 && change15 < 4 && change1 < 1.5;
+  const notExtended = change5 >= -0.5 && change5 < 2.5 &&
+    change15 >= -1 && change15 < 4 && change1 >= -0.5 && change1 < 1.5;
   const earlyVolume = volumeAcceleration >= 1.5 || lastVolumeRatio >= 1.8;
   const momentumTurning = ema7Slope > 0 && emaSpreadAcceleration > 0;
   const earlyWatch = dataFresh && wasCompressed && nearResistance &&
     earlyVolume && momentumTurning && notExtended &&
-    rsiNow >= 45 && rsiNow <= 72;
+    rsiNow >= 45 && rsiNow <= 72 && !lateMoveGuard();
+  function lateMoveGuard() {
+    return change10 >= 7 || change15 >= 8 ||
+      (change5 >= 5 && rsiNow >= 75);
+  }
   const earlyReasons = [
     wasCompressed ? "20 dakikalık fiyat aralığı dar" : null,
     nearResistance ? "Sıkışma direncine yakın" : null,
@@ -3685,8 +3692,9 @@ function analyzeMinuteRise(
     sonuç listesine almıyoruz.
   */
 
-  const qualifies =
-    stageNumber >= 1 || earlyWatch;
+  // İzleme ekranı eski veriyi gösterebilir; ancak yeni sinyal olarak
+  // yayımlanabilmesi için veri güncel ve hareket aşırı ilerlememiş olmalı.
+  const qualifies = dataFresh && (stageNumber >= 1 || earlyWatch);
 
 
   return {
@@ -5569,6 +5577,9 @@ function analyze(
 const confirmed =
   (
     !extended &&
+    Number.isFinite(atrPct) && atrPct > 0 && atrPct <= 12 &&
+    Number.isFinite(resistanceDistance) &&
+    resistanceDistance >= -4 && resistanceDistance <= 8 &&
 
     price > ema20 &&
 
