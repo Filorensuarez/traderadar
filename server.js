@@ -1,6 +1,7 @@
 import express from "express";
 import webpush from "web-push";
 import fs from "fs";
+import { detectMinutePatterns } from "./minute-patterns.js";
 import { buildDecisionPlans } from "./decision-engine.js";
 import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
@@ -3683,6 +3684,15 @@ function analyzeMinuteRise(
   }
 
 
+  const patternDecision = detectMinutePatterns(data);
+  // Teknik risk modunu güçlü yükseliş puanından bağımsız hesapla.
+  const decisionMode = patternDecision.mode;
+  const patternScore = patternDecision.patternScore;
+  const patterns = patternDecision.patterns;
+  const patternWarnings = patternDecision.warnings;
+  const triggerPrice = patternDecision.trigger;
+  const technicalStop = patternDecision.stop;
+
   const signalLevel =
     stage;
 
@@ -3747,6 +3757,12 @@ function analyzeMinuteRise(
     stageNumber,
 
     signalLevel,
+    decisionMode,
+    patternScore,
+    patterns,
+    patternWarnings,
+    triggerPrice,
+    technicalStop,
 
     earlyWatch,
     earlyScore,
