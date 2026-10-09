@@ -1,6 +1,7 @@
 import express from "express";
 import webpush from "web-push";
 import fs from "fs";
+import { buildDecisionPlans } from "./decision-engine.js";
 import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 const app = express();
@@ -7562,6 +7563,11 @@ async function scanMinuteRadar() {
 app.get("/api/signal-statistics", (req,res)=>{
   res.set("Cache-Control","no-store");
   res.json(getSignalStatistics());
+});
+
+app.get("/api/decision-plans",(req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json(buildDecisionPlans(cache,minuteRadarCache,scenarioCache));
 });
 
 /* =========================
