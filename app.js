@@ -864,6 +864,12 @@ function minuteRadarCard(item) {
 
 
       <div class="info-box" style="margin:12px 0">
+        <p>Erken Hareket: ${item.earlyWatch && item.dataFresh ? "HAZIRLIK TESPİT EDİLDİ" : "Hazırlık teyidi yok"}</p>
+        <p>Hazırlık puanı: ${number(item.earlyScore || 0,0)}/100 • Formasyon puanı: ${number(item.patternScore || 0,0)}/100</p>
+        <p>${(Array.isArray(item.earlyReasons)?item.earlyReasons:[]).map(x=>String(x).replace(/[<>&"]/g,"")).join(" • ") || "Hazırlık koşulları tamamlanmadı"}</p>
+        <p>Dirence uzaklık: ${Number.isFinite(Number(item.distanceToResistance)) ? number(item.distanceToResistance,2)+"%" : "Ölçülemedi"}</p>
+      </div>
+      <div class="info-box" style="margin:12px 0">
         <div class="confirmation ${item.decisionMode === "AL" ? "confirmed" : item.decisionMode === "SAT" ? "late" : "candidate"}">
           Teknik mod: ${["AL","BEKLE","SAT"].includes(item.decisionMode) ? item.decisionMode : "BEKLE"}
         </div>
@@ -1189,17 +1195,15 @@ function renderMinuteRadar(data) {
   }
 
 
-  const early = rows.filter(item => item.earlyWatch && item.dataFresh);
-  const earlyHtml = '<div class="info-box"><h3>Erken Hareket Uyarısı ('+early.length+')</h3>'+
-    '<p class="description">1 dakikalık mumlarla hazırlık koşulları aranır. Kesin yükseliş tahmini değildir.</p>'+
-    (early.length ? early.map(item =>
-      '<div class="coin-card"><h3>'+String(item.symbol).replace(/[<>&"]/g,"")+
-      ' • '+String(item.source||"").replace(/[<>&"]/g,"")+'</h3>'+
-      '<p>Hazırlık puanı: '+Number(item.earlyScore||0)+'/100</p>'+
-      '<p>'+item.earlyReasons.map(s=>String(s).replace(/[<>&"]/g,"")).join(" • ")+'</p>'+
-      '<p>Dirence uzaklık: %'+Number(item.distanceToResistance||0).toFixed(2)+'</p></div>'
-      ).join("") : '<p>Şu anda hazırlık koşullarını sağlayan coin yok.</p>')+'</div>';
-  radarCards.innerHTML = earlyHtml + rows.map(minuteRadarCard).join("");
+  // Her coin/borsa tek kartta: hazırlık, formasyon ve teknik mod birlikte.
+  // Aynı coin farklı borsadaysa farklı likidite/fiyat nedeniyle ayrı tutulur.
+  const ordered = [...rows].sort((a,b) =>
+    Number(Boolean(b.earlyWatch && b.dataFresh)) -
+    Number(Boolean(a.earlyWatch && a.dataFresh)) ||
+    Number(b.score || 0) - Number(a.score || 0)
+  );
+  radarCards.innerHTML = ordered.map(minuteRadarCard).join("");
+
 }
 
 
