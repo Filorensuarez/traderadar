@@ -443,3 +443,9 @@ footer {
 #xmanager .scenario-button.active { background:#367bd0; color:#fff; }
 #xmanager .refresh-button { margin:6px 6px 6px 0; }
 #xmanager [hidden] { display:none !important; }
+
+/* 36 saatlik başarı istatistikleri */
+#long .coin-card { min-width:0; }
+#long .stats-rate { font-size:clamp(26px,5vw,40px); font-weight:750; color:#52d3ab; margin:12px 0; }
+#long .stats-entries { margin-top:12px; border-top:1px solid #34465e; padding-top:10px; }
+#long .stats-entry { padding:7px 0; border-bottom:1px solid rgba(150,170,190,.16); font-size:.88rem; overflow-wrap:anywhere; }
