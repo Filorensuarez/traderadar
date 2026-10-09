@@ -863,6 +863,16 @@ function minuteRadarCard(item) {
       </div>
 
 
+      <div class="info-box" style="margin:12px 0">
+        <div class="confirmation ${item.decisionMode === "AL" ? "confirmed" : item.decisionMode === "SAT" ? "late" : "candidate"}">
+          Teknik mod: ${["AL","BEKLE","SAT"].includes(item.decisionMode) ? item.decisionMode : "BEKLE"}
+        </div>
+        <p>Formasyon uyumu: ${number(item.patternScore || 0,0)}/100</p>
+        <p>${(Array.isArray(item.patterns)?item.patterns:[]).map(x=>String(x).replace(/[<>&"]/g,"")).join(" • ") || "Teyitli formasyon yok"}</p>
+        <p>${(Array.isArray(item.patternWarnings)?item.patternWarnings:[]).map(x=>String(x).replace(/[<>&"]/g,"")).join(" • ")}</p>
+        <small>AL: teknik kırılım teyidi; SAT: risk/çıkış uyarısı. Kesin alım-satım emri değildir.</small>
+      </div>
+
       <div class="metrics">
 
         <div>
