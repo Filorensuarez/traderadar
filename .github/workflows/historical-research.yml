@@ -1,0 +1,39 @@
+name: Historical 30pct Event Research
+on:
+  workflow_dispatch:
+    inputs:
+      max_symbols:
+        description: 'Gate USDT pairs to scan (1-1000)'
+        required: true
+        default: '250'
+      event_target:
+        description: 'Maximum events to collect (1-100)'
+        required: true
+        default: '100'
+permissions:
+  contents: read
+jobs:
+  historical-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check research scripts
+        run: |
+          node --check research/collect-gate-events.js
+          node --check research/backtest-30pct.js
+          node --check minute-patterns.js
+      - name: Download historical candles and analyze
+        env:
+          MAX_SYMBOLS: ${{ inputs.max_symbols }}
+          EVENT_TARGET: ${{ inputs.event_target }}
+        run: node research/collect-gate-events.js
+      - name: Upload verified research results
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-30pct-historical-study
+          path: research/results/gate-events.json
+          retention-days: 30
