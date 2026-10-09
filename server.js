@@ -2,6 +2,7 @@ import express from "express";
 import webpush from "web-push";
 import fs from "fs";
 import { detectMinutePatterns } from "./minute-patterns.js";
+import { detectPrePumpSetup } from "./pre-pump-setup.js";
 import { buildDecisionPlans } from "./decision-engine.js";
 import { analyzeMediumTrend, detectMediumPreBreakout } from "./medium-trend.js";
 import { recordSignals, getSignalStatistics } from "./signal-stats.js";
@@ -3685,6 +3686,7 @@ function analyzeMinuteRise(
   }
 
 
+  const prePump = detectPrePumpSetup(data);
   const patternDecision = detectMinutePatterns(data);
   // Teknik risk modunu güçlü yükseliş puanından bağımsız hesapla.
   const decisionMode = patternDecision.mode;
@@ -3706,7 +3708,7 @@ function analyzeMinuteRise(
 
   // İzleme ekranı eski veriyi gösterebilir; ancak yeni sinyal olarak
   // yayımlanabilmesi için veri güncel ve hareket aşırı ilerlememiş olmalı.
-  const qualifies = dataFresh && (stageNumber >= 1 || earlyWatch || decisionMode === "AL");
+  const qualifies = dataFresh && (stageNumber >= 1 || earlyWatch || decisionMode === "AL" || prePump.setupPhase === "PRE_BREAKOUT" || prePump.setupPhase === "BREAKOUT");
 
 
   return {
@@ -3758,6 +3760,7 @@ function analyzeMinuteRise(
     stageNumber,
 
     signalLevel,
+    ...prePump,
     decisionMode,
     patternScore,
     patterns,
