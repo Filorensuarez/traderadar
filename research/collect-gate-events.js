@@ -51,6 +51,24 @@ for(let index=0;index<pairs.length;index++){
   scannedPairs++;
   try{
     const hours=await candles(pair,"1h",START,END-3600000);
+    // Non-event controls: sample an hour with no strong rise, using the
+    // same five-minute lead and only information available before that hour.
+    if(index%5===0){
+      const quiet=hours.find(h=>h.time>=START+3600000&&h.time<END-3600000&&
+        (h.high/h.open-1)*100<3&&(h.low/h.open-1)*100>-5);
+      if(quiet){
+        try{
+          const minuteControl=await candles(pair,"1m",quiet.time-45*60000,quiet.time+65*60000);
+          const pastControl=minuteControl.filter(x=>x.time<quiet.time-5*60000).slice(-40);
+          const futureControl=minuteControl.filter(x=>x.time>=quiet.time&&x.time<quiet.time+60*60000);
+          if(pastControl.length>=35&&futureControl.length>=50){
+            const signal=detectMinutePatterns(pastControl,pastControl.at(-1).time+60000);
+            const gain=(Math.max(...futureControl.map(x=>x.high))/futureControl[0].open-1)*100;
+            controls.push({symbol:pair,mode:signal.mode,gainPercent:gain});
+          }
+        }catch(e){errors.push({pair,error:"Control: "+e.message});}
+      }
+    }
     for(const h of hours){
       if(h.time<START||h.time>=END)continue;
       // Coarse filter: the 1-hour high must exceed its opening by >=30%.
@@ -85,7 +103,10 @@ const report={generatedAt:new Date().toISOString(),exchange:"GATE.IO",
   scannedPairs,distinctCoins:events.length,
   eventCount:events.length,target,complete:events.length>=target,
   fiveMinuteEarlyAlCount:events.filter(e=>e.mode==="AL").length,
-  warning:"Event-only recall is not accuracy. Negative controls and out-of-sample validation required.",
+  controlCount:controls.length,
+  controlAlCount:controls.filter(x=>x.mode==="AL").length,
+  controlFalseAlarmRate:controls.length?controls.filter(x=>x.mode==="AL").length/controls.length:null,
+  warning:"Control sample is sparse and not randomly representative; results are exploratory, not verified precision or future probability.",
   errors:errors.slice(0,50),events};
 fs.mkdirSync("research/results",{recursive:true});
 fs.writeFileSync("research/results/gate-events.json",JSON.stringify(report,null,2));
