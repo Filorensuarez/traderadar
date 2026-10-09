@@ -1,7 +1,8 @@
 import fs from "node:fs";
-const FILE="/data/traderadar-signal-stats.json";
+const FILE="/data/traderadar-signal-stats-v2.json";
+// v1 kayıtları farklı sinyal türlerini karıştırdığı için korunur ancak v2 istatistiğine katılmaz.
 const WINDOW=36*60*60*1000;
-const HORIZON=60*60*1000;
+const HORIZONS={daily:60*60*1000,radar:15*60*1000,scenario:60*60*1000};
 const GRACE=20*60*1000;
 const COOLDOWN=60*60*1000;
 let records=[];
@@ -84,17 +85,17 @@ export async function updateOutcomes(){
   running=true;
   const now=Date.now();
   try {
-    const due=records.filter(x=>x.status==="pending"&&now-x.time>=HORIZON);
+    const due=records.filter(x=>x.status==="pending"&&now-x.time>=HORIZONS[x.group]);
     if(!due.length)return;
     const prices=await tickers();
     let changed=false;
     for(const item of due){
       const p=prices.get(item.source+":"+item.base);
-      if(Number.isFinite(p)&&p>0&&now-item.time<=HORIZON+GRACE){
+      if(Number.isFinite(p)&&p>0&&now-item.time<=HORIZONS[item.group]+GRACE){
         item.exit=p;item.exitTime=now;item.result=(p/item.entry-1)*100;
         item.status=item.result>=0.5?"success":"failure";
         changed=true;
-      } else if(now-item.time>HORIZON+GRACE){
+      } else if(now-item.time>HORIZONS[item.group]+GRACE){
         item.status="unverified";changed=true;
       }
     }
@@ -106,7 +107,7 @@ export async function updateOutcomes(){
 export function getSignalStatistics(){
   const now=Date.now(),since=now-WINDOW;
   const groups=["daily","radar","scenario"];
-  const result={windowHours:36,horizonMinutes:60,successThresholdPercent:0.5,
+  const result={windowHours:36,horizonMinutesByGroup:{daily:60,radar:15,scenario:60},successThresholdPercent:0.5,
     generatedAt:now,lastPriceCheck,lastError,startedAt:records.length?Math.min(...records.map(x=>x.time)):null,groups:{}};
   for(const group of groups){
     const all=records.filter(x=>x.group===group&&x.time>=since);
@@ -115,6 +116,7 @@ export function getSignalStatistics(){
     result.groups[group]={total:all.length,evaluated:done.length,successful:wins,
       failed:done.length-wins,pending:all.filter(x=>x.status==="pending").length,
       unverified:all.filter(x=>x.status==="unverified").length,
+      horizonMinutes:HORIZONS[group]/60000,
       accuracyPercent:done.length?Number((wins/done.length*100).toFixed(1)):null,
       averageReturnPercent:done.length?Number((done.reduce((a,x)=>a+x.result,0)/done.length).toFixed(2)):null,
       latest:all.slice(-8).reverse().map(x=>({symbol:x.base+"/USDT",source:x.source,
