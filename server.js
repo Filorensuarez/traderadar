@@ -7607,8 +7607,22 @@ app.get("/api/signal-statistics", (req,res)=>{
 
 app.get("/api/medium-watch",(req,res)=>{
   res.set("Cache-Control","no-store");
-  res.json({ok:mediumWatchCache.updatedAt>0,...mediumWatchCache,
-    note:"Tamamlanmış günlük mumlarla hazırlık taraması; yükseliş garantisi değildir."});
+  const rows=mediumWatchCache.rows.map(item=>{
+    const match=minuteRadarCache.rows.find(r=>
+      String(r.symbol).replace(/[-_]USDT$/,"/USDT")===item.symbol &&
+      String(r.source).toUpperCase().replace("GATE.IO","GATE")===item.source);
+    const intraday=Boolean(match&&match.dataFresh&&!match.lateMove&&
+      (match.earlyWatch||match.decisionMode==="AL")&&
+      Number(match.volumeAcceleration)>=1.5);
+    return {...item,
+      status:intraday&&item.status==="YÜKSELİŞ HAZIRLIĞI"?
+        "YÜKSELİŞ BAŞLIYOR":item.status,
+      intradayConfirmed:intraday,
+      minuteScore:match?.score??null,
+      minuteVolume:match?.volumeAcceleration??null};
+  });
+  res.json({ok:mediumWatchCache.updatedAt>0,...mediumWatchCache,rows,
+    note:"YÜKSELİŞ BAŞLIYOR: günlük hazırlık ve güncel dakikalık hareket birlikte. Kesin yükseliş tahmini değildir."});
 });
 
 // Medium-term research uses completed UTC daily candles and existing public exchange APIs.
