@@ -2607,3 +2607,35 @@ async function loadDecisionPlans(){
   finally{decisionBusy=false;btn.disabled=false;}
 }
 document.querySelector("#decisionRefresh").addEventListener("click",loadDecisionPlans);
+
+/* ORTA VADELİ YÜKSELİŞ – TAMAMLANMIŞ GÜNLÜK MUM ANALİZİ */
+const mediumButton=document.querySelector("#mediumAnalyze");
+mediumButton.addEventListener("click",async()=>{
+  const symbol=document.querySelector("#mediumSymbol").value.trim().toUpperCase();
+  const exchange=document.querySelector("#mediumExchange").value;
+  const result=document.querySelector("#mediumResult");
+  if(!/^[A-Z0-9]{2,20}$/.test(symbol)){
+    result.textContent="Coin adını yalnız harf ve rakamla yazın.";return;
+  }
+  mediumButton.disabled=true;result.textContent="Tamamlanmış günlük mumlar inceleniyor...";
+  try{
+    const response=await fetch("/api/medium-trend?symbol="+encodeURIComponent(symbol)+"&exchange="+encodeURIComponent(exchange),{cache:"no-store"});
+    const d=await response.json();
+    if(!response.ok||!d.ok)throw Error(d.error||"Veri alınamadı");
+    result.replaceChildren();
+    const h=document.createElement("h3");h.textContent=(d.symbol||symbol)+" • "+(d.state||d.status);
+    const p=document.createElement("p");
+    p.textContent=d.score===undefined?(d.reason||"Veri yetersiz"):
+      "Formasyon puanı: "+d.score+"/100 | Hacim: "+d.volumeRatio+"x | EMA7: "+d.ema7.toPrecision(6)+
+      " | EMA25: "+d.ema25.toPrecision(6)+" | EMA99: "+d.ema99.toPrecision(6);
+    result.append(h,p);
+    for(const reason of d.reasons||[]){
+      const line=document.createElement("p");line.textContent="• "+reason;result.append(line);
+    }
+    if(d.warning){const w=document.createElement("p");w.textContent=d.warning;result.append(w);}
+    const note=document.createElement("small");
+    note.textContent="YÜKSELİŞ BAŞLIYOR ifadesi geçmiş mumların teknik teyididir; önceden kesin tahmin değildir.";
+    result.append(note);
+  }catch(e){result.textContent="Analiz yapılamadı: "+e.message;}
+  finally{mediumButton.disabled=false;}
+});
