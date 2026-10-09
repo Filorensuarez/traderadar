@@ -3705,7 +3705,7 @@ function analyzeMinuteRise(
 
   // İzleme ekranı eski veriyi gösterebilir; ancak yeni sinyal olarak
   // yayımlanabilmesi için veri güncel ve hareket aşırı ilerlememiş olmalı.
-  const qualifies = dataFresh && (stageNumber >= 1 || earlyWatch);
+  const qualifies = dataFresh && (stageNumber >= 1 || earlyWatch || decisionMode === "AL");
 
 
   return {
