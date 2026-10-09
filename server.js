@@ -1,6 +1,7 @@
 import express from "express";
 import webpush from "web-push";
 import fs from "fs";
+import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -6152,6 +6153,8 @@ const gateCandidates =
        CACHE
     ========================= */
 
+    recordSignals("daily", [...okxResults, ...kucoinResults, ...gateResults]);
+
     cache = {
 
       ok:
@@ -7007,6 +7010,8 @@ await notifyScenarioChanges(
   scenarioCache
 );
     
+    recordSignals("scenario", [...scenario1Rows, ...scenario2Rows, ...scenario3Rows, ...scenario4Rows]);
+
     console.log(
       `Senaryolar: ${scanned} coin | S1 ${scenario1Rows.length} | S2 ${scenario2Rows.length} | S3 ${scenario3Rows.length} | S4 ${scenario4Rows.length}`
     );
@@ -7505,6 +7510,8 @@ async function scanMinuteRadar() {
 
     await notifyEarlyMovement(minuteRadarCache.rows);
 
+    recordSignals("radar", minuteRadarCache.rows);
+
     console.log(
       `Anlık radar: ${minuteRadarCache.scanned} tarama / ${finalResults.length} aktif sinyal`
     );
@@ -7540,6 +7547,11 @@ async function scanMinuteRadar() {
       false;
   }
 }
+
+app.get("/api/signal-statistics", (req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json(getSignalStatistics());
+});
 
 /* =========================
    GÜNLÜK TEYİT API
