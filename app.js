@@ -140,6 +140,8 @@ function openView(view) {
   document.querySelector("#xManagerButton").classList.toggle("active", xmanager);
 
 
+  if (long) loadSignalStatistics();
+
   if (
     radar &&
     !radarLoaded
@@ -2506,3 +2508,46 @@ document.querySelector("#xOpenComposer").addEventListener("click",()=>{
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(xFinalText()),"_blank","noopener,noreferrer");
 });
 
+
+/* =========================
+   36 SAATLİK SİNYAL İSTATİSTİKLERİ
+========================= */
+let statsLoading=false;
+const statsCards=document.querySelector("#statsCards");
+const statsStatus=document.querySelector("#statsStatus");
+const statsRefreshButton=document.querySelector("#statsRefreshButton");
+const statsLabels={daily:"Günlük Yükseliş Teyidi",radar:"Anlık Yükseliş Radarı",scenario:"Yükseliş Senaryosu (1–4)"};
+async function loadSignalStatistics(){
+  if(statsLoading)return;
+  statsLoading=true;statsRefreshButton.disabled=true;
+  statsStatus.textContent="Son 36 saatlik kayıtlar inceleniyor...";
+  try{
+    const response=await fetch("/api/signal-statistics",{cache:"no-store"});
+    if(!response.ok)throw Error("HTTP "+response.status);
+    const data=await response.json();
+    const fmt=n=>Number.isFinite(Number(n))?Number(n).toLocaleString("tr-TR",{maximumFractionDigits:2}):"-";
+    statsCards.innerHTML=["daily","radar","scenario"].map(key=>{
+      const g=data.groups?.[key]||{};
+      const rate=g.accuracyPercent===null||g.accuracyPercent===undefined?"Henüz ölçülmedi":fmt(g.accuracyPercent)+"%";
+      const entries=(g.latest||[]).slice(0,5).map(x=>
+        '<div class="stats-entry">'+String(x.symbol).replace(/[<>&"]/g,"")+" • "+String(x.source).replace(/[<>&"]/g,"")+
+        " • "+(x.status==="success"?"Başarılı":x.status==="failure"?"Başarısız":x.status==="pending"?"Bekleniyor":"Doğrulanamadı")+
+        (x.returnPercent===null?"":" • "+fmt(x.returnPercent)+"%")+"</div>"
+      ).join("");
+      return '<article class="coin-card"><h3>'+statsLabels[key]+'</h3>'+
+        '<div class="stats-rate">'+rate+'</div>'+
+        '<p>Toplam sinyal: '+(g.total||0)+'</p>'+
+        '<p>Sonucu ölçülen: '+(g.evaluated||0)+'</p>'+
+        '<p>Başarılı: '+(g.successful||0)+' • Başarısız: '+(g.failed||0)+'</p>'+
+        '<p>Bekleyen: '+(g.pending||0)+' • Doğrulanamayan: '+(g.unverified||0)+'</p>'+
+        '<p>Ortalama 60 dk değişim: '+(g.averageReturnPercent===null?"-":fmt(g.averageReturnPercent)+"%")+'</p>'+
+        (entries?'<div class="stats-entries">'+entries+'</div>':'<p>Henüz kayıt yok.</p>')+
+        '</article>';
+    }).join("");
+    const start=data.startedAt?new Date(data.startedAt).toLocaleString("tr-TR"):"Henüz kayıt yok";
+    statsStatus.textContent="Son 36 saat • 60 dk değerlendirme • Başarı eşiği +%0,5 • İlk kayıt: "+start+
+      (data.lastError?" • Son fiyat sorgusunda sorun: "+data.lastError:"");
+  }catch(e){statsStatus.textContent="İstatistikler yüklenemedi: "+e.message;}
+  finally{statsLoading=false;statsRefreshButton.disabled=false;}
+}
+statsRefreshButton.addEventListener("click",loadSignalStatistics);
