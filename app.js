@@ -2545,7 +2545,7 @@ async function loadSignalStatistics(){
         '</article>';
     }).join("");
     const start=data.startedAt?new Date(data.startedAt).toLocaleString("tr-TR"):"Henüz kayıt yok";
-    statsStatus.textContent="Son 36 saat • 60 dk değerlendirme • Başarı eşiği +%0,5 • İlk kayıt: "+start+
+    statsStatus.textContent="Son 36 saat • Radar 15 dk, günlük ve senaryo 60 dk • Başarı eşiği +%0,5 • Yeni ölçüm başlangıcı: "+start+
       (data.lastError?" • Son fiyat sorgusunda sorun: "+data.lastError:"");
   }catch(e){statsStatus.textContent="İstatistikler yüklenemedi: "+e.message;}
   finally{statsLoading=false;statsRefreshButton.disabled=false;}
