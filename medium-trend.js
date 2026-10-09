@@ -54,3 +54,56 @@ export function analyzeMediumTrend(candles) {
     reasons,warning:extended?"Hareket aşırı ilerlemiş olabilir.":null,
     asOf:last.time,signalIsPrediction:false};
 }
+
+
+/**
+ * PRE-BREAKOUT accumulation scan. Historical completed daily candles only;
+ * the current live price is optional and is not used to define resistance.
+ * "YÜKSELİŞ BAŞLIYOR" means a technical transition, not future certainty.
+ */
+export function detectMediumPreBreakout(candles,livePrice=null) {
+  const x=(Array.isArray(candles)?candles:[]).map(v=>({
+    time:Number(v.time),open:Number(v.open),high:Number(v.high),low:Number(v.low),
+    close:Number(v.close),volume:Number(v.volume)
+  })).filter(v=>[v.time,v.open,v.high,v.low,v.close,v.volume].every(Number.isFinite)
+    &&v.open>0&&v.close>0&&v.low>0&&v.high>=v.low&&v.volume>=0)
+    .sort((a,b)=>a.time-b.time);
+  if(x.length<105)return null;
+  const a=x.slice(-120),last=a.at(-1);
+  const closes=a.map(v=>v.close),volumes=a.map(v=>v.volume);
+  const ema=(list,n)=>{let value=list[0],k=2/(n+1);for(let i=1;i<list.length;i++)value=list[i]*k+value*(1-k);return value;};
+  const mean=list=>list.reduce((s,v)=>s+v,0)/list.length;
+  const high=list=>Math.max(...list.map(v=>v.high));
+  const low=list=>Math.min(...list.map(v=>v.low));
+  const old=a.slice(-61,-31),base=a.slice(-31);
+  const oldRange=(high(old)/low(old)-1)*100;
+  const range=(high(base)/low(base)-1)*100;
+  const compressed=range<=22&&range<=oldRange*.8;
+  const volumeOld=mean(volumes.slice(-31,-11));
+  const volumeNew=mean(volumes.slice(-10));
+  const dryVolume=volumeOld>0&&volumeNew/volumeOld<=.85;
+  const ema7=ema(closes,7),ema25=ema(closes,25),ema99=ema(closes,99);
+  const ema7Old=ema(closes.slice(0,-4),7);
+  const rising=ema7>ema7Old&&last.close>=ema25*.98&&ema25>=ema99*.98;
+  const resistance=high(base);
+  const observed=Number.isFinite(Number(livePrice))&&Number(livePrice)>0?Number(livePrice):last.close;
+  const distance=(resistance-observed)/resistance*100;
+  const near=distance>=-1.5&&distance<=5;
+  const lastVol=volumes.at(-1);
+  const volumeIncrease=volumeOld>0&&lastVol/volumeOld>=1.3;
+  const alreadyExtended=observed/ema25>1.25||observed/last.close>1.15;
+  const score=(compressed?25:0)+(dryVolume?15:0)+(rising?25:0)+(near?20:0)+(volumeIncrease?15:0);
+  const reasons=[
+    compressed?"30 günlük fiyat aralığı daralmış":null,
+    dryVolume?"Sıkışmada işlem hacmi azalmış":null,
+    rising?"EMA eğimi yukarı dönüyor":null,
+    near?"Fiyat geçmiş dirence yaklaşıyor":null,
+    volumeIncrease?"Son tamamlanan günde hacim artışı":null
+  ].filter(Boolean);
+  const status=alreadyExtended?"GEÇ KALINDI":
+    score>=70&&compressed&&rising&&near?"YÜKSELİŞ HAZIRLIĞI":
+    score>=50?"İZLE":"BEKLE";
+  return {status,score,price:observed,resistance,distToResistance:Number(distance.toFixed(2)),
+    ema7,ema25,ema99,rangePct:Number(range.toFixed(2)),reasons,
+    asOf:last.time,confirmed:false};
+}
