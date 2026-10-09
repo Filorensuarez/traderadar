@@ -75,7 +75,6 @@ for(let index=0;index<pairs.length;index++){
       if((h.high/h.open-1)*100<30)continue;
       const eventId=pair; // require distinct coins, not repeated events from one coin
       if(seen.has(eventId))continue;
-      seen.add(eventId);
       const minute=await candles(pair,"1m",h.time-45*60000,h.time+65*60000);
       // Use last closed candle BEFORE event hour starts minus 5 minutes.
       const cutoff=h.time-5*60000;
@@ -85,6 +84,7 @@ for(let index=0;index<pairs.length;index++){
       const open=hour[0].open,peak=Math.max(...hour.map(x=>x.high));
       const gain=(peak/open-1)*100;
       if(gain<30)continue;
+      seen.add(eventId);
       const pattern=detectMinutePatterns(past,past.at(-1).time+60000);
       events.push({exchange:"GATE.IO",symbol:pair.replace("_","/"),start:h.time,
         gainPercent:Number(gain.toFixed(3)),leadMinutes:5,
