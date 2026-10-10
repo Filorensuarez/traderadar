@@ -8,7 +8,7 @@ async function render(){
   const data=await response.json();
   status.textContent=(data.running?"Tarama sürüyor | ":"")+
    "Son tarama: "+(data.updatedAt?new Date(data.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yapılmadı")+
-   " | İncelenen: "+data.checked+" | Bulunan: "+(data.rows||[]).length+
+   " | Denenen: "+data.checked+" | Başarılı: "+(data.successful??0)+" | Hatalı: "+(data.failed??0)+" | Bulunan: "+(data.rows||[]).length+
    (data.errors?.length?" | Hatalar: "+data.errors.slice(0,2).join("; "):"");
   cards.replaceChildren();
   for(const x of data.rows||[]){
