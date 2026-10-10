@@ -14,12 +14,18 @@ export function detectCrossing(input,now=Date.now()){
  const rising=e7[i]>e7[i-1]&&e25[i]>=e25[i-1];
  const avg=bars.slice(-25,-5).reduce((s,x)=>s+x.volume,0)/20;
  const volRatio=avg>0?bars.slice(-3).reduce((s,x)=>s+x.volume,0)/3/avg:0;
+ const baseline=bars.slice(-21,-1).reduce((sum,b)=>sum+b.volume,0)/20;
+ const lastVolumeRatio=baseline>0?bars[i].volume/baseline:0;
+ const risingVolume=bars[i].volume>bars[i-1].volume&&bars[i-1].volume>bars[i-2].volume;
+ const positiveCandle=bars[i].close>bars[i].open;
+ const volumeLevel=lastVolumeRatio>=4?"PATLAMA HACMİ":lastVolumeRatio>=2?"HIZLANIYOR":"NORMAL";
+ const fastVolume=lastVolumeRatio>=2&&positiveCandle;
  const above99=bars[i].close>=e99[i]*.995;
  const preparing=gap<=1.5&&near99<=5&&rising&&above99;
  if(!crossedRecently&&!preparing)return null;
  const status=crossed?"YENİ KESİŞİM":crossedRecently?"Kesişim Sonrası":"KESİŞİM ADAYI";
- const decision=crossedRecently&&rising&&above99&&volRatio>=1.5?"ALIM KOŞULLARI OLUŞUYOR":"BEKLE";
+ const decision=crossedRecently&&rising&&above99&&fastVolume?"ALIM KOŞULLARI OLUŞUYOR":"BEKLE";
  return {status,decision,price:bars[i].close,ema7:e7[i],ema25:e25[i],ema99:e99[i],
-  gapPct:+gap.toFixed(2),volumeRatio:+volRatio.toFixed(2),near99Pct:+near99.toFixed(2),
-  candleTime:bars[i].time,reason:decision==="BEKLE"?"Kesişim, EMA99 konumu veya hacim teyidi eksik.":"EMA7/25 kesişimi, yükselen ortalamalar ve hacim teyidi var. İşlem riski ayrıca kontrol edilmeli."};
+  gapPct:+gap.toFixed(2),volumeRatio:+volRatio.toFixed(2),lastVolumeRatio:+lastVolumeRatio.toFixed(2),volumeLevel,risingVolume,positiveCandle,near99Pct:+near99.toFixed(2),
+  candleTime:bars[i].time,reason:decision==="BEKLE"?"Kesişim, EMA99 konumu veya son mumda en az 2 kat pozitif hacim teyidi eksik.":"EMA7/25 kesişimi, yükselen ortalamalar ve hacim teyidi var. İşlem riski ayrıca kontrol edilmeli."};
 }
