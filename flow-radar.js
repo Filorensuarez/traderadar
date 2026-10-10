@@ -75,3 +75,39 @@ async function connect(){if(!started)return;try{
  socket.on("close",()=>{connected=false;clearInterval(heartbeat);reconnect();});
  }catch(e){connected=false;lastError=e.message;reconnect();}}
 export function startFlowRadar(){if(started)return;started=true;connect();}
+
+
+// First-reaction detector: completed trade events, rolling windows in milliseconds.
+export function firstReactionSnapshot(){
+ const now=Date.now(), rows=[];
+ for(const symbol of symbols){
+  const trades=(buckets.get(symbol)||[]).filter(t=>t.time>=now-120000&&t.time<=now);
+  const latest=trades.at(-1);
+  if(!latest||now-latest.time>10000)continue;
+  const recent=trades.filter(t=>t.time>=now-10000);
+  const previous=trades.filter(t=>t.time>=now-70000&&t.time<now-10000);
+  const short=trades.filter(t=>t.time>=now-5000);
+  const first10=recent[0], first30=trades.find(t=>t.time>=now-30000);
+  if(!first10||!first30||previous.length<8||recent.length<3)continue;
+  const volume=a=>a.reduce((sum,t)=>sum+t.value,0);
+  const buy=a=>volume(a.filter(t=>t.side==="buy"));
+  const currentVolume=volume(recent), baseline=volume(previous)/6;
+  const acceleration=baseline>0?currentVolume/baseline:0;
+  const buyValue=buy(recent), buyShare=currentVolume?buyValue/currentVolume:0;
+  const change10=(latest.price/first10.price-1)*100;
+  const change30=(latest.price/first30.price-1)*100;
+  const shortChange=short.length>=2?(latest.price/short[0].price-1)*100:0;
+  const enough=currentVolume>=500&&recent.length>=3&&acceleration>=2.5&&buyShare>=0.65;
+  let status=null;
+  if(enough&&change10>=0.25&&change10<=2.5&&shortChange>0)status="İLK HAREKET";
+  if(enough&&change30>=0.6&&change30<=4&&acceleration>=4&&buyShare>=0.72)status="YÜKSELİŞ TEYİDİ";
+  if(status)rows.push({symbol:symbol.replace("_","/"),exchange:"GATE.IO",status,
+   price:latest.price,change5Pct:Number(shortChange.toFixed(2)),
+   change10Pct:Number(change10.toFixed(2)),change30Pct:Number(change30.toFixed(2)),
+   volumeAcceleration:Number(acceleration.toFixed(2)),buySharePct:Number((buyShare*100).toFixed(1)),
+   trades10s:recent.length,observedAt:latest.time});
+ }
+ rows.sort((a,b)=>b.volumeAcceleration-a.volumeAcceleration);
+ return {connected,updatedAt:now,lastMessage,trackedSymbols:symbols.length,rows:rows.slice(0,100),
+  lastError,notice:"Gate.io işlem akışı. En az 60 saniye referans veri gerekir; tüm borsalar ve tüm coinler kapsanmaz."};
+}
