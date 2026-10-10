@@ -2,6 +2,7 @@ import WebSocket from "ws";
 const symbols=(process.env.FLOW_SYMBOLS||"BTC_USDT,ETH_USDT,SOL_USDT,XRP_USDT,DOGE_USDT,ADA_USDT,LINK_USDT,AVAX_USDT,SUI_USDT,TON_USDT,NEAR_USDT,APT_USDT,ARB_USDT,OP_USDT,UNI_USDT,LTC_USDT,PEPE_USDT")
  .split(",").map(s=>s.trim().toUpperCase()).filter(s=>/^[A-Z0-9]{2,24}_USDT$/.test(s)).slice(0,100);
 const buckets=new Map();let socket=null,connected=false,lastMessage=0,lastError=null,timer=null,heartbeat=null,started=false;
+let subscribed=0,subscriptionError=null;
 function addTrade(t){const list=buckets.get(t.symbol)||[];list.push(t);const cutoff=Date.now()-120000;
  while(list.length&&list[0].time<cutoff)list.shift();
  if(list.length>10000)list.splice(0,list.length-10000);buckets.set(t.symbol,list);}
@@ -29,22 +30,24 @@ export function flowSnapshot(){const now=Date.now();const rows=symbols.map(symbo
  imbalancePercent:Number(imbalance.toFixed(1)),trades30s:cur.count};
  });rows.sort((a,b)=>Number(b.mode.includes("ARTIYOR"))-Number(a.mode.includes("ARTIYOR"))||
  Math.abs(b.imbalancePercent)-Math.abs(a.imbalancePercent));
- return {connected,lastMessage,lastError,updatedAt:now,trackedSymbols:symbols.length,rows,
+ return {connected,lastMessage,lastError,subscriptionError,subscribed,updatedAt:now,trackedSymbols:symbols.length,rows,
  notice:"Gerçekleşen agresif işlemler ölçülür; fiyatın gelecekteki yönü garanti edilmez."};}
 function reconnect(){if(timer)return;timer=setTimeout(()=>{timer=null;connect();},5000);}
 function connect(){if(!started)return;try{
  socket=new WebSocket("wss://api.gateio.ws/ws/v4/");
  socket.on("open",()=>{connected=true;lastError=null;
- socket.send(JSON.stringify({time:Math.floor(Date.now()/1000),channel:"spot.trades",event:"subscribe",payload:symbols}));
+ for(let i=0;i<symbols.length;i+=25){socket.send(JSON.stringify({time:Math.floor(Date.now()/1000),channel:"spot.trades",event:"subscribe",payload:symbols.slice(i,i+25)}));}
+ subscribed=symbols.length;
  clearInterval(heartbeat);heartbeat=setInterval(()=>{if(socket?.readyState===WebSocket.OPEN)
  socket.send(JSON.stringify({time:Math.floor(Date.now()/1000),channel:"spot.ping"}));},20000);});
  socket.on("message",raw=>{let m;try{m=JSON.parse(String(raw));}catch{return;}
+ if(m.channel==="spot.trades"&&m.event==="subscribe"&&m.error){subscriptionError=JSON.stringify(m.error).slice(0,250);return;}
  if(m.channel!=="spot.trades"||m.event!=="update")return;
  for(const t of Array.isArray(m.result)?m.result:[m.result]){
  if(!t)continue;const symbol=String(t.currency_pair||"").toUpperCase();
  if(!symbols.includes(symbol)||!["buy","sell"].includes(t.side))continue;
  const price=Number(t.price),amount=Number(t.amount);
- const time=Number.parseFloat(t.create_time_ms)*1000||Number(t.create_time)*1000||Date.now();
+ const time=Number.parseFloat(t.create_time_ms)||Number(t.create_time)*1000||Date.now();
  if(!(price>0&&amount>0)||time>Date.now()+10000||time<Date.now()-120000)continue;
  addTrade({symbol,side:t.side,time,value:price*amount});lastMessage=Date.now();
  }});
