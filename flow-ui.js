@@ -6,14 +6,15 @@ async function loadFlow(){
   const response=await fetch("/api/flow-radar",{cache:"no-store"});
   if(!response.ok)throw Error("HTTP "+response.status);
   const data=await response.json();
-  status.textContent=(data.connected?"Gate.io bağlı":"Gate.io bağlantısı bekleniyor")+
+  status.textContent=(data.connected?"İşlem akışı bağlı":"İşlem akışı bağlantısı bekleniyor")+
    " | İzlenen: "+data.trackedSymbols+
    (data.lastMessage?" | Son işlem: "+new Date(data.lastMessage).toLocaleTimeString("tr-TR"):"")+
-   (data.lastError?" | Hata: "+data.lastError:"");
+   (data.lastError?" | Hata: "+data.lastError:"")+
+   " | "+Object.entries(data.exchanges||{}).map(([name,x])=>name.toUpperCase()+": "+(x.connected?"bağlı":"bağlantı yok")+" ("+x.tracked+")").join(" • ");
   cards.replaceChildren();
   for(const x of data.rows||[]){
    const card=document.createElement("article");card.className="coin-card";
-   const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.mode;
+   const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.exchange+" • "+x.mode;
    const p=document.createElement("p");p.textContent="30 sn alış: "+x.buyUsdt+" USDT | Satış: "+x.sellUsdt+" USDT";
    const q=document.createElement("p");q.textContent="Alış ivmesi: "+(x.buyAcceleration??"-")+"x | Satış ivmesi: "+(x.sellAcceleration??"-")+"x";
    const s=document.createElement("p");s.textContent="Net işlem baskısı: %"+x.imbalancePercent+" | İşlem sayısı: "+x.trades30s;
