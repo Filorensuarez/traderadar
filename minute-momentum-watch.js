@@ -70,6 +70,8 @@ export async function scanMinuteMomentum(){
    }
    lastDiscovery=Date.now();
   }
+  const eligible=new Set(Object.entries(markets).flatMap(([exchange,symbols])=>symbols.map(symbol=>exchange+":"+symbol)));
+  for(const key of active.keys())if(!eligible.has(key))active.delete(key);
   state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
   for(const e of ["OKX","KUCOIN","GATE.IO"]){
    for(const symbol of markets[e]||[]){
