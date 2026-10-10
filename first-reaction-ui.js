@@ -24,6 +24,7 @@ async function refresh(){
     " | 10 sn: %"+x.change10Pct+" | 30 sn: %"+x.change30Pct+
     " | Hacim: "+x.volumeAcceleration+"x | Alış payı: %"+x.buySharePct;
    card.append(p);
+   if(Number.isFinite(x.lastDetectedAt)){const age=document.createElement("p");age.textContent="Son tespit: "+Math.max(0,Math.floor((Date.now()-x.lastDetectedAt)/1000))+" saniye önce | Sinyal en fazla 60 saniye gösterilir.";card.append(age);}
    if(Number(x.price)>0){const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",{detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:Number(x.price)}})));card.append(button);}
    cards.append(card);
   }
@@ -33,5 +34,5 @@ async function refresh(){
 }
 document.querySelector("#pre15Button")?.addEventListener("click",refresh);
 document.querySelector("#firstReactionScan")?.addEventListener("click",refresh);
-setInterval(refresh,3000);
+setInterval(refresh,1000);
 refresh();
