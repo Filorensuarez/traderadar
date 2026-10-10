@@ -1,20 +1,24 @@
 import WebSocket from "ws";
 let socket=null,connected=false,error=null,lastMessage=0,started=false;
-let symbols=[];const trades=new Map();let pingTimer=null;
+let symbols=[];const trades=new Map();let pingTimer=null;let retryDelay=15000;
 async function connect(){
  try{
-  const response=await fetch("https://api.kucoin.com/api/v1/bullet-public",{method:"POST"});
+  const response=await fetch("https://api.kucoin.com/api/v1/bullet-public",{method:"POST",signal:AbortSignal.timeout(15000)});
+  if(response.status===429)throw Error("KuCoin rate limit (429)");
+  if(!response.ok)throw Error("KuCoin token HTTP "+response.status);
   const body=await response.json(),server=body.data?.instanceServers?.[0];
   if(!server)throw Error("KuCoin token unavailable");
   const tickerResponse=await fetch("https://api.kucoin.com/api/v1/market/allTickers",
    {signal:AbortSignal.timeout(15000)});
+  if(tickerResponse.status===429)throw Error("KuCoin rate limit (429)");
+  if(!tickerResponse.ok)throw Error("KuCoin ticker HTTP "+tickerResponse.status);
   const tickers=await tickerResponse.json();
   symbols=(tickers.data?.ticker||[]).filter(t=>/^[A-Z0-9]+-USDT$/.test(t.symbol)&&
    Number(t.volValue)>=50000)
    .sort((a,b)=>Number(b.volValue)-Number(a.volValue)).slice(0,100).map(t=>t.symbol);
   if(!symbols.length)throw Error("KuCoin uygun USDT piyasası bulunamadı");
   socket=new WebSocket(server.endpoint+"?token="+encodeURIComponent(body.data.token));
-  socket.on("open",()=>{connected=true;error=null;
+  socket.on("open",()=>{connected=true;error=null;retryDelay=15000;
    socket.send(JSON.stringify({id:String(Date.now()),type:"subscribe",
     topic:"/market/match:"+symbols.join(","),response:true,privateChannel:false}));
   });
@@ -30,10 +34,13 @@ async function connect(){
    trades.set(d.symbol,list);lastMessage=Date.now();
   });
   socket.on("error",e=>{error=e.message;});
-  socket.on("close",()=>{connected=false;clearInterval(pingTimer);if(started)setTimeout(connect,7000);});
+  socket.on("close",()=>{connected=false;clearInterval(pingTimer);if(started)setTimeout(connect,retryDelay);});
   clearInterval(pingTimer);pingTimer=setInterval(()=>{if(socket?.readyState===WebSocket.OPEN)
    socket.send(JSON.stringify({id:String(Date.now()),type:"ping"}));},18000);
- }catch(e){error=e.message;if(started)setTimeout(connect,10000);}
+ }catch(e){error=e.message;connected=false;
+  retryDelay=Math.min(300000,Math.max(15000,retryDelay*2));
+  if(started)setTimeout(connect,retryDelay);
+ }
 }
 export function startKucoinFlow(){if(started)return;started=true;connect();}
 export function kucoinFlowSnapshot(){
