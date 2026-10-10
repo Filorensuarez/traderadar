@@ -1,0 +1,25 @@
+name: Pre15 Radar Tests
+on:
+  push:
+    paths:
+      - 'pre15-engine.js'
+      - 'pre15-scanner.js'
+      - 'pre15-ui.js'
+      - 'server.js'
+      - 'tests/pre15.test.js'
+      - '.github/workflows/pre15-tests.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: node --check server.js
+      - run: node --check pre15-engine.js
+      - run: node --check pre15-scanner.js
+      - run: node --check pre15-ui.js
+      - run: node tests/pre15.test.js
