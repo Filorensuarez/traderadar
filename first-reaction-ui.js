@@ -16,6 +16,10 @@ async function render(){
    const decision=document.createElement("p");decision.className="first-reaction-decision "+(x.decision==="BEKLE"?"decision-wait":"decision-watch-buy");
    decision.textContent=x.decision;card.append(decision);
    const p=document.createElement("p");p.textContent="Fiyat: "+x.price+" | EMA7: "+x.ema7.toFixed(6)+" | EMA25: "+x.ema25.toFixed(6)+" | EMA99: "+x.ema99.toFixed(6)+" | Hacim: "+x.volumeRatio+"x | EMA7/25 farkı: %"+x.gapPct;card.append(p);
+   const volume=document.createElement("p");
+   volume.className="first-reaction-decision "+(x.volumeLevel==="PATLAMA HACMİ"?"decision-watch-buy":"decision-wait");
+   volume.textContent="Hacim: "+(x.volumeLevel||"ÖLÇÜLMEDİ")+" | Son mum: "+(x.lastVolumeRatio??"-")+"x | Ardışık artış: "+(x.risingVolume?"Evet":"Hayır");
+   card.append(volume);
    const why=document.createElement("p");why.textContent=x.reason;card.append(why);
    const when=document.createElement("p");when.textContent="Son tamamlanan mum: "+new Date(x.candleTime+3600000).toLocaleString("tr-TR");card.append(when);
    const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";
