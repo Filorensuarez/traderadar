@@ -1,4 +1,4 @@
-import {startPre15Scanner,pre15Status,inspectHistorical15} from "./pre15-scanner.js";
+
 import {recordFlowObservations,flowMeasurementStats} from "./flow-measurements.js";
 import {refreshMarketCaps,eligibleMarketCap,marketCapStatus} from "./market-cap-filter.js";
 import {startKucoinFlow,kucoinFlowSnapshot,kucoinFirstReactionSnapshot} from "./kucoin-flow.js";
@@ -51,16 +51,6 @@ app.get("/api/first-reaction",(req,res)=>{
   lastError:[gate.lastError,okx.lastError,kucoin.lastError].filter(Boolean).join(" | ")||null,
   rows:[...gate.rows,...okx.rows,...kucoin.rows].sort((a,b)=>b.volumeAcceleration-a.volumeAcceleration).slice(0,150),
   sources,notice:"OKX, KuCoin ve Gate.io USDT işlem akışları ayrı değerlendirilir. Kapsama sınırlıdır."});
-});
-app.get("/api/pre15/status",(req,res)=>{
- res.set("Cache-Control","no-store");res.json(pre15Status());
-});
-app.get("/api/pre15/history",async(req,res)=>{
- res.set("Cache-Control","no-store");
- try{
-  const result=await inspectHistorical15(req.query.symbol,req.query.event);
-  res.json({ok:true,...result});
- }catch(e){res.status(400).json({ok:false,error:e.message});}
 });
 const PORT = process.env.PORT || 3000;
 
@@ -8131,8 +8121,6 @@ setInterval(
 startFlowRadar();
 startOkxFlow();
 startKucoinFlow();
-refreshMarketCaps().then(()=>startPre15Scanner())
- .catch(e=>console.error("15 dakika öncesi radar başlangıcı:",e.message));
 setInterval(()=>refreshMarketCaps().catch(e=>
  console.error("Piyasa değeri güncellemesi:",e.message)),60*60*1000);
 const pre15PushCooldown=new Map();
