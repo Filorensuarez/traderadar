@@ -7,8 +7,17 @@ import { buildDecisionPlans } from "./decision-engine.js";
 import { analyzeMediumTrend, detectMediumPreBreakout } from "./medium-trend.js";
 import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 import { scanBistProvider, getBistState } from "./bist-provider.js";
+import {scanBurkut,burkutState} from "./burkut-provider.js";
 
 const app = express();
+app.get("/api/bist/burkut/status",(req,res)=>{
+  res.set("Cache-Control","no-store");res.json(burkutState());
+});
+app.post("/api/bist/burkut/scan",async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  try{res.json(await scanBurkut());}
+  catch(e){res.status(502).json({error:"BIST sağlayıcı sorgusu başarısız."});}
+});
 app.get("/api/bist/status",(req,res)=>{res.set("Cache-Control","no-store");res.json(getBistState());});
 app.post("/api/bist/scan",async(req,res)=>{
   res.set("Cache-Control","no-store");
