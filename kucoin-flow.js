@@ -1,3 +1,4 @@
+import {eligibleMarketCap} from "./market-cap-filter.js";
 import WebSocket from "ws";
 let socket=null,connected=false,error=null,lastMessage=0,started=false;
 let symbols=[];const trades=new Map();let pingTimer=null;let retryDelay=15000;
@@ -14,7 +15,7 @@ async function connect(){
   if(!tickerResponse.ok)throw Error("KuCoin ticker HTTP "+tickerResponse.status);
   const tickers=await tickerResponse.json();
   symbols=(tickers.data?.ticker||[]).filter(t=>/^[A-Z0-9]+-USDT$/.test(t.symbol)&&
-   Number(t.volValue)>=50000)
+   Number(t.volValue)>=1000&&eligibleMarketCap(t.symbol)!==null)
    .sort((a,b)=>Number(b.volValue)-Number(a.volValue)).slice(0,100).map(t=>t.symbol);
   if(!symbols.length)throw Error("KuCoin uygun USDT piyasası bulunamadı");
   socket=new WebSocket(server.endpoint+"?token="+encodeURIComponent(body.data.token));
