@@ -1,3 +1,4 @@
+import {startFlowRadar,flowSnapshot} from "./flow-radar.js";
 import express from "express";
 import webpush from "web-push";
 import fs from "fs";
@@ -6,25 +7,11 @@ import { detectPrePumpSetup } from "./pre-pump-setup.js";
 import { buildDecisionPlans } from "./decision-engine.js";
 import { analyzeMediumTrend, detectMediumPreBreakout } from "./medium-trend.js";
 import { recordSignals, getSignalStatistics } from "./signal-stats.js";
-import { scanBistProvider, getBistState } from "./bist-provider.js";
-import {scanBurkut,burkutState} from "./burkut-provider.js";
+
+
 
 const app = express();
-app.get("/api/bist/burkut/status",(req,res)=>{
-  res.set("Cache-Control","no-store");res.json(burkutState());
-});
-app.post("/api/bist/burkut/scan",async(req,res)=>{
-  res.set("Cache-Control","no-store");
-  try{res.json(await scanBurkut());}
-  catch(e){res.status(502).json({error:"BIST sağlayıcı sorgusu başarısız."});}
-});
-app.get("/api/bist/status",(req,res)=>{res.set("Cache-Control","no-store");res.json(getBistState());});
-app.post("/api/bist/scan",async(req,res)=>{
-  res.set("Cache-Control","no-store");
-  try{res.json(await scanBistProvider());}
-  catch(error){res.status(502).json({ok:false,error:"BIST veri sağlayıcısı taraması başarısız.",detail:error.message});}
-});
-
+app.get("/api/flow-radar",(req,res)=>{res.set("Cache-Control","no-store");res.json(flowSnapshot());});
 const PORT = process.env.PORT || 3000;
 
 const OKX =
@@ -8158,14 +8145,4 @@ async function backgroundMinuteRadarLoop() {
 }
 setTimeout(backgroundMinuteRadarLoop, 45 * 1000);
 
-/* BIST: provider configured only. Poll conservatively during Istanbul market hours.
-   Weekend/holiday sessions may be closed; stale bars must not be treated as live. */
-setInterval(()=>{
-  const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Istanbul",
-    weekday:"short",hour:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
-  const day=parts.find(p=>p.type==="weekday")?.value;
-  const hour=Number(parts.find(p=>p.type==="hour")?.value);
-  if(day==="Sat"||day==="Sun"||hour<9||hour>19)return;
-  if(!getBistState().providerConnected)return;
-  scanBistProvider().catch(e=>console.error("BIST otomatik tarama:",e.message));
-},15*60*1000);
+\nstartFlowRadar();\n
