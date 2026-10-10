@@ -1,3 +1,4 @@
+import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
 
 import {recordFlowObservations,flowMeasurementStats} from "./flow-measurements.js";
 import {refreshMarketCaps,eligibleMarketCap,marketCapStatus} from "./market-cap-filter.js";
@@ -17,6 +18,8 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 
 const app = express();
+app.get("/api/minute-momentum",(req,res)=>{res.set("Cache-Control","no-store");res.json(minuteMomentumStatus());});
+app.post("/api/minute-momentum/scan",(req,res)=>{res.set("Cache-Control","no-store");scanMinuteMomentum().catch(console.error);res.json({started:true,...minuteMomentumStatus()});});
 app.get("/api/flow-measurements",(req,res)=>{res.set("Cache-Control","no-store");res.json(flowMeasurementStats());});
 app.get("/api/flow-radar",(req,res)=>{
  res.set("Cache-Control","no-store");
@@ -8131,6 +8134,7 @@ setInterval(
 startFlowRadar();
 startOkxFlow();
 startKucoinFlow();
+startMinuteMomentum();
 setInterval(()=>refreshMarketCaps().catch(e=>
  console.error("Piyasa değeri güncellemesi:",e.message)),60*60*1000);
 // Historical five-candle notification job removed.
