@@ -14,7 +14,7 @@ async function universe(exchange){
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).slice(0,65).map(x=>x.currency_pair);
 }
 async function candles(exchange,symbol){
- if(exchange==="OKX"){const d=await json("https://www.okx.com/api/v5/market/history-candles?instId="+encodeURIComponent(symbol)+"&bar=1H&limit=150");
+ if(exchange==="OKX"){const d=await json("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar=1H&limit=150");
   return (d.data||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));}
  if(exchange==="KUCOIN"){const d=await json("https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol="+encodeURIComponent(symbol));
   return (d.data||[]).map(x=>({time:+x[0]*1000,open:+x[1],close:+x[2],high:+x[3],low:+x[4],volume:+x[5]}));}
