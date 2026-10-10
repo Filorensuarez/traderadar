@@ -13,7 +13,7 @@ async function render(){
   cards.replaceChildren();
   for(const x of data.rows||[]){
    const card=document.createElement("article");card.className="coin-card";
-   const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange+" • GÜNLÜK YENİ KESİŞİM";card.append(title);
+   const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange+" • "+x.status;card.append(title);
    const decision=document.createElement("p");decision.className="first-reaction-decision decision-wait";
    decision.textContent="TAKİP ET";card.append(decision);
    const detail=document.createElement("p");
