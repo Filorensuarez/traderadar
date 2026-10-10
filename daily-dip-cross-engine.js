@@ -20,7 +20,7 @@ export function detectDailyDipCross(input,now=Date.now()){
  if(rebound<0||rebound>.25)return null;
  let crossIndex=-1;
  for(let j=i;j>=i-4;j--)if(j>0&&e7[j-1]<=e25[j-1]&&e7[j]>e25[j]){crossIndex=j;break;}
- if(crossIndex<0||e7[i]<=e25[i])return null;
+ if(crossIndex<0||crossIndex<dipIndex||e7[i]<=e25[i])return null;
  const crossAge=i-crossIndex;
  const rising=e7[i]>e7[i-1]&&e25[i]>=e25[i-1];
  const priorHigh=Math.max(...bars.slice(i-5,i).map(b=>b.high));
