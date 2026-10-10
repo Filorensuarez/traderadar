@@ -6,8 +6,16 @@ import { detectPrePumpSetup } from "./pre-pump-setup.js";
 import { buildDecisionPlans } from "./decision-engine.js";
 import { analyzeMediumTrend, detectMediumPreBreakout } from "./medium-trend.js";
 import { recordSignals, getSignalStatistics } from "./signal-stats.js";
+import { scanBistProvider, getBistState } from "./bist-provider.js";
 
 const app = express();
+app.get("/api/bist/status",(req,res)=>{res.set("Cache-Control","no-store");res.json(getBistState());});
+app.post("/api/bist/scan",async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  try{res.json(await scanBistProvider());}
+  catch(error){res.status(502).json({ok:false,error:"BIST veri sağlayıcısı taraması başarısız.",detail:error.message});}
+});
+
 const PORT = process.env.PORT || 3000;
 
 const OKX =
