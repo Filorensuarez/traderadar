@@ -1,22 +1,5 @@
-import fs from "node:fs";
-import {detectEarlyCandle} from "./early-candle-engine.js";
+import {detectDailyDipCross} from "./daily-dip-cross-engine.js";
 const state={updatedAt:0,rows:[],checked:0,errors:[],running:false,universes:{}};
-const tracked=new Map();
-const STORE=process.env.CROSSING_STORE_PATH||"/data/crossing-tracked.json";
-try{
- if(fs.existsSync(STORE)){
-  const saved=JSON.parse(fs.readFileSync(STORE,"utf8"));
-  if(Array.isArray(saved))for(const [key,row] of saved){
-   if(typeof key==="string"&&row?.timeframe==="5m"&&["DİP SONRASI KESİŞİM","HACİMLİ MUM TEYİDİ"].includes(row.status)&&Date.now()-(row.lastCheckedAt||row.candleTime)<7200000)tracked.set(key,row);
-  }
- }
-}catch(e){console.warn("Kesişim kayıtları okunamadı:",e.message);}
-function saveTracked(){
- try{fs.mkdirSync(new URL(".", "file://"+STORE).pathname,{recursive:true});
-  const tmp=STORE+".tmp";fs.writeFileSync(tmp,JSON.stringify([...tracked]),"utf8");fs.renameSync(tmp,STORE);
- }catch(e){console.warn("Kesişim kayıtları saklanamadı:",e.message);}
-}
-
 const timeout=()=>AbortSignal.timeout(11000);
 async function json(url){const r=await fetch(url,{signal:timeout()});if(!r.ok)throw Error("HTTP "+r.status);return r.json();}
 async function universe(exchange){
@@ -31,11 +14,11 @@ async function universe(exchange){
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).slice(0,65).map(x=>x.currency_pair);
 }
 async function candles(exchange,symbol){
- if(exchange==="OKX"){const d=await json("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar="+"5m"+"&limit=150");
+ if(exchange==="OKX"){const d=await json("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar=1D&limit=150");
   return (d.data||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));}
- if(exchange==="KUCOIN"){const d=await json("https://api.kucoin.com/api/v1/market/candles?type="+"5min"+"&symbol="+encodeURIComponent(symbol));
+ if(exchange==="KUCOIN"){const d=await json("https://api.kucoin.com/api/v1/market/candles?type=1day&symbol="+encodeURIComponent(symbol));
   return (d.data||[]).map(x=>({time:+x[0]*1000,open:+x[1],close:+x[2],high:+x[3],low:+x[4],volume:+x[5]}));}
- const d=await json("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(symbol)+"&interval=5m&limit=150");
+ const d=await json("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(symbol)+"&interval=1d&limit=150");
  return d.map(x=>({time:+x[0]*1000,volume:+x[1],close:+x[2],high:+x[3],low:+x[4],open:+x[5]}));
 }
 let lastUniverse=0,universeCache={};
@@ -48,35 +31,24 @@ export async function scanCrossings(){
    for(let i=0;i<results.length;i++){const e=["OKX","KUCOIN","GATE.IO"][i];if(results[i].status==="fulfilled")universeCache[e]=results[i].value[1];else state.errors.push(e+": "+results[i].reason.message);}
    lastUniverse=Date.now();
   }
-  const errors=[];let checked=0;
+  const errors=[],rows=[];let checked=0;
   for(const e of ["OKX","KUCOIN","GATE.IO"]){
    const list=universeCache[e]||[];
    for(let i=0;i<list.length;i+=8){
     const batch=await Promise.allSettled(list.slice(i,i+8).map(async symbol=>{
-     const result=detectEarlyCandle(await candles(e,symbol));
+     const result=detectDailyDipCross(await candles(e,symbol));
      return {key:e+":"+symbol,row:result?{symbol:symbol.replace(/[-_]/,"/"),exchange:e,...result}:null};
     }));
-    for(const x of batch){checked++;if(x.status==="fulfilled"){
-      const {key,row}=x.value;
-      const previous=tracked.get(key);
-      if(row&&["DİP SONRASI KESİŞİM","HACİMLİ MUM TEYİDİ"].includes(row.status)){
-       const keepConfirmed=previous?.status==="HACİMLİ MUM TEYİDİ"&&row.status!=="HACİMLİ MUM TEYİDİ";
-       tracked.set(key,{...(keepConfirmed?previous:row),firstSeenAt:previous?.firstSeenAt||Date.now(),
-        lastCheckedAt:Date.now(),stale:false});
-      }else if(previous){
-       tracked.set(key,{...previous,stale:true,lastCheckedAt:Date.now(),
-        decision:"BEKLE",reason:"Yeni 5 dakikalık mumda formasyon teyidi yok. Eski sinyal güncel alım önerisi değildir."});
-      }
-     }else if(errors.length<10)errors.push(e+": "+x.reason.message);}
+    for(const x of batch){
+     checked++;
+     if(x.status==="fulfilled"&&x.value.row)rows.push(x.value.row);
+     else if(x.status==="rejected"&&errors.length<10)errors.push(e+": "+x.reason.message);
+    }
    }
   }
-  for(const [key,row] of tracked)if(Date.now()-row.firstSeenAt>7200000)tracked.delete(key);
-  saveTracked();
-  state.rows=[...tracked.values()].sort((a,b)=>Number(b.status==="HACİMLİ MUM TEYİDİ")-Number(a.status==="HACİMLİ MUM TEYİDİ")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
+  state.rows=rows.sort((a,b)=>a.crossAgeDays-b.crossAgeDays||a.priceFromDipPct-b.priceFromDipPct).slice(0,150);
   state.checked=checked;state.updatedAt=Date.now();state.errors=errors;state.universes=Object.fromEntries(Object.entries(universeCache).map(([k,v])=>[k,v.length]));
  }finally{state.running=false;}
  return crossingStatus();
 }
-export function crossingStatus(){
- const rows=[...tracked.values()].sort((a,b)=>Number(b.status==="ERKEN YÜKSELİŞ MUMU")-Number(a.status==="ERKEN YÜKSELİŞ MUMU")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
- return {...state,rows,trackedTotal:tracked.size,notice:"Dip sonrası EMA7/25 yakınlaşması takip edilir; hacimli pozitif 5 dakikalık kırılımda teknik AL sinyali gösterilir. Sinyaller en fazla 2 saat saklanır. Borsa başına en fazla 65 USDT çifti taranır."};}
+export function crossingStatus(){return {...state,notice:"Yalnızca tamamlanmış günlük mumlar; son 3 mumda EMA7/25 yukarı kesişimi ve 2–10 mum önce dip arar. Borsa başına ilk 65 USDT çifti taranır."};}
