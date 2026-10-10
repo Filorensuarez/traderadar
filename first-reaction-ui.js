@@ -12,7 +12,8 @@ async function render(){
   cards.replaceChildren();
   for(const x of d.rows||[]){
    const card=document.createElement("article");card.className="coin-card";
-   const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.exchange+" • "+x.status;card.append(h);
+   const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.exchange+" • "+(x.stale?"TEYİT BEKLENİYOR":x.status);card.append(h);
+   const tracking=document.createElement("p");tracking.className="description";tracking.textContent="Takip başlangıcı: "+new Date(x.firstSeenAt||x.candleTime).toLocaleString("tr-TR")+(x.stale?" | Güncel mum verisiyle teyit edilemedi":" | Aktif takip");card.append(tracking);
    const decision=document.createElement("p");decision.className="first-reaction-decision "+(x.decision==="BEKLE"?"decision-wait":"decision-watch-buy");
    decision.textContent=x.decision;card.append(decision);
    const p=document.createElement("p");p.textContent="Fiyat: "+x.price+" | EMA7: "+x.ema7.toFixed(6)+" | EMA25: "+x.ema25.toFixed(6)+" | EMA99: "+x.ema99.toFixed(6)+" | Hacim: "+x.volumeRatio+"x | EMA7/25 farkı: %"+x.gapPct;card.append(p);
