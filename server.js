@@ -1,3 +1,4 @@
+import {startPre15Scanner,pre15Status,inspectHistorical15} from "./pre15-scanner.js";
 import {recordFlowObservations,flowMeasurementStats} from "./flow-measurements.js";
 import {refreshMarketCaps,eligibleMarketCap,marketCapStatus} from "./market-cap-filter.js";
 import {startKucoinFlow,kucoinFlowSnapshot} from "./kucoin-flow.js";
@@ -36,6 +37,16 @@ app.get("/api/flow-radar",(req,res)=>{
    kucoin:{connected:kucoin.connected,tracked:kucoin.trackedSymbols,error:kucoin.lastError}},
   marketCap:marketCapStatus(),
   shown:rows.length,rows:rows.slice(0,200),notice:"Gerçekleşen işlemler; her coin ve borsada eksiksiz kapsama garanti edilmez."});
+});
+app.get("/api/pre15/status",(req,res)=>{
+ res.set("Cache-Control","no-store");res.json(pre15Status());
+});
+app.get("/api/pre15/history",async(req,res)=>{
+ res.set("Cache-Control","no-store");
+ try{
+  const result=await inspectHistorical15(req.query.symbol,req.query.event);
+  res.json({ok:true,...result});
+ }catch(e){res.status(400).json({ok:false,error:e.message});}
 });
 const PORT = process.env.PORT || 3000;
 
@@ -8101,107 +8112,26 @@ setInterval(
   5 * 60 * 1000
 );
 
-/* =========================
-   7/24 SENARYO TARAMASI
-========================= */
-
-/*
-  Sunucu açıldıktan 30 saniye
-  sonra ilk senaryo taramasını
-  başlat.
-*/
-
-setTimeout(
-  () => {
-
-    scanScenarios()
-      .catch(
-        error => {
-
-          console.error(
-            "Otomatik senaryo taraması:",
-            error.message
-          );
-        }
-      );
-  },
-  30 * 1000
-);
-
-
-/*
-  Uygulama veya telefon açık
-  olmasa da Railway üzerinde
-  senaryoları 2 dakikada bir tara.
-*/
-
-setInterval(
-  () => {
-
-    scanScenarios()
-      .catch(
-        error => {
-
-          console.error(
-            "Otomatik senaryo taraması:",
-            error.message
-          );
-        }
-      );
-  },
-  2 * 60 * 1000
-);
-
-/* Sunucuda otomatik erken hareket taraması.
-   Tam piyasa REST taraması uzun sürebileceği için üst üste başlatılmaz.
-   Bir sonraki tur, önceki tur bittikten sonra planlanır. */
-let backgroundMinuteRadarEnabled = true;
-async function backgroundMinuteRadarLoop() {
-  if (!backgroundMinuteRadarEnabled) return;
-  try {
-    if (!minuteRadarScanning) await scanMinuteRadar();
-  } catch (error) {
-    console.error("Erken hareket arka plan taraması:", error.message);
-  } finally {
-    if (backgroundMinuteRadarEnabled) {
-      setTimeout(backgroundMinuteRadarLoop, 3 * 60 * 1000);
-    }
-  }
-}
-setTimeout(backgroundMinuteRadarLoop, 45 * 1000);
-
-
-refreshMarketCaps().then(()=>{
-  startFlowRadar();startOkxFlow();startKucoinFlow();
-}).catch(e=>console.error("Piyasa değeri ilk yükleme:",e.message));
-setInterval(()=>refreshMarketCaps().catch(e=>console.error("Piyasa değeri:",e.message)),60*60*1000);
-
-setInterval(()=>{const gate=flowSnapshot(),okx=okxFlowSnapshot(),kucoin=kucoinFlowSnapshot();recordFlowObservations([...gate.rows,...okx.rows,...kucoin.rows]);},10000);
-
-/* 5-second server-side early watch; operates with the browser closed.
-   Notifications are hypotheses, not a guaranteed 2-minute lead. */
-const earlyAlertCooldown=new Map();
-let earlyWatchRunning=false;
+/* Legacy scenario, minute radar and trade-flow jobs are retired.
+   Daily confirmation and X Manager endpoints remain available. */
+refreshMarketCaps().then(()=>startPre15Scanner())
+ .catch(e=>console.error("15 dakika öncesi radar başlangıcı:",e.message));
+setInterval(()=>refreshMarketCaps().catch(e=>
+ console.error("Piyasa değeri güncellemesi:",e.message)),60*60*1000);
+const pre15PushCooldown=new Map();
 setInterval(async()=>{
- if(earlyWatchRunning)return;
- earlyWatchRunning=true;
  try{
-  const all=[...flowSnapshot().rows,...okxFlowSnapshot().rows,...kucoinFlowSnapshot().rows];
-  const now=Date.now();
-  for(const row of all){
-   if(!row.earlyBuyWatch||!Number.isFinite(row.earlyScore)||row.earlyScore<60)continue;
-   const cap=eligibleMarketCap(row.symbol);
-   if(cap===null)continue;
+  const snapshot=pre15Status(),now=Date.now();
+  for(const row of snapshot.rows){
+   if(row.status!=="YÜKSELİŞ HAZIRLIĞI"||now-row.scannedAt>120000)continue;
    const key=row.exchange+":"+row.symbol;
-   if(now-(earlyAlertCooldown.get(key)||0)<15*60*1000)continue;
-   earlyAlertCooldown.set(key,now);
-   await sendPush({title:"TradeRadar • ERKEN YÜKSELİŞ İZLEME",
-    body:row.symbol+" ("+row.exchange+") alış ivmesi "+(row.buySpeed10s??"-")+
-      "x, alış payı %"+(row.buySharePercent??"-")+
-      ". Yükseliş kesin değildir.",
-    url:"/#flow"});
+   if(now-(pre15PushCooldown.get(key)||0)<30*60000)continue;
+   pre15PushCooldown.set(key,now);
+   await sendPush({title:"TradeRadar • YÜKSELİŞ HAZIRLIĞI",
+    body:row.symbol+" ("+row.exchange+") | Hazırlık: "+row.score+
+      "/100 | 15 dk hacim: "+row.volumeRatio+"x. Kesin tahmin değildir.",
+    url:"/#pre15"});
   }
-  for(const [key,t] of earlyAlertCooldown)if(now-t>24*60*60*1000)earlyAlertCooldown.delete(key);
- }catch(error){console.error("Erken alış izleme:",error.message);}
- finally{earlyWatchRunning=false;}
-},5000);
+  for(const [key,t] of pre15PushCooldown)if(now-t>3600000)pre15PushCooldown.delete(key);
+ }catch(e){console.error("Pre15 bildirim:",e.message);}
+},30000);
