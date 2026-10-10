@@ -1,3 +1,4 @@
+import {detectFirstReaction} from "./first-reaction-engine.js";
 import {detectFastBuy} from "./fast-buy-detector.js";
 import {eligibleMarketCap} from "./market-cap-filter.js";
 import WebSocket from "ws";
@@ -63,6 +64,15 @@ export function okxFlowSnapshot(){
   rows.push({symbol:symbol.replace("-","/"),exchange:"OKX",mode,...fast,
    buyUsdt:Math.round(buy),sellUsdt:Math.round(sell),buyAcceleration,sellAcceleration,
    imbalancePercent:Number(imbalance.toFixed(1)),trades30s:count});
+ }
+ return {connected,lastMessage,lastError:error,trackedSymbols:markets.length,rows};
+}
+
+export function okxFirstReactionSnapshot(){
+ const now=Date.now(),rows=[];
+ for(const symbol of markets){
+  const signal=detectFirstReaction(trades.get(symbol)||[],now);
+  if(signal)rows.push({symbol:symbol.replace("-","/"),exchange:"OKX",...signal});
  }
  return {connected,lastMessage,lastError:error,trackedSymbols:markets.length,rows};
 }
