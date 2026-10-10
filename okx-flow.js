@@ -1,3 +1,4 @@
+import {eligibleMarketCap} from "./market-cap-filter.js";
 import WebSocket from "ws";
 // OKX public trades feed; a trade side identifies the aggressive taker.
 let ws=null,connected=false,lastMessage=0,error=null,started=false;
@@ -7,7 +8,7 @@ async function discover(){
   {signal:AbortSignal.timeout(15000)});
  if(!response.ok)throw Error("OKX discovery HTTP "+response.status);
  const json=await response.json();
- markets=(json.data||[]).filter(t=>/^[A-Z0-9]+-USDT$/.test(t.instId)&&Number(t.volCcy24h)>=50000)
+ markets=(json.data||[]).filter(t=>/^[A-Z0-9]+-USDT$/.test(t.instId)&&Number(t.volCcy24h)>=1000&&eligibleMarketCap(t.instId)!==null)
   .sort((a,b)=>Number(b.volCcy24h)-Number(a.volCcy24h)).slice(0,150).map(t=>t.instId);
 }
 function connect(){
