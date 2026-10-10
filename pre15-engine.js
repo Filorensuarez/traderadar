@@ -28,31 +28,48 @@ export function analyzePre15(input,{now=Date.now()}={}){
  const change15=(last.close/recent[0].open-1)*100;
  const distance=(resistance-last.close)/resistance*100;
  const ema7=ema(close,7),ema21=ema(close,21),ema7Old=ema(close.slice(0,-5),7);
- const green=recent.slice(-5).filter(x=>x.close>x.open).length;
+ const lastFive=recent.slice(-5);
+ const green=lastFive.filter(x=>x.close>x.open).length;
+ const fiveVolume=mean(lastFive.map(x=>x.volume));
+ const fiveVolumeRatio=fiveVolume/baselineVolume;
+ const fivePricePct=(last.close/lastFive[0].open-1)*100;
+ const fiveHigherLows=lastFive.slice(1).filter((x,i)=>x.low>=lastFive[i].low).length;
+ const fiveGreen=green;
+ const fiveVolumeAcceleration=mean(lastFive.slice(-2).map(x=>x.volume))/
+  Math.max(mean(lastFive.slice(0,3).map(x=>x.volume)),1e-12);
+ const fivePattern={
+  volumeRatio:Number(fiveVolumeRatio.toFixed(2)),
+  priceChangePct:Number(fivePricePct.toFixed(2)),
+  greenCandles:fiveGreen,
+  risingLowSteps:fiveHigherLows,
+  volumeAcceleration:Number(fiveVolumeAcceleration.toFixed(2))
+ };
  const risingLows=Math.min(...recent.slice(-5).map(x=>x.low))>
   Math.min(...recent.slice(0,5).map(x=>x.low));
  const compression=baseRange<=5&&recentRange<=Math.max(2,baseRange*1.15);
  const approaching=distance>=-0.4&&distance<=2.5;
  const momentum=ema7>ema7Old&&ema7>=ema21*.997&&green>=3;
  const early=change15>=-1&&change15<3;
- const volumeAwakening=volRatio>=1.25||last3>=1.7;
+ const volumeAwakening=volRatio>=1.25||last3>=1.7||fiveVolumeRatio>=1.5;
+ const fivePreparation=fiveVolumeRatio>=1.4&&fiveVolumeAcceleration>=1.15&&
+  fiveHigherLows>=2&&fivePricePct>=-0.5&&fivePricePct<2.5;
  const score=(compression?25:0)+(approaching?20:0)+(momentum?20:0)+
-  (volumeAwakening?20:0)+(risingLows?10:0)+(early?5:0);
+  (volumeAwakening?15:0)+(risingLows?5:0)+(early?5:0)+(fivePreparation?10:0);
  const reasons=[
   compression?"Dar fiyat aralığı":null,approaching?"Önceki dirence yakın":null,
   momentum?"EMA7 yukarı dönüyor ve pozitif mumlar artıyor":null,
   volumeAwakening?"Hacim hareketleniyor":null,risingLows?"Dipler yükseliyor":null,
-  early?"Fiyat henüz aşırı uzaklaşmamış":null
+  early?"Fiyat henüz aşırı uzaklaşmamış":null, fivePreparation?"Son 5 mumda hacim ve dipler güçleniyor":null
  ].filter(Boolean);
  let status="BEKLE";
  if(change15>=5||distance< -3)status="GEÇ KALINDI";
- else if(score>=70&&compression&&momentum&&volumeAwakening&&approaching&&early)
+ else if(score>=70&&compression&&momentum&&volumeAwakening&&approaching&&early&&fivePreparation)
   status="YÜKSELİŞ HAZIRLIĞI";
  else if(score>=50&&early)status="İZLE";
  return {status,score,reasons,price:last.close,resistance,support,
   change15Pct:Number(change15.toFixed(2)),distancePct:Number(distance.toFixed(2)),
   volumeRatio:Number(volRatio.toFixed(2)),last3VolumeRatio:Number(last3.toFixed(2)),
-  baseRangePct:Number(baseRange.toFixed(2)),ema7,ema21,asOf:last.time,
+  baseRangePct:Number(baseRange.toFixed(2)),fivePattern,ema7,ema21,asOf:last.time,
   predictionMinutes:null};
 }
 // Historical evaluation: event is a user-selected timestamp, never used in the signal.
