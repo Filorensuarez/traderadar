@@ -1,3 +1,4 @@
+import {detectFastBuy} from "./fast-buy-detector.js";
 import {eligibleMarketCap} from "./market-cap-filter.js";
 import WebSocket from "ws";
 let socket=null,connected=false,error=null,lastMessage=0,started=false;
@@ -30,7 +31,7 @@ async function connect(){
    if(!symbols.includes(d.symbol)||!["buy","sell"].includes(d.side)||!(p>0&&size>0))return;
    if(Math.abs(Date.now()-time)>120000)return;
    const list=trades.get(d.symbol)||[];
-   list.push({time,side:d.side,value:p*size});
+   list.push({time,side:d.side,value:p*size,price:p});
    while(list.length&&list[0].time<Date.now()-120000)list.shift();
    trades.set(d.symbol,list);lastMessage=Date.now();
   });
@@ -60,7 +61,8 @@ export function kucoinFlowSnapshot(){
   const mode=!enough?"VERİ YETERSİZ":buyAcceleration>=1.8&&imbalance>=25?
    "ALIŞ BASKISI ARTIYOR":sellAcceleration>=1.8&&imbalance<=-25?
    "SATIŞ BASKISI ARTIYOR":"DENGELİ / İZLE";
-  return {symbol:symbol.replace("-","/"),exchange:"KUCOIN",mode,buyUsdt:Math.round(buy),
+  const fast=detectFastBuy(list,now);
+  return {symbol:symbol.replace("-","/"),exchange:"KUCOIN",mode,...fast,buyUsdt:Math.round(buy),
    sellUsdt:Math.round(sell),buyAcceleration,sellAcceleration,
    imbalancePercent:Number(imbalance.toFixed(1)),trades30s:count};
  });
