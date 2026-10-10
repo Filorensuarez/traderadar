@@ -70,6 +70,7 @@ export async function scanMinuteMomentum(){
    }
    lastDiscovery=Date.now();
   }
+  state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
   for(const e of ["OKX","KUCOIN","GATE.IO"]){
    for(const symbol of markets[e]||[]){
     checked++;
@@ -87,6 +88,8 @@ export async function scanMinuteMomentum(){
       active.set(key,{exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result,firstSeenAt:Date.now(),lastCheckedAt:Date.now()});
      }
     }catch(err){failed++;if(errors.length<12)errors.push(e+" "+symbol+": "+err.message);}
+    state.checked=checked;state.successful=successful;state.failed=failed;
+    if(checked%10===0){state.closest=[...closest].sort((a,b)=>b.changePct-a.changePct).slice(0,12);state.maxChangePct=state.closest[0]?.changePct??null;}
     await pause(requestSpacing[e]);
    }
   }
