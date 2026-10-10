@@ -2712,4 +2712,5 @@ async function loadMediumWatch(){
 document.querySelector("#mediumWatchRefresh").addEventListener("click",loadMediumWatch);
 
 document.querySelector("#flowButton").addEventListener("click",()=>openView("flow"));
-\ndocument.querySelector("#pre15Button").addEventListener("click",()=>openView("pre15"));
+
+document.querySelector("#pre15Button").addEventListener("click",()=>openView("pre15"));
