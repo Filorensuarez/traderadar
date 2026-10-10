@@ -16,13 +16,13 @@ async function render(){
    const tracking=document.createElement("p");tracking.className="description";tracking.textContent="Takip başlangıcı: "+new Date(x.firstSeenAt||x.candleTime).toLocaleString("tr-TR")+(x.stale?" | Güncel mum verisiyle teyit edilemedi":" | Aktif takip");card.append(tracking);
    const decision=document.createElement("p");decision.className="first-reaction-decision "+(x.decision==="BEKLE"?"decision-wait":"decision-watch-buy");
    decision.textContent=x.decision;card.append(decision);
-   const p=document.createElement("p");p.textContent="Fiyat: "+x.price+" | EMA7: "+x.ema7.toFixed(6)+" | EMA25: "+x.ema25.toFixed(6)+" | EMA99: "+x.ema99.toFixed(6)+" | Hacim: "+x.volumeRatio+"x | EMA7/25 farkı: %"+x.gapPct;card.append(p);
+   const p=document.createElement("p");p.textContent="Fiyat: "+x.price+" | EMA7: "+x.ema7.toFixed(6)+" | EMA25: "+x.ema25.toFixed(6)+" | EMA99: "+(Number.isFinite(x.ema99)?x.ema99.toFixed(6):"5 dk taramasında yok")+" | Hacim: "+x.volumeRatio+"x | EMA7/25 farkı: %"+x.gapPct;card.append(p);
    const volume=document.createElement("p");
    volume.className="first-reaction-decision "+(x.volumeLevel==="PATLAMA HACMİ"?"decision-watch-buy":"decision-wait");
    volume.textContent="Hacim: "+(x.volumeLevel||"ÖLÇÜLMEDİ")+" | Son mum: "+(x.lastVolumeRatio??"-")+"x | Ardışık artış: "+(x.risingVolume?"Evet":"Hayır");
    card.append(volume);
    const age=document.createElement("p");
-   age.textContent="Kesişim yaşı: "+(x.crossAgeHours==null?"Son 150 mumda yukarı kesişim bulunamadı":x.crossAgeHours+" tamamlanmış saatlik mum önce")+
+   age.textContent="Zaman aralığı: "+(x.timeframe||"1h")+" | Kesişim yaşı: "+(x.crossAgeHours==null?"Son 150 mumda yukarı kesişim bulunamadı":x.crossAgeHours+" tamamlanmış saatlik mum önce")+
     (x.crossTime?" | Kesişim zamanı: "+new Date(x.crossTime).toLocaleString("tr-TR"):"");
    card.append(age);
    const checkLabels=[
@@ -43,7 +43,7 @@ async function render(){
     "Bekleme nedeni: "+(x.missingReasons?.join("; ")||x.reason):
     "Teyit: "+x.reason;
    card.append(why);
-   const when=document.createElement("p");when.textContent="Son tamamlanan mum: "+new Date(x.candleTime+3600000).toLocaleString("tr-TR");card.append(when);
+   const when=document.createElement("p");when.textContent="Son tamamlanan mum: "+new Date(x.candleTime+(x.timeframe==="5m"?300000:3600000)).toLocaleString("tr-TR");card.append(when);
    const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";
    button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",{detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:x.price}})));
    card.append(button);cards.append(card);
