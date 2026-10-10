@@ -1,6 +1,22 @@
+import fs from "node:fs";
 import {detectCrossing} from "./crossing-engine.js";
 const state={updatedAt:0,rows:[],checked:0,errors:[],running:false,universes:{}};
 const tracked=new Map();
+const STORE=process.env.CROSSING_STORE_PATH||"/data/crossing-tracked.json";
+try{
+ if(fs.existsSync(STORE)){
+  const saved=JSON.parse(fs.readFileSync(STORE,"utf8"));
+  if(Array.isArray(saved))for(const [key,row] of saved){
+   if(typeof key==="string"&&row&&typeof row==="object"&&Number.isFinite(row.firstSeenAt))tracked.set(key,row);
+  }
+ }
+}catch(e){console.warn("Kesişim kayıtları okunamadı:",e.message);}
+function saveTracked(){
+ try{fs.mkdirSync(new URL(".", "file://"+STORE).pathname,{recursive:true});
+  const tmp=STORE+".tmp";fs.writeFileSync(tmp,JSON.stringify([...tracked]),"utf8");fs.renameSync(tmp,STORE);
+ }catch(e){console.warn("Kesişim kayıtları saklanamadı:",e.message);}
+}
+
 const timeout=()=>AbortSignal.timeout(11000);
 async function json(url){const r=await fetch(url,{signal:timeout()});if(!r.ok)throw Error("HTTP "+r.status);return r.json();}
 async function universe(exchange){
@@ -32,8 +48,7 @@ export async function scanCrossings(){
    for(let i=0;i<results.length;i++){const e=["OKX","KUCOIN","GATE.IO"][i];if(results[i].status==="fulfilled")universeCache[e]=results[i].value[1];else state.errors.push(e+": "+results[i].reason.message);}
    lastUniverse=Date.now();
   }
-  const rows=[],errors=[];let checked=0;
-  const evaluated=new Set();
+  const errors=[];let checked=0;
   for(const e of ["OKX","KUCOIN","GATE.IO"]){
    const list=universeCache[e]||[];
    for(let i=0;i<list.length;i+=8){
@@ -42,7 +57,7 @@ export async function scanCrossings(){
      return {key:e+":"+symbol,row:result?{symbol:symbol.replace(/[-_]/,"/"),exchange:e,...result}:null};
     }));
     for(const x of batch){checked++;if(x.status==="fulfilled"){
-      const {key,row}=x.value;evaluated.add(key);
+      const {key,row}=x.value;
       if(row?.endConfirmed){tracked.delete(key);continue;}
       if(row&&(row.status==="YENİ KESİŞİM"||row.status==="KESİŞİM ADAYI"||row.trendActive)){
        const previous=tracked.get(key);
@@ -53,9 +68,12 @@ export async function scanCrossings(){
      }else if(errors.length<10)errors.push(e+": "+x.reason.message);}
    }
   }
+  saveTracked();
   state.rows=[...tracked.values()].sort((a,b)=>(b.decision==="ALIM KOŞULLARI OLUŞUYOR")-(a.decision==="ALIM KOŞULLARI OLUŞUYOR")||b.lastVolumeRatio-a.lastVolumeRatio).slice(0,150);
   state.checked=checked;state.updatedAt=Date.now();state.errors=errors;state.universes=Object.fromEntries(Object.entries(universeCache).map(([k,v])=>[k,v.length]));
  }finally{state.running=false;}
  return crossingStatus();
 }
-export function crossingStatus(){return {...state,notice:"Yalnızca tamamlanmış 1 saatlik mumlar; ilk 65 yüksek hacimli USDT çifti/borsa. Tüm piyasa taraması değildir."};}
+export function crossingStatus(){
+ const rows=[...tracked.values()].sort((a,b)=>(b.decision==="ALIM KOŞULLARI OLUŞUYOR")-(a.decision==="ALIM KOŞULLARI OLUŞUYOR")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
+ return {...state,rows,trackedTotal:tracked.size,notice:"Yalnızca tamamlanmış 1 saatlik mumlar; ilk 65 yüksek hacimli USDT çifti/borsa. Tüm piyasa taraması değildir."};}
