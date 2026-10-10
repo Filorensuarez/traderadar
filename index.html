@@ -76,7 +76,7 @@
   <button id="decisionButton" class="tab" type="button" data-view="decision">Orta Vadeli Yükseliş</button>
   <button id="bistButton" class="tab" type="button" data-view="bist">Kısa Vade BIST Yükseliş Radarı</button>
   <button id="bistButton" class="tab" type="button" data-view="bist">Kısa Vadeli BIST Radarı</button>
-  <button id="longButton" class="tab" data-view="long" type="button">36 Saatlik Başarı İstatistikleri</button>
+  <button id="flowButton" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>\n  <button id="longButton" class="tab" data-view="long" type="button">36 Saatlik Başarı İstatistikleri</button>
 </nav>
     <main class="container">
 
@@ -355,34 +355,16 @@
     <div id="decisionCards" class="coin-grid"></div>
     <div class="info-box">Fiyatlar gerçek alış/satış teklifi değildir. Komisyon, kayma ve emir defteri teyidi bulunmadığı için burada görülen planlar doğrudan alım emri sayılmaz.</div>
   </section>
-  <section id="bist" hidden>
-    <h2>Kısa Vade BIST Hisse Yükseliş Radarı</h2>
-    <p>EMA20/50, RSI, MACD, hacim artışı, direnç kırılımı ve sıkışma taraması.</p>
-    <div class="info-box">
-      <p>Gerçek zamanlı BIST veri lisansı henüz bağlı değildir. Şimdilik aracı, yetkili kaynaktan aldığınız OHLCV CSV verileriyle kullanabilirsiniz.</p>
-      <p>CSV sütunları: symbol,time,open,high,low,close,volume. Birden fazla hisse aynı dosyada bulunabilir. Her hisse için en az 60 tamamlanmış mum gerekir.</p>
-      <input id="bistFile" type="file" accept=".csv,text/csv" />
-      <button id="bistScan" type="button" class="refresh-button">BIST Hisselerini Tara</button>
-      <p id="bistStatus" aria-live="polite">CSV yükleyerek taramayı başlatın.</p>
-      <div class="info-box">
-        <h3>Otomatik Hisse Taraması</h3>
-        <p>Yetkili veri sağlayıcısı bağlandığında hisseleri otomatik tarar. Bağlantı yoksa açıkça bildirir; sahte canlı sonuç göstermez.</p>
-        <button id="bistAutoScan" class="refresh-button" type="button">Otomatik Tara</button>
-        <p id="bistAutoStatus" aria-live="polite">Veri sağlayıcısı kontrol edilmedi.</p>
-        <div id="bistAutoCards" class="coin-grid"></div>
-        <div class="info-box">
-          <h3>Ücretsiz Bürküt BIST Verileri</h3>
-          <p>15 dakika gecikmeli fiyat ve hacim listesi. 5/15 dakikalık mum analizi değildir. Ücretsiz kotayı korumak için en fazla 30 dakikada bir sorgulanır.</p>
-          <button id="burkutScan" class="refresh-button" type="button">Ücretsiz BIST Verisini Çek</button>
-          <p id="burkutStatus" aria-live="polite">Bağlantı kontrol ediliyor.</p>
-          <div id="burkutCards" class="coin-grid"></div>
-        </div>
-      </div>
-    </div>
-    <div id="bistCards" class="coin-grid"></div>
-    <div class="info-box">YÜKSELİŞ HAZIRLIĞI ve YÜKSELİŞ TEYİDİ teknik sınıflandırmadır. Canlı fiyat, işlem emri veya kazanç garantisi değildir.</div>
-  </section>
   
+  
+  <section id="flow" hidden>
+    <h2>Kripto Alış–Satış Baskısı Radarı</h2>
+    <p>Son 30 saniyedeki gerçekleşen piyasa alışları ve satışları, önceki 60 saniyenin ortalamasıyla karşılaştırılır.</p>
+    <button id="flowRefresh" class="refresh-button" type="button">Akışı Yenile</button>
+    <p id="flowStatus" aria-live="polite">İşlem akışı bekleniyor.</p>
+    <div id="flowCards" class="coin-grid"></div>
+    <p>Alış baskısı ve satış baskısı fiyatın kesin yönünü göstermez. İlk sürüm Gate.io USDT paritelerini izler.</p>
+  </section>
   </main>
 
 
@@ -396,7 +378,7 @@
 
 
   <script src="./app.js"></script>
-  <script type="module" src="./bist-ui.js"></script>
+  <script type="module" src="./flow-ui.js"></script>
 
 </body>
 </html>
