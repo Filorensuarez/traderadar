@@ -1,5 +1,5 @@
 import {detectFastBuy} from "./fast-buy-detector.js";
-import {eligibleMarketCap} from "./market-cap-filter.js";
+
 import WebSocket from "ws";
 let symbols=(process.env.FLOW_SYMBOLS||"BTC_USDT,ETH_USDT,SOL_USDT,XRP_USDT,DOGE_USDT,ADA_USDT,LINK_USDT,AVAX_USDT,SUI_USDT,TON_USDT,NEAR_USDT,APT_USDT,ARB_USDT,OP_USDT,UNI_USDT,LTC_USDT,PEPE_USDT")
  .split(",").map(s=>s.trim().toUpperCase()).filter(s=>/^[A-Z0-9]{2,24}_USDT$/.test(s)).slice(0,500);
@@ -13,10 +13,10 @@ async function discoverMarkets(){
   const tickers=await response.json();
   const limit=Math.min(500,Math.max(20,Number(process.env.FLOW_MAX_SYMBOLS)||300));
   const next=tickers.filter(t=>/^[A-Z0-9]{2,24}_USDT$/.test(t.currency_pair||"")&&
-    Number(t.quote_volume)>=1000&&eligibleMarketCap(t.currency_pair)!==null)
+    Number(t.quote_volume)>=1000)
     .sort((a,b)=>Number(b.quote_volume)-Number(a.quote_volume))
     .slice(0,limit).map(t=>t.currency_pair);
-  if(next.length)symbols=next;
+  if(next.length)symbols=next;else lastError="Gate.io aktif USDT paritesi bulunamadı";
  }catch(e){lastError="Piyasa keşfi: "+e.message;}
 }
 const buckets=new Map();let socket=null,connected=false,lastMessage=0,lastError=null,timer=null,heartbeat=null,started=false;
