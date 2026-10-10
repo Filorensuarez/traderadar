@@ -8123,20 +8123,5 @@ startOkxFlow();
 startKucoinFlow();
 setInterval(()=>refreshMarketCaps().catch(e=>
  console.error("Piyasa değeri güncellemesi:",e.message)),60*60*1000);
-const pre15PushCooldown=new Map();
-setInterval(async()=>{
- try{
-  const snapshot=pre15Status(),now=Date.now();
-  for(const row of snapshot.rows){
-   if(row.status!=="YÜKSELİŞ HAZIRLIĞI"||now-row.scannedAt>120000)continue;
-   const key=row.exchange+":"+row.symbol;
-   if(now-(pre15PushCooldown.get(key)||0)<30*60000)continue;
-   pre15PushCooldown.set(key,now);
-   await sendPush({title:"TradeRadar • YÜKSELİŞ HAZIRLIĞI",
-    body:row.symbol+" ("+row.exchange+") | Hazırlık: "+row.score+
-      "/100 | 15 dk hacim: "+row.volumeRatio+"x. Kesin tahmin değildir.",
-    url:"/#pre15"});
-  }
-  for(const [key,t] of pre15PushCooldown)if(now-t>3600000)pre15PushCooldown.delete(key);
- }catch(e){console.error("Pre15 bildirim:",e.message);}
-},30000);
+// Historical five-candle notification job removed.
+// First reaction uses live OKX, KuCoin and Gate.io streams.
