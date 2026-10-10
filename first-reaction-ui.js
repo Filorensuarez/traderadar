@@ -13,7 +13,7 @@ async function refresh(){
   status.textContent="Bağlantı: "+(d.connected?"Aktif":"Kesik")+
    " | İzlenen: "+d.trackedSymbols+" | Son işlem: "+
    (d.lastMessage?new Date(d.lastMessage).toLocaleTimeString("tr-TR"):"Yok")+
-   (d.lastError?" | Hata: "+d.lastError:"")+" | "+Object.entries(d.sources||{}).map(([name,v])=>name.toUpperCase()+": "+(v.connected?"aktif":"kesik")+" ("+v.tracked+")").join(" • ");
+   (d.lastError?" | Hata: "+d.lastError:"")+" | "+Object.entries(d.sources||{}).map(([name,v])=>name.toUpperCase()+": "+(v.connected?"bağlı":"kesik")+" ("+v.tracked+" parite"+(v.error?"; "+v.error:"")+")").join(" • ")+(d.lastMessage&&Date.now()-d.lastMessage>30000?" | UYARI: 30 saniyedir işlem verisi yok.":"");
   cards.replaceChildren();
   const stamp=document.createElement("p");stamp.textContent="Tarama: "+new Date(lastScan).toLocaleTimeString("tr-TR")+" | Aktif sinyal: "+(d.rows||[]).length;cards.append(stamp);
   for(const x of d.rows||[]){
@@ -27,7 +27,7 @@ async function refresh(){
    if(Number(x.price)>0){const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",{detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:Number(x.price)}})));card.append(button);}
    cards.append(card);
   }
-  if(!d.rows?.length){const p=document.createElement("p");p.textContent="Şu anda koşulları karşılayan canlı sinyal yok. "+d.notice;cards.append(p);}
+  if(!d.rows?.length){const p=document.createElement("p");p.textContent=!d.lastMessage?"Henüz canlı işlem verisi gelmedi. Bağlantı ve abonelikler kontrol edilmeli.":Date.now()-d.lastMessage>30000?"İşlem verisi güncel değil; radar sonucu güvenilir değil.":"Şu anda koşulları karşılayan canlı sinyal yok. "+d.notice;cards.append(p);}
  }catch(e){status.textContent="Canlı veri hatası: "+e.message;}
  finally{busy=false;}
 }
