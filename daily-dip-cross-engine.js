@@ -17,15 +17,36 @@ export function detectDailyDipCross(input,now=Date.now()){
  if(dipIndex+5>i)return null;
  for(let j=dipIndex+1;j<=dipIndex+5;j++)if(!(bars[j].close>bars[j-1].close))return null;
  const distance=(bars[i].close/dip-1)*100;
- if(distance<0||distance>10)return null;
+ if(distance<0)return null;
  const dipAge=crossIndex-dipIndex;
  if(dipAge<0)return null;
+ // Extended moves are retained only while the completed-candle trend remains positive.
+ const trendContinues=e7[i]>e25[i]&&e7[i]>=e7[i-1]&&
+  bars[i].close>=e7[i]&&bars[i].close>=bars[i-1].close;
+ if(distance>10&&!trendContinues)return null;
+ // Historical resistance and ATR give conditional targets, not a knowable top.
+ const ranges=[];
+ for(let j=Math.max(1,i-13);j<=i;j++){
+  const prev=bars[j-1].close;
+  ranges.push(Math.max(bars[j].high-bars[j].low,Math.abs(bars[j].high-prev),Math.abs(bars[j].low-prev)));
+ }
+ const atr=ranges.reduce((sum,n)=>sum+n,0)/ranges.length;
+ const priorHighs=bars.slice(Math.max(0,i-60),i).map(b=>b.high).filter(h=>h>bars[i].close).sort((a,b)=>a-b);
+ const resistance=priorHighs.length?priorHighs[0]:null;
+ const target1=bars[i].close+1.5*atr;
+ const target2=bars[i].close+3*atr;
+ const upperScenario=resistance!==null?Math.max(target2,resistance):target2;
+ const projectedUpsidePct=(upperScenario/bars[i].close-1)*100;
+ const extended=distance>10;
  const volumeBase=bars.slice(Math.max(0,i-20),i).reduce((s,b)=>s+b.volume,0)/Math.min(20,i);
  const volumeRatio=volumeBase>0?bars[i].volume/volumeBase:0;
- return {status:"GÜNLÜK YENİ KESİŞİM",decision:"TAKİP ET",timeframe:"1d",
+ return {status:extended?"YÜKSELİŞ DEVAM EDİYOR":"GÜNLÜK YENİ KESİŞİM",decision:extended?"UZAMIŞ HAREKET — RİSKİ KONTROL ET":"TAKİP ET",timeframe:"1d",
   price:bars[i].close,ema7:e7[i],ema25:e25[i],gapPct:+((e7[i]/e25[i]-1)*100).toFixed(2),
   dipPrice:dip,dipTime:bars[dipIndex].time,dipToCrossDays:dipAge,priceFromDipPct:+distance.toFixed(2),higherClosesAfterDip:5,lookbackCandles:20,
   crossTime:bars[crossIndex].time+DAY,crossAgeDays:i-crossIndex,candleTime:bars[i].time,
   volumeRatio:+volumeRatio.toFixed(2),lastVolumeRatio:+volumeRatio.toFixed(2),
-  reason:"Son 20 mumun en dusuk seviyesinden sonra 5 mum art arda yuksek kapandi; dipten uzaklik en fazla yuzde 10 ve EMA7 EMA25 yukari kesisti."};
+  trendContinues,extended,atr:+atr.toPrecision(8),target1:+target1.toPrecision(8),target2:+target2.toPrecision(8),
+  resistance:resistance===null?null:+resistance.toPrecision(8),upperScenario:+upperScenario.toPrecision(8),
+  projectedUpsidePct:+projectedUpsidePct.toFixed(2),
+  reason:extended?"Dipten %10 üzerinde yükseldi; EMA7/25 ve son kapanışla trend sürüyor. Hedefler ATR ve geçmiş dirençten türetilen koşullu senaryolardır.":"Dip sonrası beş yükselen kapanış ve yeni EMA7/25 kesişimi görüldü. Hedefler ATR ve geçmiş dirençten türetilen koşullu senaryolardır."};
 }
