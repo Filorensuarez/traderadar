@@ -6,7 +6,6 @@ let records=[];
 try{records=JSON.parse(localStorage.getItem(storageKey)||"[]");if(!Array.isArray(records))records=[];}catch{records=[];}
 let draft=null;
 let selectedExchange="";
-let selectedPrice=null;
 const planKey="traderadar-capital-plans";
 let plans=[];try{plans=JSON.parse(localStorage.getItem(planKey)||"[]");if(!Array.isArray(plans))plans=[];}catch{plans=[];}
 function stats(){
@@ -23,24 +22,6 @@ function render(){
  el("capitalLedger").textContent="Kaydedilen işlem sonucu: "+records.length+" | Kayıtlı plan: "+plans.length+" | Bugünkü net sonuç: "+money(s.today)+" TL.";
  el("capitalRecord").disabled=!draft||s.locked;
 }
-function importSignal(signal){
- if(!signal||!Number.isFinite(Number(signal.price))||Number(signal.price)<=0)return;
- selectedExchange=String(signal.exchange||"");
- selectedPrice=Number(signal.price);
- el("capitalSymbol").value=String(signal.symbol||"").toUpperCase();
- el("capitalEntry").value=String(selectedPrice);
- el("capitalStop").value="";
- el("capitalTarget").value="";
- draft=null;
- el("capitalSelected").textContent="İlk Tepki sinyali: "+signal.symbol+" • "+selectedExchange+" • "+signal.status;
- el("capitalExchange").textContent="Gözlenen fiyat: "+selectedPrice+" (paritenin kotasyon para birimi). TL karşılığı ve piyasa likiditesi doğrulanmadı.";
- el("capitalPlan").textContent="Sinyal aktarıldı. Örnek risk senaryosu oluşturabilir veya fiyat seviyelerini elle girebilirsiniz. Bu bir alım önerisi değildir.";
- render();
-}
-window.addEventListener("traderadar:select-signal",event=>{
- importSignal(event.detail);
- document.querySelector("#capitalButton").click();
-});
 el("capitalScenario").addEventListener("click",()=>{
  const entry=Number(el("capitalEntry").value);
  if(!(entry>0)){el("capitalPlan").textContent="Önce geçerli bir giriş fiyatı girin.";return;}
