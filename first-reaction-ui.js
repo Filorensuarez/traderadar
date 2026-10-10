@@ -24,6 +24,21 @@ async function refresh(){
     " | 10 sn: %"+x.change10Pct+" | 30 sn: %"+x.change30Pct+
     " | Hacim: "+x.volumeAcceleration+"x | Alış payı: %"+x.buySharePct;
    card.append(p);
+   const signalAge=Date.now()-Number(x.observedAt||0);
+   const current=Number.isFinite(signalAge)&&signalAge>=0&&signalAge<=15000;
+   const strong=x.status==="YÜKSELİŞ TEYİDİ"&&
+    Number(x.volumeAcceleration)>=4&&Number(x.buySharePct)>=72&&
+    Number(x.change30Pct)>=0.6&&Number(x.change30Pct)<=2.5;
+   const decision=document.createElement("p");
+   decision.className="first-reaction-decision "+(current&&strong?"decision-watch-buy":"decision-wait");
+   decision.textContent=current&&strong?"ALIM KOŞULLARI OLUŞUYOR — RİSKİ KONTROL ET":"BEKLE";
+   card.append(decision);
+   const explanation=document.createElement("p");
+   explanation.className="description";
+   explanation.textContent=!current?"İşlem sinyali güncel değil.":strong?
+    "Hacim ve alış baskısı güçlü; ancak likidite, zarar-kes ve risk/getiri henüz doğrulanmadı. Kesin alım kararı değildir.":
+    "Yükseliş teyidi, hacim veya alış baskısı koşulları henüz yeterli değil.";
+   card.append(explanation);
    if(Number.isFinite(x.lastDetectedAt)){const age=document.createElement("p");age.textContent="Son tespit: "+Math.max(0,Math.floor((Date.now()-x.lastDetectedAt)/1000))+" saniye önce | Sinyal en fazla 60 saniye gösterilir.";card.append(age);}
    if(Number(x.price)>0){const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",{detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:Number(x.price)}})));card.append(button);}
    cards.append(card);
