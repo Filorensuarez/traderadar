@@ -34,16 +34,16 @@ function detect(raw,now=Date.now()){
 async function universe(exchange){
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
-  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&+x.volCcy24h>0)
+  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&+x.volCcy24h>=10000)
    .sort((a,b)=>+b.volCcy24h-+a.volCcy24h).map(x=>x.instId);
  }
  if(exchange==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/allTickers");
-  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&+x.volValue>0)
+  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&+x.volValue>=10000)
    .sort((a,b)=>+b.volValue-+a.volValue).map(x=>x.symbol);
  }
  const d=await get("https://api.gateio.ws/api/v4/spot/tickers");
- return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&+x.quote_volume>0)
+ return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&+x.quote_volume>=10000)
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).map(x=>x.currency_pair);
 }
 async function candles(e,s){
@@ -103,7 +103,7 @@ export async function scanMinuteMomentum(){
 }
 export function minuteMomentumStatus(){
  return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
-  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, onlardan önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Borsalarda işlem hacmi bulunan bütün USDT spot çiftleri kapsamda; sabit coin sınırı yoktur. API hız sınırları nedeniyle tam tarama birkaç dakika veya daha uzun sürebilir."};
+  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, onlardan önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Borsalarda son 24 saatlik USDT karşılığı işlem hacmi en az 10.000 dolar olan bütün USDT spot çiftleri kapsamda; sabit coin sayısı sınırı yoktur. API hız sınırları nedeniyle tam tarama birkaç dakika veya daha uzun sürebilir."};
 }
 export function startMinuteMomentum(){scanMinuteMomentum().catch(console.error);
  setInterval(()=>scanMinuteMomentum().catch(console.error),60000);}
