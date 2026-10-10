@@ -5,6 +5,8 @@ const storageKey="traderadar-capital-journal";
 let records=[];
 try{records=JSON.parse(localStorage.getItem(storageKey)||"[]");if(!Array.isArray(records))records=[];}catch{records=[];}
 let draft=null;
+const planKey="traderadar-capital-plans";
+let plans=[];try{plans=JSON.parse(localStorage.getItem(planKey)||"[]");if(!Array.isArray(plans))plans=[];}catch{plans=[];}
 function stats(){
  const total=start+records.reduce((sum,r)=>sum+Number(r.pnl||0),0);
  const day=new Date().toDateString();
@@ -16,7 +18,7 @@ function render(){
  el("capitalSummary").textContent="Manuel kayıtlı sermaye: "+money(s.total)+" TL | Hedef: "+money(goal)+" TL | 12 ayda gerekli aylık bileşik getiri: %32,77.";
  el("capitalLimits").textContent="İşlem başına risk sınırı: %0,5 | Günlük kayıp sınırı: 2.000 TL | Toplam kayıp uyarısı: 10.000 TL.";
  el("capitalWarnings").textContent=s.locked?"Risk sınırı aşıldı: yeni plan oluşturmayın.":"Borsa bağlantısı yoktur; bütün kayıtlar manueldir.";
- el("capitalLedger").textContent="Kaydedilen işlem sonucu: "+records.length+" | Bugünkü net sonuç: "+money(s.today)+" TL.";
+ el("capitalLedger").textContent="Kaydedilen işlem sonucu: "+records.length+" | Kayıtlı plan: "+plans.length+" | Bugünkü net sonuç: "+money(s.today)+" TL.";
  el("capitalRecord").disabled=!draft||s.locked;
 }
 el("capitalCalculate").addEventListener("click",()=>{
@@ -33,7 +35,7 @@ el("capitalCalculate").addEventListener("click",()=>{
  el("capitalPlan").textContent="Teorik pozisyon: "+money(size)+" TL | Zarar-kes riski: "+money(loss)+" TL | Hedef kâr: "+money(profit)+" TL. Komisyon ve kayma hariç.";
  render();
 });
-el("capitalRecord").addEventListener("click",()=>{if(!draft)return;el("capitalPlan").textContent="Plan hesaplandı. Gerçek emir gönderilmedi.";draft=null;render();});
+el("capitalRecord").addEventListener("click",()=>{if(!draft||stats().locked)return;plans.push({...draft,at:Date.now(),type:"MANUAL_PLAN"});try{localStorage.setItem(planKey,JSON.stringify(plans));}catch{}el("capitalPlan").textContent="Plan günlüğe kaydedildi. Gerçek emir gönderilmedi.";draft=null;render();});
 el("capitalAddPnl").addEventListener("click",()=>{
  const value=el("capitalPnl").value.trim(),pnl=Number(value);
  if(!value||!Number.isFinite(pnl))return;
@@ -41,7 +43,7 @@ el("capitalAddPnl").addEventListener("click",()=>{
  el("capitalPnl").value="";render();
 });
 el("capitalExport").addEventListener("click",()=>{
- const url=URL.createObjectURL(new Blob([JSON.stringify(records,null,2)],{type:"application/json"}));
+ const url=URL.createObjectURL(new Blob([JSON.stringify({realizedResults:records,plans},null,2)],{type:"application/json"}));
  const a=document.createElement("a");a.href=url;a.download="sermaye-gunlugu.json";a.click();URL.revokeObjectURL(url);
 });
 const button=el("capitalButton"),section=el("capital");
