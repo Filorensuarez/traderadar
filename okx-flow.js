@@ -1,3 +1,4 @@
+import {detectFastBuy} from "./fast-buy-detector.js";
 import {eligibleMarketCap} from "./market-cap-filter.js";
 import WebSocket from "ws";
 // OKX public trades feed; a trade side identifies the aggressive taker.
@@ -30,7 +31,7 @@ function connect(){
     const price=Number(t.px),amount=Number(t.sz),time=Number(t.ts);
     if(!(price>0&&amount>0)||!["buy","sell"].includes(t.side)||Math.abs(Date.now()-time)>120000)continue;
     const key=String(t.instId),list=trades.get(key)||[];
-    list.push({time,side:t.side,value:price*amount});
+    list.push({time,side:t.side,value:price*amount,price});
     while(list.length&&list[0].time<Date.now()-120000)list.shift();
     if(list.length>10000)list.splice(0,list.length-10000);
     trades.set(key,list);lastMessage=Date.now();
@@ -58,7 +59,8 @@ export function okxFlowSnapshot(){
   const mode=!enough?"VERİ YETERSİZ":
    buyAcceleration>=1.8&&imbalance>=25?"ALIŞ BASKISI ARTIYOR":
    sellAcceleration>=1.8&&imbalance<=-25?"SATIŞ BASKISI ARTIYOR":"DENGELİ / İZLE";
-  rows.push({symbol:symbol.replace("-","/"),exchange:"OKX",mode,
+  const fast=detectFastBuy(list,now);
+  rows.push({symbol:symbol.replace("-","/"),exchange:"OKX",mode,...fast,
    buyUsdt:Math.round(buy),sellUsdt:Math.round(sell),buyAcceleration,sellAcceleration,
    imbalancePercent:Number(imbalance.toFixed(1)),trades30s:count});
  }
