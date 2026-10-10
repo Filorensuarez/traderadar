@@ -62,9 +62,9 @@ export async function scanCrossings(){
     if(e==="OKX")await pause(350);
    }
   }
-  state.rows=rows.sort((a,b)=>a.crossAgeDays-b.crossAgeDays||a.priceFromDipPct-b.priceFromDipPct).slice(0,150);
+  state.rows=rows.sort((a,b)=>Number(b.decision==="ALIM KOŞULLARI UYGUN")-Number(a.decision==="ALIM KOŞULLARI UYGUN")||a.crossAgeDays-b.crossAgeDays||a.priceFromDipPct-b.priceFromDipPct).slice(0,150);
   state.checked=checked;state.successful=successful;state.failed=failed;state.updatedAt=Date.now();state.errors=errors;state.universes=Object.fromEntries(Object.entries(universeCache).map(([k,v])=>[k,v.length]));
  }finally{state.running=false;}
  return crossingStatus();
 }
-export function crossingStatus(){return {...state,notice:"Tamamlanmış günlük mumlar: son 20 mumun en düşük seviyesi, ardından 5 ardışık yüksek kapanış, dipten %10 üzerindeki hareketlerde trend devamı kontrolü ve son 3 mumda EMA7/25 yukarı kesişimi. Borsa başına en fazla 65 USDT çifti."};}
+export function crossingStatus(){return {...state,notice:"Tek strateji: 20 günlük dip, son 5 mumda EMA7/25 yukarı kesişimi, 1,5 kat hacim, 5 mum zirve kırılımı, zarar-kes ve en az 1:2 risk/getiri. Borsa başına en fazla 65 USDT çifti."};}
