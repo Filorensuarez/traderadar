@@ -40,3 +40,33 @@ document.querySelector("#bistScan").addEventListener("click",async()=>{
     status.textContent=results.length+" hisse analiz edildi. Kaynak: yüklediğiniz CSV; canlı veri değildir.";
   }catch(e){status.textContent="Hata: "+e.message;}
 });
+
+const autoButton=document.querySelector("#bistAutoScan");
+const autoStatus=document.querySelector("#bistAutoStatus");
+const autoCards=document.querySelector("#bistAutoCards");
+function showAuto(data){
+  autoCards.replaceChildren();
+  autoStatus.textContent=(data.message||"")+
+    (data.updatedAt?" Son tarama: "+new Date(data.updatedAt).toLocaleString("tr-TR"):"")+
+    (data.scanned?" | İncelenen: "+data.scanned:"")+
+    (data.errors?.length?" | Veri hatası: "+data.errors.length:"");
+  for(const x of data.rows||[]){
+    const card=document.createElement("article");card.className="coin-card";
+    const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.status;
+    const p=document.createElement("p");p.textContent="Puan: "+(x.score??"-")+"/100 | Fiyat: "+(x.price??"-")+" TL | Hacim: "+(x.volumeRatio??"-")+"x";
+    const note=document.createElement("p");note.textContent=(x.reasons||[]).join(" • ");
+    card.append(h,p,note);autoCards.append(card);
+  }
+}
+autoButton.addEventListener("click",async()=>{
+  autoButton.disabled=true;autoStatus.textContent="Yetkili veri kaynağı kontrol ediliyor...";
+  try{
+    const r=await fetch("/api/bist/scan",{method:"POST"});
+    const data=await r.json();
+    if(!r.ok)throw Error(data.error||"Tarama hatası");
+    showAuto(data);
+  }catch(e){autoStatus.textContent="Tarama yapılamadı: "+e.message;}
+  finally{autoButton.disabled=false;}
+});
+fetch("/api/bist/status").then(r=>r.json()).then(showAuto)
+  .catch(()=>{autoStatus.textContent="Veri sağlayıcı durumu alınamadı.";});
