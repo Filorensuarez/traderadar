@@ -70,3 +70,33 @@ autoButton.addEventListener("click",async()=>{
 });
 fetch("/api/bist/status").then(r=>r.json()).then(showAuto)
   .catch(()=>{autoStatus.textContent="Veri sağlayıcı durumu alınamadı.";});
+
+const burkutButton=document.querySelector("#burkutScan");
+const burkutStatus=document.querySelector("#burkutStatus");
+const burkutCards=document.querySelector("#burkutCards");
+function showBurkut(data){
+  burkutCards.replaceChildren();
+  burkutStatus.textContent=(data.configured?"Bağlantı yapılandırılmış. ":"API anahtarı henüz eklenmedi. ")+
+    (data.message||"")+(data.universeCount?" Toplam hisse: "+data.universeCount:"")+
+    (data.updatedAt?" Son veri: "+new Date(data.updatedAt).toLocaleString("tr-TR"):"");
+  for(const x of data.rows||[]){
+    const card=document.createElement("article");card.className="coin-card";
+    const title=document.createElement("h3");title.textContent=x.symbol;
+    const price=document.createElement("p");price.textContent="Gecikmeli fiyat: "+x.price+" TL | Günlük değişim: %"+x.changePercent;
+    const volume=document.createElement("p");volume.textContent="Hacim: "+x.volume+
+      " | Veri zamanı: "+(x.updatedAt||"Bilinmiyor");
+    card.append(title,price,volume);burkutCards.append(card);
+  }
+}
+burkutButton.addEventListener("click",async()=>{
+  burkutButton.disabled=true;burkutStatus.textContent="Ücretsiz veri kaynağı sorgulanıyor...";
+  try{
+    const r=await fetch("/api/bist/burkut/scan",{method:"POST"});
+    const data=await r.json();
+    if(!r.ok)throw Error(data.error||"Bağlantı hatası");
+    showBurkut(data);
+  }catch(e){burkutStatus.textContent="Veri alınamadı: "+e.message;}
+  finally{burkutButton.disabled=false;}
+});
+fetch("/api/bist/burkut/status").then(r=>r.json()).then(showBurkut)
+  .catch(()=>{burkutStatus.textContent="Bürküt bağlantı durumu alınamadı.";});
