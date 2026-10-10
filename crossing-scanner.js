@@ -1,5 +1,6 @@
 import {detectCrossing} from "./crossing-engine.js";
 const state={updatedAt:0,rows:[],checked:0,errors:[],running:false,universes:{}};
+const tracked=new Map();
 const timeout=()=>AbortSignal.timeout(11000);
 async function json(url){const r=await fetch(url,{signal:timeout()});if(!r.ok)throw Error("HTTP "+r.status);return r.json();}
 async function universe(exchange){
@@ -32,17 +33,27 @@ export async function scanCrossings(){
    lastUniverse=Date.now();
   }
   const rows=[],errors=[];let checked=0;
+  const evaluated=new Set();
   for(const e of ["OKX","KUCOIN","GATE.IO"]){
    const list=universeCache[e]||[];
    for(let i=0;i<list.length;i+=8){
     const batch=await Promise.allSettled(list.slice(i,i+8).map(async symbol=>{
      const result=detectCrossing(await candles(e,symbol));
-     return result?{symbol:symbol.replace(/[-_]/,"/"),exchange:e,...result}:null;
+     return {key:e+":"+symbol,row:result?{symbol:symbol.replace(/[-_]/,"/"),exchange:e,...result}:null};
     }));
-    for(const x of batch){checked++;if(x.status==="fulfilled"&&x.value)rows.push(x.value);else if(x.status==="rejected"&&errors.length<10)errors.push(e+": "+x.reason.message);}
+    for(const x of batch){checked++;if(x.status==="fulfilled"){
+      const {key,row}=x.value;evaluated.add(key);
+      if(row?.endConfirmed){tracked.delete(key);continue;}
+      if(row&&(row.status==="YENİ KESİŞİM"||row.status==="KESİŞİM ADAYI"||row.trendActive)){
+       const previous=tracked.get(key);
+       tracked.set(key,{...row,firstSeenAt:previous?.firstSeenAt||Date.now(),lastCheckedAt:Date.now(),stale:false});
+      }else if(tracked.has(key)){
+       const previous=tracked.get(key);tracked.set(key,{...previous,lastCheckedAt:Date.now(),stale:true,decision:"BEKLE",reason:"Bu taramada yükseliş yapısı doğrulanamadı; kesin bitiş teyidi de yok."});
+      }
+     }else if(errors.length<10)errors.push(e+": "+x.reason.message);}
    }
   }
-  state.rows=rows.sort((a,b)=>(b.decision==="ALIM KOŞULLARI OLUŞUYOR")-(a.decision==="ALIM KOŞULLARI OLUŞUYOR")||b.volumeRatio-a.volumeRatio).slice(0,100);
+  state.rows=[...tracked.values()].sort((a,b)=>(b.decision==="ALIM KOŞULLARI OLUŞUYOR")-(a.decision==="ALIM KOŞULLARI OLUŞUYOR")||b.lastVolumeRatio-a.lastVolumeRatio).slice(0,150);
   state.checked=checked;state.updatedAt=Date.now();state.errors=errors;state.universes=Object.fromEntries(Object.entries(universeCache).map(([k,v])=>[k,v.length]));
  }finally{state.running=false;}
  return crossingStatus();
