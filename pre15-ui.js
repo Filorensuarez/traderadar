@@ -26,6 +26,7 @@ async function refresh(){
    row("Hazırlık puanı",x.score+"/100",card);
    row("Piyasa değeri","$"+trNumber(x.marketCapUsd,0),card);
    row("15 dk fiyat değişimi","%"+trNumber(x.change15Pct),card);
+   if(x.fivePattern){row("Son 5 mum hacim oranı",trNumber(x.fivePattern.volumeRatio)+"x",card);row("Son 5 mum fiyat değişimi","%"+trNumber(x.fivePattern.priceChangePct),card);row("Yeşil mum",x.fivePattern.greenCandles+"/5",card);row("Yükselen dip adımı",x.fivePattern.risingLowSteps+"/4",card);row("Hacim hızlanması",trNumber(x.fivePattern.volumeAcceleration)+"x",card);}
    row("15 dk hacim ivmesi",trNumber(x.volumeRatio)+"x",card);
    row("Son 3 dk hacim ivmesi",trNumber(x.last3VolumeRatio)+"x",card);
    row("Dirence uzaklık","%"+trNumber(x.distancePct),card);
@@ -54,6 +55,7 @@ document.querySelector("#pre15History").addEventListener("click",async()=>{
   row("Olay öncesi teknik durum",data.before.status||"Veri yetersiz",history);
   row("Olay öncesi puan",(data.before.score??0)+"/100",history);
   row("Hacim oranı",(data.before.volumeRatio??"-")+"x",history);
+  if(data.before.fivePattern){const f=data.before.fivePattern;row("Önceki 5 mum hacim oranı",f.volumeRatio+"x",history);row("Önceki 5 mum fiyat değişimi","%"+f.priceChangePct,history);row("Yeşil mum",f.greenCandles+"/5",history);row("Yükselen dip adımı",f.risingLowSteps+"/4",history);row("Hacim hızlanması",f.volumeAcceleration+"x",history);}
   row("İşaretler",(data.before.reasons||[]).join(" • ")||data.before.reason||"-",history);
   row("Sonraki 15 dk kapanış değişimi",data.future15Pct===null?"Veri yok":"%"+data.future15Pct,history);
   row("Sonraki 60 dk kapanış değişimi",data.future60Pct===null?"Veri yok":"%"+data.future60Pct,history);
