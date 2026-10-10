@@ -10,24 +10,22 @@ export function detectDailyDipCross(input,now=Date.now()){
  let crossIndex=-1;
  for(let j=i;j>=Math.max(1,i-2);j--){if(e7[j-1]<=e25[j-1]&&e7[j]>e25[j]){crossIndex=j;break;}}
  if(crossIndex<0||e7[i]<=e25[i])return null;
- const start=Math.max(0,crossIndex-10),end=Math.max(start,crossIndex-2);
- const candidates=bars.slice(start,end+1);
- if(!candidates.length)return null;
- let dipIndex=start;
- for(let j=start+1;j<=end;j++)if(bars[j].low<bars[dipIndex].low)dipIndex=j;
+ const windowStart=i-19;
+ let dipIndex=windowStart;
+ for(let j=windowStart+1;j<=i;j++)if(bars[j].low<bars[dipIndex].low)dipIndex=j;
  const dip=bars[dipIndex].low;
- const earlier=bars.slice(Math.max(0,dipIndex-12),dipIndex);
- if(earlier.length<5||dip>Math.min(...earlier.map(b=>b.low))*1.005)return null;
- const dipAge=crossIndex-dipIndex;
- if(dipAge<2||dipAge>10)return null;
- if(bars[crossIndex].close<=dip||bars[i].close<=dip)return null;
+ if(dipIndex+5>i)return null;
+ for(let j=dipIndex+1;j<=dipIndex+5;j++)if(!(bars[j].close>bars[j-1].close))return null;
  const distance=(bars[i].close/dip-1)*100;
+ if(distance<0||distance>10)return null;
+ const dipAge=crossIndex-dipIndex;
+ if(dipAge<0)return null;
  const volumeBase=bars.slice(Math.max(0,i-20),i).reduce((s,b)=>s+b.volume,0)/Math.min(20,i);
  const volumeRatio=volumeBase>0?bars[i].volume/volumeBase:0;
  return {status:"GÜNLÜK YENİ KESİŞİM",decision:"TAKİP ET",timeframe:"1d",
   price:bars[i].close,ema7:e7[i],ema25:e25[i],gapPct:+((e7[i]/e25[i]-1)*100).toFixed(2),
-  dipPrice:dip,dipTime:bars[dipIndex].time,dipToCrossDays:dipAge,priceFromDipPct:+distance.toFixed(2),
+  dipPrice:dip,dipTime:bars[dipIndex].time,dipToCrossDays:dipAge,priceFromDipPct:+distance.toFixed(2),higherClosesAfterDip:5,lookbackCandles:20,
   crossTime:bars[crossIndex].time+DAY,crossAgeDays:i-crossIndex,candleTime:bars[i].time,
   volumeRatio:+volumeRatio.toFixed(2),lastVolumeRatio:+volumeRatio.toFixed(2),
-  reason:"Dipten sonra EMA7, EMA25'i son üç tamamlanmış günlük mumda yukarı kesti. Kesin alım önerisi değildir."};
+  reason:"Son 20 mumun en dusuk seviyesinden sonra 5 mum art arda yuksek kapandi; dipten uzaklik en fazla yuzde 10 ve EMA7 EMA25 yukari kesisti."};
 }
