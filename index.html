@@ -76,6 +76,7 @@
   <button id="decisionButton" class="tab" type="button" data-view="decision" style="display:none" aria-hidden="true">Orta Vadeli Yükseliş</button>
   <button id="flowButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
+  <button id="momentumButton" class="tab" type="button" data-view="momentum">1 Dakikalık Momentum</button>
   <button id="capitalButton" class="tab" type="button" data-view="capital">Sermaye Yönetimi</button>
 </nav>
     <main class="container">
@@ -389,6 +390,13 @@
  <p id="capitalLedger" aria-live="polite"></p></div>
  <p class="description">Kaldıraç yok. İşlem başına azami planlanan risk %0,5; günlük zarar limiti %2; toplam düşüş uyarısı %10. Fiyat kayması ve komisyonlar gerçek zararı artırabilir.</p>
 </section>
+<section id="momentum" hidden>
+ <h2>1 Dakikalık Momentum</h2>
+ <p class="description">Son 10 tamamlanmış 1 dakikalık mumun ortalama kapanışı, önceki 10 mumun ortalamasına göre %2 yükseldiğinde takibe alır; %-2 düştüğünde takipten çıkarır.</p>
+ <button id="momentumScan" class="refresh-button" type="button">Şimdi Tara</button>
+ <p id="momentumStatus" aria-live="polite">Veriler bekleniyor.</p>
+ <div id="momentumCards" class="coin-grid"></div>
+</section>
   </main>
 
 
@@ -403,6 +411,7 @@
 
   <script src="./app.js"></script>
   <script type="module" src="./capital-manager.js"></script>
+  <script type="module" src="./minute-momentum-ui.js"></script>
 
 </body>
 </html>
