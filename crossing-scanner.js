@@ -51,4 +51,4 @@ export async function scanCrossings(){
  }finally{state.running=false;}
  return crossingStatus();
 }
-export function crossingStatus(){return {...state,notice:"Yalnızca tamamlanmış günlük mumlar; son 3 mumda EMA7/25 yukarı kesişimi ve 2–10 mum önce dip arar. Borsa başına ilk 65 USDT çifti taranır."};}
+export function crossingStatus(){return {...state,notice:"Tamamlanmış günlük mumlar: son 20 mumun en düşük seviyesi, ardından 5 ardışık yüksek kapanış, dipten en fazla %10 uzaklık ve son 3 mumda EMA7/25 yukarı kesişimi. Borsa başına en fazla 65 USDT çifti."};}
