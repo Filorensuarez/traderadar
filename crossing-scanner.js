@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import {detectCrossing} from "./crossing-engine.js";
+import {detectEarlyCandle} from "./early-candle-engine.js";
 const state={updatedAt:0,rows:[],checked:0,errors:[],running:false,universes:{}};
 const tracked=new Map();
 const STORE=process.env.CROSSING_STORE_PATH||"/data/crossing-tracked.json";
@@ -30,12 +31,12 @@ async function universe(exchange){
  return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&+x.quote_volume>1000)
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).slice(0,65).map(x=>x.currency_pair);
 }
-async function candles(exchange,symbol){
- if(exchange==="OKX"){const d=await json("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar=1H&limit=150");
+async function candles(exchange,symbol,interval="1h"){
+ if(exchange==="OKX"){const d=await json("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar="+(interval==="5m"?"5m":"1H")+"&limit=150");
   return (d.data||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));}
- if(exchange==="KUCOIN"){const d=await json("https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol="+encodeURIComponent(symbol));
+ if(exchange==="KUCOIN"){const d=await json("https://api.kucoin.com/api/v1/market/candles?type="+(interval==="5m"?"5min":"1hour")+"&symbol="+encodeURIComponent(symbol));
   return (d.data||[]).map(x=>({time:+x[0]*1000,open:+x[1],close:+x[2],high:+x[3],low:+x[4],volume:+x[5]}));}
- const d=await json("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(symbol)+"&interval=1h&limit=150");
+ const d=await json("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(symbol)+"&interval="+interval+"&limit=150");
  return d.map(x=>({time:+x[0]*1000,volume:+x[1],close:+x[2],high:+x[3],low:+x[4],open:+x[5]}));
 }
 let lastUniverse=0,universeCache={};
@@ -53,13 +54,16 @@ export async function scanCrossings(){
    const list=universeCache[e]||[];
    for(let i=0;i<list.length;i+=8){
     const batch=await Promise.allSettled(list.slice(i,i+8).map(async symbol=>{
-     const result=detectCrossing(await candles(e,symbol));
+     const hourly=detectCrossing(await candles(e,symbol));
+     let early=null;
+     try{early=detectEarlyCandle(await candles(e,symbol,"5m"));}catch{}
+     const result=early||hourly;
      return {key:e+":"+symbol,row:result?{symbol:symbol.replace(/[-_]/,"/"),exchange:e,...result}:null};
     }));
     for(const x of batch){checked++;if(x.status==="fulfilled"){
       const {key,row}=x.value;
       if(row?.endConfirmed){tracked.delete(key);continue;}
-      if(row&&(row.status==="YENİ KESİŞİM"||row.status==="KESİŞİM ADAYI"||row.trendActive)){
+      if(row&&(row.status==="YENİ KESİŞİM"||row.status==="KESİŞİM ADAYI"||row.status==="ERKEN YÜKSELİŞ MUMU"||row.trendActive)){
        const previous=tracked.get(key);
        tracked.set(key,{...row,firstSeenAt:previous?.firstSeenAt||Date.now(),lastCheckedAt:Date.now(),stale:false});
       }else if(tracked.has(key)){
@@ -69,11 +73,11 @@ export async function scanCrossings(){
    }
   }
   saveTracked();
-  state.rows=[...tracked.values()].sort((a,b)=>(b.decision==="ALIM KOŞULLARI OLUŞUYOR")-(a.decision==="ALIM KOŞULLARI OLUŞUYOR")||b.lastVolumeRatio-a.lastVolumeRatio).slice(0,150);
+  state.rows=[...tracked.values()].sort((a,b)=>Number(b.status==="ERKEN YÜKSELİŞ MUMU")-Number(a.status==="ERKEN YÜKSELİŞ MUMU")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
   state.checked=checked;state.updatedAt=Date.now();state.errors=errors;state.universes=Object.fromEntries(Object.entries(universeCache).map(([k,v])=>[k,v.length]));
  }finally{state.running=false;}
  return crossingStatus();
 }
 export function crossingStatus(){
- const rows=[...tracked.values()].sort((a,b)=>(b.decision==="ALIM KOŞULLARI OLUŞUYOR")-(a.decision==="ALIM KOŞULLARI OLUŞUYOR")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
+ const rows=[...tracked.values()].sort((a,b)=>Number(b.status==="ERKEN YÜKSELİŞ MUMU")-Number(a.status==="ERKEN YÜKSELİŞ MUMU")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
  return {...state,rows,trackedTotal:tracked.size,notice:"Yalnızca tamamlanmış 1 saatlik mumlar; ilk 65 yüksek hacimli USDT çifti/borsa. Tüm piyasa taraması değildir."};}
