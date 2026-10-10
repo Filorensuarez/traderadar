@@ -367,26 +367,10 @@
   </section>
 <section id="pre15" hidden>
  <h2>İlk Tepki</h2>
- <p class="description">5, 10 ve 30 saniyelik işlem akışından yükseliş başlangıcını tarar.</p>
+ <p class="description">Tara düğmesine bastığınız anda OKX, KuCoin ve Gate.io işlem akışlarında yeni başlayan yükselişler kontrol edilir. Veriler arka planda biriktirilir.</p>
+ <button id="firstReactionScan" class="refresh-button" type="button">Şimdi Tara</button>
  <p id="firstReactionStatus" aria-live="polite">Canlı işlem akışı bekleniyor...</p>
  <div id="firstReactionCards" class="coin-grid"></div>
- <p class="description">ERA, CFX ve ARPA benzeri hareketlerin başlangıcından önceki 5 adet bir dakikalık mumda hacim, fiyat, EMA ve dip değişimlerini tarar. 5 dakika önceden kesin tahmin değildir.</p>
- <div class="info-box">
-  <button id="pre15Refresh" class="refresh-button" type="button">Sonuçları Yenile</button>
-  <p id="pre15Status" aria-live="polite">İlk tarama bekleniyor.</p>
-  <div id="pre15Cards" class="coin-grid"></div>
- </div>
- <div class="info-box">
-  <h3>Yükseliş Öncesi 5 Mumu İncele</h3>
-  <p>Geçmiş bir olayın başlangıç saatini seçin. Seçilen olaydan önceki mumlar değerlendirilir. Bu, ileriye dönük başarı testi değildir.</p>
-  <label for="pre15Symbol">Coin (USDT)</label>
-  <input id="pre15Symbol" type="text" value="ARPA" maxlength="24" placeholder="ARPA"/>
-  <label for="pre15Event">Yükseliş başlangıcı (Türkiye saati)</label>
-  <input id="pre15Event" type="datetime-local"/>
-  <button id="pre15History" class="refresh-button" type="button">Önceki 5 Mumu Hesapla</button>
-  <div id="pre15HistoryResult" aria-live="polite"></div>
- </div>
- <p class="description">Şimdilik Gate.io'daki USDT pariteleri taranır. TRY grafikleriyle birebir aynı piyasa değildir. Yalnız piyasa değeri doğrulanmış 100 milyon USD ve altı coinler otomatik listelenir.</p>
 </section>
   </main>
 
@@ -401,7 +385,7 @@
 
 
   <script src="./app.js"></script>
-  <script type="module" src="./pre15-ui.js"></script>
+  
   <script type="module" src="./first-reaction-ui.js"></script>
 
 </body>
