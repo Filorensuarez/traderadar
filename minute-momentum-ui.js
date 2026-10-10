@@ -20,7 +20,7 @@ async function refresh(){
    const decision=document.createElement("p");decision.className="first-reaction-decision decision-watch-buy";
    decision.textContent="TAKİPTE";card.append(decision);
    const p=document.createElement("p");
-   p.textContent="Son 10 / önceki 10 ortalama değişimi: %"+x.changePct+
+   p.textContent="Son 10 / önceki 30 ortalama değişimi: %"+x.changePct+
     " | Fiyat: "+x.price+" | Önceki ortalama: "+x.previousAverage.toPrecision(8)+
     " | Son ortalama: "+x.currentAverage.toPrecision(8);
    card.append(p);
@@ -35,7 +35,7 @@ async function refresh(){
    if(d.closest?.length){
     const heading=document.createElement("h3");heading.textContent="Eşiğe en yakın coinler (takip sinyali değil)";cards.append(heading);
     for(const x of d.closest.slice(0,8)){
-     const line=document.createElement("p");line.textContent=x.symbol+" • "+x.exchange+" | 10/10 ortalama değişim: %"+x.changePct;cards.append(line);
+     const line=document.createElement("p");line.textContent=x.symbol+" • "+x.exchange+" | 10/30 ortalama değişim: %"+x.changePct;cards.append(line);
     }
    }
   }
