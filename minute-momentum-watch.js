@@ -1,4 +1,4 @@
-// 1-minute 10-vs-10 moving-average momentum watch, with hysteresis.
+// 1-minute 10-vs-30 moving-average momentum watch, with hysteresis.
 // Only completed candles count. Exchange symbols are kept separate.
 const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[],rows:[],universe:{},closest:[],maxChangePct:null};
 const active=new Map();
@@ -23,11 +23,11 @@ async function get(url,e){
 function detect(raw,now=Date.now()){
  const a=raw.map(x=>({time:+x.time,close:+x.close})).filter(x=>Number.isFinite(x.time)&&Number.isFinite(x.close)&&x.close>0&&x.time+INTERVAL<=now)
   .sort((x,y)=>x.time-y.time);
- const b=a.slice(-20);
- if(b.length!==20||now-(b.at(-1).time+INTERVAL)>120000)return null;
+ const b=a.slice(-40);
+ if(b.length!==40||now-(b.at(-1).time+INTERVAL)>120000)return null;
  for(let i=1;i<b.length;i++)if(b[i].time-b[i-1].time!==INTERVAL)return null;
  const avg=x=>x.reduce((s,v)=>s+v.close,0)/x.length;
- const previous=avg(b.slice(0,10)),latest=avg(b.slice(10));
+ const previous=avg(b.slice(0,30)),latest=avg(b.slice(30));
  return {changePct:+((latest/previous-1)*100).toFixed(3),price:b.at(-1).close,candleTime:b.at(-1).time,
   previousAverage:previous,currentAverage:latest};
 }
@@ -48,14 +48,14 @@ async function universe(exchange){
 }
 async function candles(e,s){
  if(e==="OKX"){
-  const d=await get("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=30","OKX");
+  const d=await get("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=50","OKX");
   return (d.data||[]).map(x=>({time:+x[0],close:+x[4]}));
  }
  if(e==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/candles?type=1min&symbol="+encodeURIComponent(s));
   return (d.data||[]).map(x=>({time:+x[0]*1000,close:+x[2]}));
  }
- const d=await get("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(s)+"&interval=1m&limit=30","GATE.IO");
+ const d=await get("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(s)+"&interval=1m&limit=50","GATE.IO");
  return d.map(x=>({time:+x[0]*1000,close:+x[2]}));
 }
 let lastDiscovery=0,markets={};
@@ -103,7 +103,7 @@ export async function scanMinuteMomentum(){
 }
 export function minuteMomentumStatus(){
  return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
-  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, önceki 10 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Borsalarda işlem hacmi bulunan bütün USDT spot çiftleri kapsamda; sabit coin sınırı yoktur. API hız sınırları nedeniyle tam tarama birkaç dakika veya daha uzun sürebilir."};
+  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, onlardan önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Borsalarda işlem hacmi bulunan bütün USDT spot çiftleri kapsamda; sabit coin sınırı yoktur. API hız sınırları nedeniyle tam tarama birkaç dakika veya daha uzun sürebilir."};
 }
 export function startMinuteMomentum(){scanMinuteMomentum().catch(console.error);
  setInterval(()=>scanMinuteMomentum().catch(console.error),60000);}
