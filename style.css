@@ -460,3 +460,8 @@ footer {
 #capital [hidden]{display:none!important}
 #firstReactionCards .coin-card button{margin-top:12px}
 @media(max-width:480px){#capital .refresh-button{width:100%;margin:6px 0}#capital .info-box{padding:16px}}
+
+/* First reaction decision labels */
+.first-reaction-decision{display:block;padding:12px 14px;border-radius:10px;font-weight:750;letter-spacing:.02em;margin:12px 0 8px}
+.decision-watch-buy{background:rgba(43,180,117,.14);border:1px solid rgba(43,180,117,.6);color:#80e6af}
+.decision-wait{background:rgba(235,180,62,.10);border:1px solid rgba(235,180,62,.45);color:#f2d188}
