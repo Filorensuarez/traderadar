@@ -1,3 +1,4 @@
+import {detectFirstReaction} from "./first-reaction-engine.js";
 import {detectFastBuy} from "./fast-buy-detector.js";
 import {eligibleMarketCap} from "./market-cap-filter.js";
 import WebSocket from "ws";
@@ -66,5 +67,14 @@ export function kucoinFlowSnapshot(){
    sellUsdt:Math.round(sell),buyAcceleration,sellAcceleration,
    imbalancePercent:Number(imbalance.toFixed(1)),trades30s:count};
  });
+ return {connected,lastMessage,lastError:error,trackedSymbols:symbols.length,rows};
+}
+
+export function kucoinFirstReactionSnapshot(){
+ const now=Date.now(),rows=[];
+ for(const symbol of symbols){
+  const signal=detectFirstReaction(trades.get(symbol)||[],now);
+  if(signal)rows.push({symbol:symbol.replace("-","/"),exchange:"KUCOIN",...signal});
+ }
  return {connected,lastMessage,lastError:error,trackedSymbols:symbols.length,rows};
 }
