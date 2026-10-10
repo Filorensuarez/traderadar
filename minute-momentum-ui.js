@@ -12,7 +12,7 @@ async function refresh(){
   status.textContent=(d.running?"Tarama sürüyor | ":"")+
    "Son tarama: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yok")+
    " | Denenen: "+d.checked+" | Başarılı: "+d.successful+" | Hatalı: "+d.failed+
-   " | Takipte: "+d.rows.length+(d.errors.length?" | İlk hata: "+d.errors[0]:"");
+   " | Takipte: "+d.rows.length+" | En yüksek değişim: "+(d.maxChangePct===null?"Veri yok":"%"+d.maxChangePct)+(d.errors.length?" | İlk hata: "+d.errors[0]:"");
   cards.replaceChildren();
   for(const x of d.rows){
    const card=document.createElement("article");card.className="coin-card";
@@ -30,7 +30,15 @@ async function refresh(){
     " | Son kontrol: "+new Date(x.lastCheckedAt).toLocaleTimeString("tr-TR");
    card.append(t);cards.append(card);
   }
-  if(!d.rows.length){const p=document.createElement("p");p.textContent="Takipte coin yok. "+d.notice;cards.append(p);}
+  if(!d.rows.length){
+   const p=document.createElement("p");p.textContent="Henüz %2 eşiğini karşılayan takip sinyali yok. "+d.notice;cards.append(p);
+   if(d.closest?.length){
+    const heading=document.createElement("h3");heading.textContent="Eşiğe en yakın coinler (takip sinyali değil)";cards.append(heading);
+    for(const x of d.closest.slice(0,8)){
+     const line=document.createElement("p");line.textContent=x.symbol+" • "+x.exchange+" | 10/10 ortalama değişim: %"+x.changePct;cards.append(line);
+    }
+   }
+  }
  }catch(e){status.textContent="Tarama hatası: "+e.message;}
 }
 button?.addEventListener("click",()=>{
