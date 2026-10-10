@@ -18,7 +18,7 @@ app.get("/api/flow-radar",(req,res)=>{
  res.set("Cache-Control","no-store");
  const gate=flowSnapshot(),okx=okxFlowSnapshot(),kucoin=kucoinFlowSnapshot();
  const rows=[...gate.rows,...okx.rows,...kucoin.rows]
-  .filter(row=>row.mode==="ALIŞ BASKISI ARTIYOR"||row.mode==="SATIŞ BASKISI ARTIYOR")
+  .filter(row=>row.fastBuyAlert||row.mode==="ALIŞ BASKISI ARTIYOR"||row.mode==="SATIŞ BASKISI ARTIYOR")
   .map(row=>({...row,marketCapUsd:eligibleMarketCap(row.symbol)}))
   .filter(row=>row.marketCapUsd!==null)
   .sort((a,b)=>
