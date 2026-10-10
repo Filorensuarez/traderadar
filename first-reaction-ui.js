@@ -1,53 +1,38 @@
-const status=document.querySelector("#firstReactionStatus");
-const cards=document.querySelector("#firstReactionCards");
+const status=document.querySelector("#firstReactionStatus"),cards=document.querySelector("#firstReactionCards");
 let busy=false;
-let lastScan=0;
-async function refresh(){
- if(busy||document.querySelector("#pre15")?.hidden)return;
- lastScan=Date.now();
- busy=true;
+async function render(){
  try{
-  const r=await fetch("/api/first-reaction",{cache:"no-store"});
+  const r=await fetch("/api/crossings/status",{cache:"no-store"});
   if(!r.ok)throw Error("HTTP "+r.status);
   const d=await r.json();
-  status.textContent="Bağlantı: "+(d.connected?"Aktif":"Kesik")+
-   " | İzlenen: "+d.trackedSymbols+" | Son işlem: "+
-   (d.lastMessage?new Date(d.lastMessage).toLocaleTimeString("tr-TR"):"Yok")+
-   (d.lastError?" | Hata: "+d.lastError:"")+" | "+Object.entries(d.sources||{}).map(([name,v])=>name.toUpperCase()+": "+(v.connected?"bağlı":"kesik")+" ("+v.tracked+" parite"+(v.error?"; "+v.error:"")+")").join(" • ")+(d.lastMessage&&Date.now()-d.lastMessage>30000?" | UYARI: 30 saniyedir işlem verisi yok.":"");
+  status.textContent=(d.running?"Tarama devam ediyor. ":"")+
+   "Son tarama: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yok")+
+   " | İncelenen: "+d.checked+" | Borsalar: "+Object.entries(d.universes||{}).map(([k,v])=>k+" "+v).join(", ")+
+   (d.errors?.length?" | Hatalar: "+d.errors.slice(0,2).join("; "):"");
   cards.replaceChildren();
-  const stamp=document.createElement("p");stamp.textContent="Tarama: "+new Date(lastScan).toLocaleTimeString("tr-TR")+" | Aktif sinyal: "+(d.rows||[]).length;cards.append(stamp);
   for(const x of d.rows||[]){
    const card=document.createElement("article");card.className="coin-card";
    const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.exchange+" • "+x.status;card.append(h);
-   const p=document.createElement("p");
-   p.textContent="Fiyat: "+x.price+" | 5 sn: %"+x.change5Pct+
-    " | 10 sn: %"+x.change10Pct+" | 30 sn: %"+x.change30Pct+
-    " | Hacim: "+x.volumeAcceleration+"x | Alış payı: %"+x.buySharePct;
-   card.append(p);
-   const signalAge=Date.now()-Number(x.observedAt||0);
-   const current=Number.isFinite(signalAge)&&signalAge>=0&&signalAge<=15000;
-   const strong=x.status==="YÜKSELİŞ TEYİDİ"&&
-    Number(x.volumeAcceleration)>=4&&Number(x.buySharePct)>=72&&
-    Number(x.change30Pct)>=0.6&&Number(x.change30Pct)<=2.5;
-   const decision=document.createElement("p");
-   decision.className="first-reaction-decision "+(current&&strong?"decision-watch-buy":"decision-wait");
-   decision.textContent=current&&strong?"ALIM KOŞULLARI OLUŞUYOR — RİSKİ KONTROL ET":"BEKLE";
-   card.append(decision);
-   const explanation=document.createElement("p");
-   explanation.className="description";
-   explanation.textContent=!current?"İşlem sinyali güncel değil.":strong?
-    "Hacim ve alış baskısı güçlü; ancak likidite, zarar-kes ve risk/getiri henüz doğrulanmadı. Kesin alım kararı değildir.":
-    "Yükseliş teyidi, hacim veya alış baskısı koşulları henüz yeterli değil.";
-   card.append(explanation);
-   if(Number.isFinite(x.lastDetectedAt)){const age=document.createElement("p");age.textContent="Son tespit: "+Math.max(0,Math.floor((Date.now()-x.lastDetectedAt)/1000))+" saniye önce | Sinyal en fazla 60 saniye gösterilir.";card.append(age);}
-   if(Number(x.price)>0){const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",{detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:Number(x.price)}})));card.append(button);}
-   cards.append(card);
+   const decision=document.createElement("p");decision.className="first-reaction-decision "+(x.decision==="BEKLE"?"decision-wait":"decision-watch-buy");
+   decision.textContent=x.decision;card.append(decision);
+   const p=document.createElement("p");p.textContent="Fiyat: "+x.price+" | EMA7: "+x.ema7.toFixed(6)+" | EMA25: "+x.ema25.toFixed(6)+" | EMA99: "+x.ema99.toFixed(6)+" | Hacim: "+x.volumeRatio+"x | EMA7/25 farkı: %"+x.gapPct;card.append(p);
+   const why=document.createElement("p");why.textContent=x.reason;card.append(why);
+   const when=document.createElement("p");when.textContent="Son tamamlanan mum: "+new Date(x.candleTime+3600000).toLocaleString("tr-TR");card.append(when);
+   const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";
+   button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",{detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:x.price}})));
+   card.append(button);cards.append(card);
   }
-  if(!d.rows?.length){const p=document.createElement("p");p.textContent=!d.lastMessage?"Henüz canlı işlem verisi gelmedi. Bağlantı ve abonelikler kontrol edilmeli.":Date.now()-d.lastMessage>30000?"İşlem verisi güncel değil; radar sonucu güvenilir değil.":"Şu anda koşulları karşılayan canlı sinyal yok. "+d.notice;cards.append(p);}
- }catch(e){status.textContent="Canlı veri hatası: "+e.message;}
- finally{busy=false;}
+  if(!d.rows?.length){const p=document.createElement("p");p.textContent=d.updatedAt?"Son taramada koşulları karşılayan kesişim bulunmadı.":"Kesişim taraması başlatılmadı.";cards.append(p);}
+  const note=document.createElement("p");note.className="description";note.textContent=d.notice;cards.append(note);
+ }catch(e){status.textContent="Tarama sonucu alınamadı: "+e.message;}
 }
-document.querySelector("#pre15Button")?.addEventListener("click",refresh);
-document.querySelector("#firstReactionScan")?.addEventListener("click",refresh);
-setInterval(refresh,1000);
-refresh();
+async function scan(){
+ if(busy)return;busy=true;status.textContent="Üç borsada 1 saatlik mumlar inceleniyor. Bu işlem biraz sürebilir.";
+ try{const r=await fetch("/api/crossings/scan",{method:"POST"});if(!r.ok)throw Error("HTTP "+r.status);}
+ catch(e){status.textContent="Tarama hatası: "+e.message;}
+ finally{busy=false;await render();}
+}
+document.querySelector("#firstReactionScan")?.addEventListener("click",scan);
+document.querySelector("#pre15Button")?.addEventListener("click",render);
+setInterval(()=>{if(!document.querySelector("#pre15")?.hidden)render();},15000);
+render();
