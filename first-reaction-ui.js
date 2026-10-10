@@ -21,7 +21,28 @@ async function render(){
    volume.className="first-reaction-decision "+(x.volumeLevel==="PATLAMA HACMİ"?"decision-watch-buy":"decision-wait");
    volume.textContent="Hacim: "+(x.volumeLevel||"ÖLÇÜLMEDİ")+" | Son mum: "+(x.lastVolumeRatio??"-")+"x | Ardışık artış: "+(x.risingVolume?"Evet":"Hayır");
    card.append(volume);
-   const why=document.createElement("p");why.textContent=x.reason;card.append(why);
+   const age=document.createElement("p");
+   age.textContent="Kesişim yaşı: "+(x.crossAgeHours==null?"Son 150 mumda yukarı kesişim bulunamadı":x.crossAgeHours+" tamamlanmış saatlik mum önce")+
+    (x.crossTime?" | Kesişim zamanı: "+new Date(x.crossTime).toLocaleString("tr-TR"):"");
+   card.append(age);
+   const checkLabels=[
+    ["recentCross","Yeni EMA7/25 kesişimi"],
+    ["risingAverages","Ortalamalar yükseliyor"],
+    ["aboveEma99","EMA99 teyidi"],
+    ["volumeAtLeast2x","En az 2 kat hacim"],
+    ["positiveCandle","Pozitif mum kapanışı"],
+    ["risingVolume","Ardışık hacim artışı (bilgi amaçlı)"]
+   ];
+   if(x.checks){
+    const checks=document.createElement("p");checks.className="description";
+    checks.textContent=checkLabels.map(([key,label])=>label+": "+(x.checks[key]?"VAR":"YOK")).join(" | ");
+    card.append(checks);
+   }
+   const why=document.createElement("p");
+   why.textContent=x.stale?"Bekleme nedeni: Bu taramada güncel teknik teyit alınamadı.":x.decision==="BEKLE"?
+    "Bekleme nedeni: "+(x.missingReasons?.join("; ")||x.reason):
+    "Teyit: "+x.reason;
+   card.append(why);
    const when=document.createElement("p");when.textContent="Son tamamlanan mum: "+new Date(x.candleTime+3600000).toLocaleString("tr-TR");card.append(when);
    const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";
    button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",{detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:x.price}})));
