@@ -5,6 +5,8 @@ const storageKey="traderadar-capital-journal";
 let records=[];
 try{records=JSON.parse(localStorage.getItem(storageKey)||"[]");if(!Array.isArray(records))records=[];}catch{records=[];}
 let draft=null;
+let selectedExchange="";
+let selectedPrice=null;
 const planKey="traderadar-capital-plans";
 let plans=[];try{plans=JSON.parse(localStorage.getItem(planKey)||"[]");if(!Array.isArray(plans))plans=[];}catch{plans=[];}
 function stats(){
@@ -21,6 +23,31 @@ function render(){
  el("capitalLedger").textContent="Kaydedilen işlem sonucu: "+records.length+" | Kayıtlı plan: "+plans.length+" | Bugünkü net sonuç: "+money(s.today)+" TL.";
  el("capitalRecord").disabled=!draft||s.locked;
 }
+function importSignal(signal){
+ if(!signal||!Number.isFinite(Number(signal.price))||Number(signal.price)<=0)return;
+ selectedExchange=String(signal.exchange||"");
+ selectedPrice=Number(signal.price);
+ el("capitalSymbol").value=String(signal.symbol||"").toUpperCase();
+ el("capitalEntry").value=String(selectedPrice);
+ el("capitalStop").value="";
+ el("capitalTarget").value="";
+ draft=null;
+ el("capitalSelected").textContent="İlk Tepki sinyali: "+signal.symbol+" • "+selectedExchange+" • "+signal.status;
+ el("capitalExchange").textContent="Gözlenen fiyat: "+selectedPrice+" (paritenin kotasyon para birimi). TL karşılığı ve piyasa likiditesi doğrulanmadı.";
+ el("capitalPlan").textContent="Sinyal aktarıldı. Örnek risk senaryosu oluşturabilir veya fiyat seviyelerini elle girebilirsiniz. Bu bir alım önerisi değildir.";
+ render();
+}
+window.addEventListener("traderadar:select-signal",event=>{
+ importSignal(event.detail);
+ document.querySelector("#capitalButton").click();
+});
+el("capitalScenario").addEventListener("click",()=>{
+ const entry=Number(el("capitalEntry").value);
+ if(!(entry>0)){el("capitalPlan").textContent="Önce geçerli bir giriş fiyatı girin.";return;}
+ el("capitalStop").value=Number((entry*.98).toPrecision(10));
+ el("capitalTarget").value=Number((entry*1.04).toPrecision(10));
+ el("capitalPlan").textContent="ÖRNEK: %2 zarar-kes ve %4 hedef varsayımı girildi. Gerçek destek/direnç veya ATR analizi değildir; otomatik işlem yapmayın.";
+});
 el("capitalCalculate").addEventListener("click",()=>{
  const s=stats(),entry=Number(el("capitalEntry").value),stop=Number(el("capitalStop").value),target=Number(el("capitalTarget").value);
  const symbol=el("capitalSymbol").value.trim().toUpperCase();
@@ -31,7 +58,7 @@ el("capitalCalculate").addEventListener("click",()=>{
  const distance=(entry-stop)/entry;
  const size=Math.min(s.total*.2,s.total*.005/distance);
  const loss=size*distance,profit=size*(target/entry-1);
- draft={symbol,entry,stop,target,size,loss,profit};
+ draft={symbol,exchange:selectedExchange||"MANUEL",entry,stop,target,size,loss,profit};
  el("capitalPlan").textContent="Teorik pozisyon: "+money(size)+" TL | Zarar-kes riski: "+money(loss)+" TL | Hedef kâr: "+money(profit)+" TL. Komisyon ve kayma hariç.";
  render();
 });
