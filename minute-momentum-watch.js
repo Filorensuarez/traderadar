@@ -102,7 +102,7 @@ export async function scanMinuteMomentum(){
  return minuteMomentumStatus();
 }
 export function minuteMomentumStatus(){
- return {...state,rows:[...active.values()].sort((a,b)=>b.changePct-a.changePct),
+ return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
   notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, önceki 10 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Borsalarda işlem hacmi bulunan bütün USDT spot çiftleri kapsamda; sabit coin sınırı yoktur. API hız sınırları nedeniyle tam tarama birkaç dakika veya daha uzun sürebilir."};
 }
 export function startMinuteMomentum(){scanMinuteMomentum().catch(console.error);
