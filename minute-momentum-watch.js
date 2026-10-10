@@ -1,6 +1,6 @@
 // 1-minute 10-vs-10 moving-average momentum watch, with hysteresis.
 // Only completed candles count. Exchange symbols are kept separate.
-const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[],rows:[],universe:{}};
+const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[],rows:[],universe:{},closest:[],maxChangePct:null};
 const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
@@ -24,7 +24,7 @@ async function universe(exchange){
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
   return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&+x.volCcy24h>1000)
-   .sort((a,b)=>+b.volCcy24h-+a.volCcy24h).slice(0,35).map(x=>x.instId);
+   .sort((a,b)=>+b.volCcy24h-+a.volCcy24h).slice(0,80).map(x=>x.instId);
  }
  if(exchange==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/allTickers");
@@ -51,7 +51,7 @@ let lastDiscovery=0,markets={};
 export async function scanMinuteMomentum(){
  if(state.running)return minuteMomentumStatus();
  state.running=true;
- const errors=[];let checked=0,successful=0,failed=0;
+ const errors=[],closest=[];let checked=0,successful=0,failed=0;
  try{
   if(Date.now()-lastDiscovery>15*60000){
    for(const e of ["OKX","KUCOIN","GATE.IO"]){
@@ -67,6 +67,7 @@ export async function scanMinuteMomentum(){
      const result=detect(await candles(e,symbol));
      if(!result)throw Error("Yeterli ardışık kapanmış mum yok");
      successful++;
+     closest.push({exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result});
      const previous=active.get(key);
      if(previous){
       if(result.changePct<=-2){active.delete(key);}
@@ -80,13 +81,15 @@ export async function scanMinuteMomentum(){
   }
   state.checked=checked;state.successful=successful;state.failed=failed;
   state.updatedAt=Date.now();state.errors=errors;
+  state.closest=closest.sort((a,b)=>b.changePct-a.changePct).slice(0,12);
+  state.maxChangePct=state.closest.length?state.closest[0].changePct:null;
   state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
  }finally{state.running=false;}
  return minuteMomentumStatus();
 }
 export function minuteMomentumStatus(){
  return {...state,rows:[...active.values()].sort((a,b)=>b.changePct-a.changePct),
-  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, önceki 10 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Her borsada en fazla 35 USDT çifti."};
+  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, önceki 10 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Her borsada en fazla 80 yüksek hacimli USDT çifti. Eşiğe yaklaşanlar ayrı gösterilir."};
 }
 export function startMinuteMomentum(){scanMinuteMomentum().catch(console.error);
  setInterval(()=>scanMinuteMomentum().catch(console.error),60000);}
