@@ -74,6 +74,7 @@
   </button>
 
   <button id="decisionButton" class="tab" type="button" data-view="decision">Orta Vadeli Yükseliş</button>
+  <button id="bistButton" class="tab" type="button" data-view="bist">Kısa Vade BIST Yükseliş Radarı</button>
   <button id="longButton" class="tab" data-view="long" type="button">36 Saatlik Başarı İstatistikleri</button>
 </nav>
     <main class="container">
@@ -353,6 +354,19 @@
     <div id="decisionCards" class="coin-grid"></div>
     <div class="info-box">Fiyatlar gerçek alış/satış teklifi değildir. Komisyon, kayma ve emir defteri teyidi bulunmadığı için burada görülen planlar doğrudan alım emri sayılmaz.</div>
   </section>
+  <section id="bist" hidden>
+    <h2>Kısa Vade BIST Hisse Yükseliş Radarı</h2>
+    <p>EMA20/50, RSI, MACD, hacim artışı, direnç kırılımı ve sıkışma taraması.</p>
+    <div class="info-box">
+      <p>Gerçek zamanlı BIST veri lisansı henüz bağlı değildir. Şimdilik aracı, yetkili kaynaktan aldığınız OHLCV CSV verileriyle kullanabilirsiniz.</p>
+      <p>CSV sütunları: symbol,time,open,high,low,close,volume. Birden fazla hisse aynı dosyada bulunabilir. Her hisse için en az 60 tamamlanmış mum gerekir.</p>
+      <input id="bistFile" type="file" accept=".csv,text/csv" />
+      <button id="bistScan" type="button" class="refresh-button">BIST Hisselerini Tara</button>
+      <p id="bistStatus" aria-live="polite">CSV yükleyerek taramayı başlatın.</p>
+    </div>
+    <div id="bistCards" class="coin-grid"></div>
+    <div class="info-box">YÜKSELİŞ HAZIRLIĞI ve YÜKSELİŞ TEYİDİ teknik sınıflandırmadır. Canlı fiyat, işlem emri veya kazanç garantisi değildir.</div>
+  </section>
   </main>
 
 
@@ -366,6 +380,7 @@
 
 
   <script src="./app.js"></script>
+  <script type="module" src="./bist-ui.js"></script>
 
 </body>
 </html>
