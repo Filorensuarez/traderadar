@@ -8148,3 +8148,15 @@ async function backgroundMinuteRadarLoop() {
   }
 }
 setTimeout(backgroundMinuteRadarLoop, 45 * 1000);
+
+/* BIST: provider configured only. Poll conservatively during Istanbul market hours.
+   Weekend/holiday sessions may be closed; stale bars must not be treated as live. */
+setInterval(()=>{
+  const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Istanbul",
+    weekday:"short",hour:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
+  const day=parts.find(p=>p.type==="weekday")?.value;
+  const hour=Number(parts.find(p=>p.type==="hour")?.value);
+  if(day==="Sat"||day==="Sun"||hour<9||hour>19)return;
+  if(!getBistState().providerConnected)return;
+  scanBistProvider().catch(e=>console.error("BIST otomatik tarama:",e.message));
+},15*60*1000);
