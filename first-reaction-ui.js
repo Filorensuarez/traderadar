@@ -1,8 +1,10 @@
 const status=document.querySelector("#firstReactionStatus");
 const cards=document.querySelector("#firstReactionCards");
 let busy=false;
+let lastScan=0;
 async function refresh(){
  if(busy||document.querySelector("#pre15")?.hidden)return;
+ lastScan=Date.now();
  busy=true;
  try{
   const r=await fetch("/api/first-reaction",{cache:"no-store"});
@@ -13,6 +15,7 @@ async function refresh(){
    (d.lastMessage?new Date(d.lastMessage).toLocaleTimeString("tr-TR"):"Yok")+
    (d.lastError?" | Hata: "+d.lastError:"")+" | "+Object.entries(d.sources||{}).map(([name,v])=>name.toUpperCase()+": "+(v.connected?"aktif":"kesik")+" ("+v.tracked+")").join(" • ");
   cards.replaceChildren();
+  const stamp=document.createElement("p");stamp.textContent="Tarama: "+new Date(lastScan).toLocaleTimeString("tr-TR")+" | Aktif sinyal: "+(d.rows||[]).length;cards.append(stamp);
   for(const x of d.rows||[]){
    const card=document.createElement("article");card.className="coin-card";
    const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.exchange+" • "+x.status;card.append(h);
@@ -27,5 +30,6 @@ async function refresh(){
  finally{busy=false;}
 }
 document.querySelector("#pre15Button")?.addEventListener("click",refresh);
+document.querySelector("#firstReactionScan")?.addEventListener("click",refresh);
 setInterval(refresh,3000);
 refresh();
