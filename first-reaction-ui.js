@@ -14,8 +14,8 @@ async function render(){
   for(const x of data.rows||[]){
    const card=document.createElement("article");card.className="coin-card";
    const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange+" • "+x.status;card.append(title);
-   const decision=document.createElement("p");decision.className="first-reaction-decision decision-wait";
-   decision.textContent="TAKİP ET";card.append(decision);
+   const decision=document.createElement("p");decision.className="first-reaction-decision "+(x.decision==="ALIM KOŞULLARI UYGUN"?"decision-watch-buy":"decision-wait");
+   decision.textContent=x.decision;card.append(decision);
    const detail=document.createElement("p");
    detail.textContent="Fiyat: "+x.price+" | EMA7: "+x.ema7.toFixed(6)+" | EMA25: "+x.ema25.toFixed(6)+
     " | EMA farkı: %"+x.gapPct+" | Günlük hacim: "+x.volumeRatio+"x";
@@ -24,11 +24,12 @@ async function render(){
    dip.textContent="Dip: "+x.dipPrice+" ("+new Date(x.dipTime).toLocaleDateString("tr-TR")+") | Dipten kesişime: "+x.dipToCrossDays+
     " gün | Kesişim yaşı: "+x.crossAgeDays+" günlük mum | Dipten uzaklık: %"+x.priceFromDipPct;
    card.append(dip);
-   const projection=document.createElement("p");projection.textContent="ATR senaryosu: "+x.target1+" / "+x.target2+" | Üst band: "+x.upperScenario;card.append(projection);
+   const projection=document.createElement("p");projection.textContent="Giriş referansı: "+x.price+" | Zarar-kes: "+x.stop+" (%"+x.stopPct+") | Hedef 1: "+x.target1+" | Hedef 2: "+x.target2+" | Risk/getiri: 1:2";card.append(projection);
+   const resistance=document.createElement("p");resistance.textContent="Geçmiş direnç: "+(x.resistance??"Bulunamadı")+" | "+(x.reasons?.length?"Eksikler: "+x.reasons.join("; "):"Teknik kontroller tamam");card.append(resistance);
    const when=document.createElement("p");when.textContent="Kesişim: "+new Date(x.crossTime).toLocaleString("tr-TR")+
     " | Son tamamlanmış günlük mum: "+new Date(x.candleTime+86400000).toLocaleString("tr-TR");
    card.append(when);
-   const note=document.createElement("p");note.textContent=x.reason;card.append(note);
+   const note=document.createElement("p");note.textContent=x.reason+" Bu otomatik emir veya kesin kazanç tahmini değildir.";card.append(note);
    const button=document.createElement("button");button.className="refresh-button";button.type="button";button.textContent="Sermaye Yönetimine Aktar";
    button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",
     {detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:x.price}})));
