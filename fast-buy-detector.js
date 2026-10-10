@@ -11,7 +11,7 @@ export function detectFastBuy(trades,now=Date.now()){
  const acceleration=baselineBuy>0?buy10/baselineBuy:null;
  const share=buy10+sell10>0?buy10/(buy10+sell10)*100:null;
  const previous=trades.filter(t=>t.time>=now-40000&&t.time<now-30000);
- const middle=trades.filter(t=>t.time>=now-30000&&t.time<now-20000);
+ const middle=trades.filter(t=>t.time>=now-20000&&t.time<now-10000);
  const lastPrice=recent.at(-1)?.price;
  const middlePrice=middle.at(-1)?.price;
  const oldPrice=previous.at(-1)?.price;
