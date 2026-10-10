@@ -1,3 +1,4 @@
+import {recordFlowObservations,flowMeasurementStats} from "./flow-measurements.js";
 import {refreshMarketCaps,eligibleMarketCap,marketCapStatus} from "./market-cap-filter.js";
 import {startKucoinFlow,kucoinFlowSnapshot} from "./kucoin-flow.js";
 import {startOkxFlow,okxFlowSnapshot} from "./okx-flow.js";
@@ -14,9 +15,11 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 
 const app = express();
+app.get("/api/flow-measurements",(req,res)=>{res.set("Cache-Control","no-store");res.json(flowMeasurementStats());});
 app.get("/api/flow-radar",(req,res)=>{
  res.set("Cache-Control","no-store");
  const gate=flowSnapshot(),okx=okxFlowSnapshot(),kucoin=kucoinFlowSnapshot();
+ recordFlowObservations([...gate.rows,...okx.rows,...kucoin.rows]);
  const rows=[...gate.rows,...okx.rows,...kucoin.rows]
   .filter(row=>row.fastBuyAlert||row.mode==="ALIŞ BASKISI ARTIYOR"||row.mode==="SATIŞ BASKISI ARTIYOR")
   .map(row=>({...row,marketCapUsd:eligibleMarketCap(row.symbol)}))
@@ -8171,3 +8174,5 @@ refreshMarketCaps().then(()=>{
   startFlowRadar();startOkxFlow();startKucoinFlow();
 }).catch(e=>console.error("Piyasa değeri ilk yükleme:",e.message));
 setInterval(()=>refreshMarketCaps().catch(e=>console.error("Piyasa değeri:",e.message)),60*60*1000);
+
+setInterval(()=>{const gate=flowSnapshot(),okx=okxFlowSnapshot(),kucoin=kucoinFlowSnapshot();recordFlowObservations([...gate.rows,...okx.rows,...kucoin.rows]);},10000);
