@@ -23,7 +23,9 @@ async function refresh(){
    p.textContent="Fiyat: "+x.price+" | 5 sn: %"+x.change5Pct+
     " | 10 sn: %"+x.change10Pct+" | 30 sn: %"+x.change30Pct+
     " | Hacim: "+x.volumeAcceleration+"x | Alış payı: %"+x.buySharePct;
-   card.append(p);cards.append(card);
+   card.append(p);
+   if(Number(x.price)>0){const button=document.createElement("button");button.type="button";button.className="refresh-button";button.textContent="Sermaye Yönetimine Aktar";button.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("traderadar:select-signal",{detail:{symbol:x.symbol,exchange:x.exchange,status:x.status,price:Number(x.price)}})));card.append(button);}
+   cards.append(card);
   }
   if(!d.rows?.length){const p=document.createElement("p");p.textContent="Şu anda koşulları karşılayan canlı sinyal yok. "+d.notice;cards.append(p);}
  }catch(e){status.textContent="Canlı veri hatası: "+e.message;}
