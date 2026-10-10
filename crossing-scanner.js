@@ -7,7 +7,7 @@ try{
  if(fs.existsSync(STORE)){
   const saved=JSON.parse(fs.readFileSync(STORE,"utf8"));
   if(Array.isArray(saved))for(const [key,row] of saved){
-   if(typeof key==="string"&&row?.timeframe==="5m"&&row.status==="ERKEN YÜKSELİŞ MUMU"&&Date.now()-row.candleTime<1800000)tracked.set(key,row);
+   if(typeof key==="string"&&row?.timeframe==="5m"&&["DİP SONRASI KESİŞİM","HACİMLİ MUM TEYİDİ"].includes(row.status)&&Date.now()-(row.lastCheckedAt||row.candleTime)<7200000)tracked.set(key,row);
   }
  }
 }catch(e){console.warn("Kesişim kayıtları okunamadı:",e.message);}
@@ -58,20 +58,25 @@ export async function scanCrossings(){
     }));
     for(const x of batch){checked++;if(x.status==="fulfilled"){
       const {key,row}=x.value;
-      if(row?.status==="ERKEN YÜKSELİŞ MUMU"){
-       const previous=tracked.get(key);
-       tracked.set(key,{...row,firstSeenAt:previous?.firstSeenAt||Date.now(),lastCheckedAt:Date.now(),stale:false});
+      const previous=tracked.get(key);
+      if(row&&["DİP SONRASI KESİŞİM","HACİMLİ MUM TEYİDİ"].includes(row.status)){
+       const keepConfirmed=previous?.status==="HACİMLİ MUM TEYİDİ"&&row.status!=="HACİMLİ MUM TEYİDİ";
+       tracked.set(key,{...(keepConfirmed?previous:row),firstSeenAt:previous?.firstSeenAt||Date.now(),
+        lastCheckedAt:Date.now(),stale:false});
+      }else if(previous){
+       tracked.set(key,{...previous,stale:true,lastCheckedAt:Date.now(),
+        decision:"BEKLE",reason:"Yeni 5 dakikalık mumda formasyon teyidi yok. Eski sinyal güncel alım önerisi değildir."});
       }
      }else if(errors.length<10)errors.push(e+": "+x.reason.message);}
    }
   }
-  for(const [key,row] of tracked)if(Date.now()-row.candleTime>1800000)tracked.delete(key);
+  for(const [key,row] of tracked)if(Date.now()-row.firstSeenAt>7200000)tracked.delete(key);
   saveTracked();
-  state.rows=[...tracked.values()].sort((a,b)=>Number(b.status==="ERKEN YÜKSELİŞ MUMU")-Number(a.status==="ERKEN YÜKSELİŞ MUMU")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
+  state.rows=[...tracked.values()].sort((a,b)=>Number(b.status==="HACİMLİ MUM TEYİDİ")-Number(a.status==="HACİMLİ MUM TEYİDİ")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
   state.checked=checked;state.updatedAt=Date.now();state.errors=errors;state.universes=Object.fromEntries(Object.entries(universeCache).map(([k,v])=>[k,v.length]));
  }finally{state.running=false;}
  return crossingStatus();
 }
 export function crossingStatus(){
  const rows=[...tracked.values()].sort((a,b)=>Number(b.status==="ERKEN YÜKSELİŞ MUMU")-Number(a.status==="ERKEN YÜKSELİŞ MUMU")||(b.lastVolumeRatio||0)-(a.lastVolumeRatio||0)).slice(0,150);
- return {...state,rows,trackedTotal:tracked.size,notice:"Yalnızca tamamlanmış 5 dakikalık erken yükseliş mumları taranır. Sinyaller 30 dakika tutulur. Borsa başına en fazla 65 USDT çifti incelenir."};}
+ return {...state,rows,trackedTotal:tracked.size,notice:"Dip sonrası EMA7/25 yakınlaşması takip edilir; hacimli pozitif 5 dakikalık kırılımda teknik AL sinyali gösterilir. Sinyaller en fazla 2 saat saklanır. Borsa başına en fazla 65 USDT çifti taranır."};}
