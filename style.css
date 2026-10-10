@@ -449,3 +449,14 @@ footer {
 #long .stats-rate { font-size:clamp(26px,5vw,40px); font-weight:750; color:#52d3ab; margin:12px 0; }
 #long .stats-entries { margin-top:12px; border-top:1px solid #34465e; padding-top:10px; }
 #long .stats-entry { padding:7px 0; border-bottom:1px solid rgba(150,170,190,.16); font-size:.88rem; overflow-wrap:anywhere; }
+
+/* Mobile capital planner */
+#capital .info-box{margin:16px 0;padding:clamp(14px,4vw,22px);min-width:0}
+#capital .capital-field{display:flex;flex-direction:column;gap:7px;margin:14px 0;min-width:0}
+#capital .capital-field label{display:block;position:static;line-height:1.4}
+#capital .capital-field .x-field{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;background:#111f35;color:#f1f6ff;border:1px solid #354d6b;border-radius:10px;padding:12px;font:inherit;margin:0}
+#capital .refresh-button{display:inline-flex;align-items:center;justify-content:center;max-width:100%;white-space:normal;line-height:1.35;margin:6px 8px 6px 0}
+#capital p{overflow-wrap:anywhere;line-height:1.6}
+#capital [hidden]{display:none!important}
+#firstReactionCards .coin-card button{margin-top:12px}
+@media(max-width:480px){#capital .refresh-button{width:100%;margin:6px 0}#capital .info-box{padding:16px}}
