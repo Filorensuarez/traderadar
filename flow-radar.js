@@ -41,7 +41,7 @@ export function flowSnapshot(){const now=Date.now();const rows=symbols.map(symbo
  else if(enough&&sellRatio!==null&&sellRatio>=1.8&&imbalance<=-25)mode="SATIŞ BASKISI ARTIYOR";
  else if(enough)mode="DENGELİ / İZLE";
  const fast=detectFastBuy(list,now);
- return {symbol:symbol.replace("_","/"),exchange:"GATE.IO",mode,...fast,
+ return {symbol:symbol.replace("_","/"),exchange:"GATE.IO",mode,...fast,lastPrice:list.at(-1)?.price??null,
  buyUsdt:Math.round(cur.buy),sellUsdt:Math.round(cur.sell),
  buyCount:cur.buys,sellCount:cur.sells,
  buyAcceleration:buyRatio===null?null:Number(buyRatio.toFixed(2)),
