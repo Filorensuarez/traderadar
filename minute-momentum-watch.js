@@ -4,10 +4,21 @@ const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[]
 const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
-async function get(url){
- const r=await fetch(url,{signal:AbortSignal.timeout(12000)});
- if(!r.ok)throw Error("HTTP "+r.status);
- return r.json();
+const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0};
+const requestSpacing={OKX:280,KUCOIN:160,"GATE.IO":160};
+async function get(url,e){
+ for(let attempt=0;attempt<3;attempt++){
+  if(e&&backoffUntil[e]>Date.now())await pause(backoffUntil[e]-Date.now());
+  const r=await fetch(url,{signal:AbortSignal.timeout(12000)});
+  if((r.status===429||r.status===418)&&e){
+   const retry=Number(r.headers.get("retry-after"));
+   const delay=Number.isFinite(retry)&&retry>0?Math.min(retry*1000,120000):Math.min(30000,2500*2**attempt);
+   backoffUntil[e]=Date.now()+delay;
+   if(attempt<2)continue;
+  }
+  if(!r.ok)throw Error("HTTP "+r.status);
+  return r.json();
+ }
 }
 function detect(raw,now=Date.now()){
  const a=raw.map(x=>({time:+x.time,close:+x.close})).filter(x=>Number.isFinite(x.time)&&Number.isFinite(x.close)&&x.close>0&&x.time+INTERVAL<=now)
@@ -23,28 +34,28 @@ function detect(raw,now=Date.now()){
 async function universe(exchange){
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
-  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&+x.volCcy24h>1000)
-   .sort((a,b)=>+b.volCcy24h-+a.volCcy24h).slice(0,80).map(x=>x.instId);
+  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&+x.volCcy24h>0)
+   .sort((a,b)=>+b.volCcy24h-+a.volCcy24h).map(x=>x.instId);
  }
  if(exchange==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/allTickers");
-  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&+x.volValue>1000)
-   .sort((a,b)=>+b.volValue-+a.volValue).slice(0,35).map(x=>x.symbol);
+  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&+x.volValue>0)
+   .sort((a,b)=>+b.volValue-+a.volValue).map(x=>x.symbol);
  }
  const d=await get("https://api.gateio.ws/api/v4/spot/tickers");
- return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&+x.quote_volume>1000)
-  .sort((a,b)=>+b.quote_volume-+a.quote_volume).slice(0,35).map(x=>x.currency_pair);
+ return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&+x.quote_volume>0)
+  .sort((a,b)=>+b.quote_volume-+a.quote_volume).map(x=>x.currency_pair);
 }
 async function candles(e,s){
  if(e==="OKX"){
-  const d=await get("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=30");
+  const d=await get("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=30","OKX");
   return (d.data||[]).map(x=>({time:+x[0],close:+x[4]}));
  }
  if(e==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/candles?type=1min&symbol="+encodeURIComponent(s));
   return (d.data||[]).map(x=>({time:+x[0]*1000,close:+x[2]}));
  }
- const d=await get("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(s)+"&interval=1m&limit=30");
+ const d=await get("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(s)+"&interval=1m&limit=30","GATE.IO");
  return d.map(x=>({time:+x[0]*1000,close:+x[2]}));
 }
 let lastDiscovery=0,markets={};
@@ -76,7 +87,7 @@ export async function scanMinuteMomentum(){
       active.set(key,{exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result,firstSeenAt:Date.now(),lastCheckedAt:Date.now()});
      }
     }catch(err){failed++;if(errors.length<12)errors.push(e+" "+symbol+": "+err.message);}
-    if(e==="OKX")await pause(300);
+    await pause(requestSpacing[e]);
    }
   }
   state.checked=checked;state.successful=successful;state.failed=failed;
@@ -89,7 +100,7 @@ export async function scanMinuteMomentum(){
 }
 export function minuteMomentumStatus(){
  return {...state,rows:[...active.values()].sort((a,b)=>b.changePct-a.changePct),
-  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, önceki 10 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Her borsada en fazla 80 yüksek hacimli USDT çifti. Eşiğe yaklaşanlar ayrı gösterilir."};
+  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, önceki 10 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Borsalarda işlem hacmi bulunan bütün USDT spot çiftleri kapsamda; sabit coin sınırı yoktur. API hız sınırları nedeniyle tam tarama birkaç dakika veya daha uzun sürebilir."};
 }
 export function startMinuteMomentum(){scanMinuteMomentum().catch(console.error);
  setInterval(()=>scanMinuteMomentum().catch(console.error),60000);}
