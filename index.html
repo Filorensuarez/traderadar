@@ -364,19 +364,18 @@
       <input id="bistFile" type="file" accept=".csv,text/csv" />
       <button id="bistScan" type="button" class="refresh-button">BIST Hisselerini Tara</button>
       <p id="bistStatus" aria-live="polite">CSV yükleyerek taramayı başlatın.</p>
+      <div class="info-box">
+        <h3>Otomatik Hisse Taraması</h3>
+        <p>Yetkili veri sağlayıcısı bağlandığında hisseleri otomatik tarar. Bağlantı yoksa açıkça bildirir; sahte canlı sonuç göstermez.</p>
+        <button id="bistAutoScan" class="refresh-button" type="button">Otomatik Tara</button>
+        <p id="bistAutoStatus" aria-live="polite">Veri sağlayıcısı kontrol edilmedi.</p>
+        <div id="bistAutoCards" class="coin-grid"></div>
+      </div>
     </div>
     <div id="bistCards" class="coin-grid"></div>
     <div class="info-box">YÜKSELİŞ HAZIRLIĞI ve YÜKSELİŞ TEYİDİ teknik sınıflandırmadır. Canlı fiyat, işlem emri veya kazanç garantisi değildir.</div>
   </section>
-  <section id="bist" hidden>
-    <h2>Kısa Vadeli BIST Hisse Yükseliş Radarı</h2>
-    <p>EMA9/21/50, hacim artışı, sıkışma ve direnç kırılımı taraması.</p>
-    <p>Veri bağlantısı henüz yok. İzinli OHLCV CSV yükleyin: symbol,time,open,high,low,close,volume.</p>
-    <input id="bistFile" type="file" accept=".csv,text/csv"/>
-    <button id="bistScan" type="button">Hisseleri Tara</button>
-    <p id="bistStatus">CSV bekleniyor.</p>
-    <div id="bistCards" class="coin-grid"></div>
-  </section>
+  
   </main>
 
 
