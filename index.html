@@ -367,6 +367,9 @@
   </section>
 <section id="pre15" hidden>
  <h2>İlk Tepki</h2>
+ <p class="description">5, 10 ve 30 saniyelik işlem akışından yükseliş başlangıcını tarar.</p>
+ <p id="firstReactionStatus" aria-live="polite">Canlı işlem akışı bekleniyor...</p>
+ <div id="firstReactionCards" class="coin-grid"></div>
  <p class="description">ERA, CFX ve ARPA benzeri hareketlerin başlangıcından önceki 5 adet bir dakikalık mumda hacim, fiyat, EMA ve dip değişimlerini tarar. 5 dakika önceden kesin tahmin değildir.</p>
  <div class="info-box">
   <button id="pre15Refresh" class="refresh-button" type="button">Sonuçları Yenile</button>
@@ -399,6 +402,7 @@
 
   <script src="./app.js"></script>
   <script type="module" src="./pre15-ui.js"></script>
+  <script type="module" src="./first-reaction-ui.js"></script>
 
 </body>
 </html>
