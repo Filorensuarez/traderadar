@@ -1,3 +1,4 @@
+import {detectFastBuy} from "./fast-buy-detector.js";
 import {eligibleMarketCap} from "./market-cap-filter.js";
 import WebSocket from "ws";
 let symbols=(process.env.FLOW_SYMBOLS||"BTC_USDT,ETH_USDT,SOL_USDT,XRP_USDT,DOGE_USDT,ADA_USDT,LINK_USDT,AVAX_USDT,SUI_USDT,TON_USDT,NEAR_USDT,APT_USDT,ARB_USDT,OP_USDT,UNI_USDT,LTC_USDT,PEPE_USDT")
@@ -39,7 +40,8 @@ export function flowSnapshot(){const now=Date.now();const rows=symbols.map(symbo
  if(enough&&buyRatio!==null&&buyRatio>=1.8&&imbalance>=25)mode="ALIŞ BASKISI ARTIYOR";
  else if(enough&&sellRatio!==null&&sellRatio>=1.8&&imbalance<=-25)mode="SATIŞ BASKISI ARTIYOR";
  else if(enough)mode="DENGELİ / İZLE";
- return {symbol:symbol.replace("_","/"),exchange:"GATE.IO",mode,
+ const fast=detectFastBuy(list,now);
+ return {symbol:symbol.replace("_","/"),exchange:"GATE.IO",mode,...fast,
  buyUsdt:Math.round(cur.buy),sellUsdt:Math.round(cur.sell),
  buyCount:cur.buys,sellCount:cur.sells,
  buyAcceleration:buyRatio===null?null:Number(buyRatio.toFixed(2)),
@@ -67,7 +69,7 @@ async function connect(){if(!started)return;try{
  const price=Number(t.price),amount=Number(t.amount);
  const time=Number.parseFloat(t.create_time_ms)||Number(t.create_time)*1000||Date.now();
  if(!(price>0&&amount>0)||time>Date.now()+10000||time<Date.now()-120000)continue;
- addTrade({symbol,side:t.side,time,value:price*amount});lastMessage=Date.now();
+ addTrade({symbol,side:t.side,time,value:price*amount,price});lastMessage=Date.now();
  }});
  socket.on("error",e=>{lastError=e.message;});
  socket.on("close",()=>{connected=false;clearInterval(heartbeat);reconnect();});
