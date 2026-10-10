@@ -24,6 +24,7 @@ async function render(){
    dip.textContent="Dip: "+x.dipPrice+" ("+new Date(x.dipTime).toLocaleDateString("tr-TR")+") | Dipten kesişime: "+x.dipToCrossDays+
     " gün | Kesişim yaşı: "+x.crossAgeDays+" günlük mum | Dipten uzaklık: %"+x.priceFromDipPct;
    card.append(dip);
+   const projection=document.createElement("p");projection.textContent="ATR senaryosu: "+x.target1+" / "+x.target2+" | Üst band: "+x.upperScenario;card.append(projection);
    const when=document.createElement("p");when.textContent="Kesişim: "+new Date(x.crossTime).toLocaleString("tr-TR")+
     " | Son tamamlanmış günlük mum: "+new Date(x.candleTime+86400000).toLocaleString("tr-TR");
    card.append(when);
