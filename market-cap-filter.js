@@ -25,6 +25,7 @@ export async function refreshMarketCaps(force=false){
      else seen.set(symbol,{id:item.id,cap});
     }
     if(items.length<250)break;
+    await new Promise(resolve=>setTimeout(resolve,1300));
    }
    if(!seen.size)throw Error("Piyasa değeri listesi boş");
    cache=seen;ambiguous=duplicates;updatedAt=Date.now();lastError=null;
