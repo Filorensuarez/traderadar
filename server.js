@@ -8160,6 +8160,7 @@ async function backgroundMinuteRadarLoop() {
 }
 setTimeout(backgroundMinuteRadarLoop, 45 * 1000);
 
-\nstartFlowRadar();
+
+startFlowRadar();
 startOkxFlow();
-startKucoinFlow();\n
+startKucoinFlow();
