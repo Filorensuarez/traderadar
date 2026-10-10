@@ -101,7 +101,7 @@ function openView(view) {
 
   const xmanager = view === "xmanager";
   const decision = view === "decision";
-  const bist = view === "bist";
+  const flow = view === "flow";
 
 
   dailySection.hidden =
@@ -118,7 +118,7 @@ function openView(view) {
 
   document.querySelector("#xmanager").hidden = !xmanager;
   document.querySelector("#decision").hidden = !decision;
-  document.querySelector("#bist").hidden = !bist;
+  document.querySelector("#flow").hidden = !flow;
 
 
   dailyButton.classList.toggle(
@@ -143,7 +143,7 @@ function openView(view) {
 
   document.querySelector("#xManagerButton").classList.toggle("active", xmanager);
   document.querySelector("#decisionButton").classList.toggle("active", decision);
-  document.querySelector("#bistButton").classList.toggle("active", bist);
+  document.querySelector("#flowButton").classList.toggle("active", flow);
   if (decision) { loadMediumWatch(); }
 
 
@@ -2708,4 +2708,4 @@ async function loadMediumWatch(){
 }
 document.querySelector("#mediumWatchRefresh").addEventListener("click",loadMediumWatch);
 
-document.querySelector("#bistButton").addEventListener("click",()=>openView("bist"));
+document.querySelector("#flowButton").addEventListener("click",()=>openView("flow"));
