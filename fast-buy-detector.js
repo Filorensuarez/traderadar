@@ -23,7 +23,15 @@ export function detectFastBuy(trades,now=Date.now()){
  const sufficient=recent.length>=5&&baseline.length>=12&&buy10+sell10>=2000&&
   acceleration!==null&&share!==null&&priceAccelerating;
  const alert=Boolean(sufficient&&acceleration>=2&&share>=65&&!late);
- return {fastBuyAlert:alert,buy10Usdt:Math.round(buy10),sell10Usdt:Math.round(sell10),
+ // EARLY WATCH: more permissive than a confirmed breakout. Never infer a 2-minute ETA.
+ const active=recent.length>=3&&baseline.length>=6&&buy10+sell10>=500;
+ const earlyBuy=Boolean(active&&acceleration!==null&&acceleration>=1.5&&
+  share>=58&&!late&&move30!==null&&move30<2&&move30>-1.5);
+ const buyIntensity=acceleration===null?0:Math.min(40,acceleration*12);
+ const pressure=share===null?0:Math.min(35,Math.max(0,(share-50)*1.5));
+ const movement=move30===null?0:Math.min(25,Math.max(0,move30*20+10));
+ const earlyScore=Math.round(buyIntensity+pressure+movement);
+ return {fastBuyAlert:alert,earlyBuyWatch:earlyBuy,earlyScore,buy10Usdt:Math.round(buy10),sell10Usdt:Math.round(sell10),
   buySharePercent:share===null?null:Number(share.toFixed(1)),
   buySpeed10s:acceleration===null?null:Number(acceleration.toFixed(2)),
   priceAccelerating,priceChange30s:move30===null?null:Number(move30.toFixed(2)),
