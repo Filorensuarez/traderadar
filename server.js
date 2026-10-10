@@ -39,6 +39,7 @@ app.get("/api/flow-radar",(req,res)=>{
   marketCap:marketCapStatus(),
   shown:rows.length,rows:rows.slice(0,200),notice:"Gerçekleşen işlemler; her coin ve borsada eksiksiz kapsama garanti edilmez."});
 });
+const firstReactionRecent=new Map();
 app.get("/api/first-reaction",(req,res)=>{
  res.set("Cache-Control","no-store");
  const gate=firstReactionSnapshot(),okx=okxFirstReactionSnapshot(),kucoin=kucoinFirstReactionSnapshot();
@@ -49,7 +50,16 @@ app.get("/api/first-reaction",(req,res)=>{
   trackedSymbols:gate.trackedSymbols+okx.trackedSymbols+kucoin.trackedSymbols,
   lastMessage:Math.max(gate.lastMessage||0,okx.lastMessage||0,kucoin.lastMessage||0),
   lastError:[gate.lastError,okx.lastError,kucoin.lastError].filter(Boolean).join(" | ")||null,
-  rows:[...gate.rows,...okx.rows,...kucoin.rows].sort((a,b)=>b.volumeAcceleration-a.volumeAcceleration).slice(0,150),
+  rows:(()=>{
+   const now=Date.now();
+   for(const row of [...gate.rows,...okx.rows,...kucoin.rows]){
+    if(!row||!row.symbol||!row.exchange||!Number.isFinite(row.observedAt)||now-row.observedAt>15000)continue;
+    const key=row.exchange+":"+row.symbol+":"+row.status;
+    firstReactionRecent.set(key,{...row,lastDetectedAt:now});
+   }
+   for(const [key,row] of firstReactionRecent)if(now-row.lastDetectedAt>60000)firstReactionRecent.delete(key);
+   return [...firstReactionRecent.values()].sort((a,b)=>b.lastDetectedAt-a.lastDetectedAt).slice(0,150);
+  })(),
   sources,notice:"OKX, KuCoin ve Gate.io USDT işlem akışları ayrı değerlendirilir. Kapsama sınırlıdır."});
 });
 const PORT = process.env.PORT || 3000;
