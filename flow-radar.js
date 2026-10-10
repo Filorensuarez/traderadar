@@ -1,6 +1,22 @@
 import WebSocket from "ws";
-const symbols=(process.env.FLOW_SYMBOLS||"BTC_USDT,ETH_USDT,SOL_USDT,XRP_USDT,DOGE_USDT,ADA_USDT,LINK_USDT,AVAX_USDT,SUI_USDT,TON_USDT,NEAR_USDT,APT_USDT,ARB_USDT,OP_USDT,UNI_USDT,LTC_USDT,PEPE_USDT")
- .split(",").map(s=>s.trim().toUpperCase()).filter(s=>/^[A-Z0-9]{2,24}_USDT$/.test(s)).slice(0,100);
+let symbols=(process.env.FLOW_SYMBOLS||"BTC_USDT,ETH_USDT,SOL_USDT,XRP_USDT,DOGE_USDT,ADA_USDT,LINK_USDT,AVAX_USDT,SUI_USDT,TON_USDT,NEAR_USDT,APT_USDT,ARB_USDT,OP_USDT,UNI_USDT,LTC_USDT,PEPE_USDT")
+ .split(",").map(s=>s.trim().toUpperCase()).filter(s=>/^[A-Z0-9]{2,24}_USDT$/.test(s)).slice(0,500);
+// Discover active USDT markets. The bounded list is refreshed on reconnect.
+async function discoverMarkets(){
+ if(process.env.FLOW_SYMBOLS)return;
+ try{
+  const response=await fetch("https://api.gateio.ws/api/v4/spot/tickers",
+    {signal:AbortSignal.timeout(12000)});
+  if(!response.ok)throw Error("Market discovery HTTP "+response.status);
+  const tickers=await response.json();
+  const limit=Math.min(500,Math.max(20,Number(process.env.FLOW_MAX_SYMBOLS)||300));
+  const next=tickers.filter(t=>/^[A-Z0-9]{2,24}_USDT$/.test(t.currency_pair||"")&&
+    Number(t.quote_volume)>=50000)
+    .sort((a,b)=>Number(b.quote_volume)-Number(a.quote_volume))
+    .slice(0,limit).map(t=>t.currency_pair);
+  if(next.length)symbols=next;
+ }catch(e){lastError="Piyasa keşfi: "+e.message;}
+}
 const buckets=new Map();let socket=null,connected=false,lastMessage=0,lastError=null,timer=null,heartbeat=null,started=false;
 let subscribed=0,subscriptionError=null;
 function addTrade(t){const list=buckets.get(t.symbol)||[];list.push(t);const cutoff=Date.now()-120000;
@@ -33,7 +49,8 @@ export function flowSnapshot(){const now=Date.now();const rows=symbols.map(symbo
  return {connected,lastMessage,lastError,subscriptionError,subscribed,updatedAt:now,trackedSymbols:symbols.length,rows,
  notice:"Gerçekleşen agresif işlemler ölçülür; fiyatın gelecekteki yönü garanti edilmez."};}
 function reconnect(){if(timer)return;timer=setTimeout(()=>{timer=null;connect();},5000);}
-function connect(){if(!started)return;try{
+async function connect(){if(!started)return;try{
+ await discoverMarkets();
  socket=new WebSocket("wss://api.gateio.ws/ws/v4/");
  socket.on("open",()=>{connected=true;lastError=null;
  for(let i=0;i<symbols.length;i+=25){socket.send(JSON.stringify({time:Math.floor(Date.now()/1000),channel:"spot.trades",event:"subscribe",payload:symbols.slice(i,i+25)}));}
