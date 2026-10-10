@@ -3,7 +3,7 @@ import {recordFlowObservations,flowMeasurementStats} from "./flow-measurements.j
 import {refreshMarketCaps,eligibleMarketCap,marketCapStatus} from "./market-cap-filter.js";
 import {startKucoinFlow,kucoinFlowSnapshot} from "./kucoin-flow.js";
 import {startOkxFlow,okxFlowSnapshot} from "./okx-flow.js";
-import {startFlowRadar,flowSnapshot} from "./flow-radar.js";
+import {startFlowRadar,flowSnapshot,firstReactionSnapshot} from "./flow-radar.js";
 import express from "express";
 import webpush from "web-push";
 import fs from "fs";
@@ -38,6 +38,7 @@ app.get("/api/flow-radar",(req,res)=>{
   marketCap:marketCapStatus(),
   shown:rows.length,rows:rows.slice(0,200),notice:"Gerçekleşen işlemler; her coin ve borsada eksiksiz kapsama garanti edilmez."});
 });
+app.get("/api/first-reaction",(req,res)=>{res.set("Cache-Control","no-store");res.json(firstReactionSnapshot());});
 app.get("/api/pre15/status",(req,res)=>{
  res.set("Cache-Control","no-store");res.json(pre15Status());
 });
