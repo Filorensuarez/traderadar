@@ -1,3 +1,4 @@
+import {refreshMarketCaps,eligibleMarketCap,marketCapStatus} from "./market-cap-filter.js";
 import {startKucoinFlow,kucoinFlowSnapshot} from "./kucoin-flow.js";
 import {startOkxFlow,okxFlowSnapshot} from "./okx-flow.js";
 import {startFlowRadar,flowSnapshot} from "./flow-radar.js";
@@ -16,7 +17,11 @@ const app = express();
 app.get("/api/flow-radar",(req,res)=>{
  res.set("Cache-Control","no-store");
  const gate=flowSnapshot(),okx=okxFlowSnapshot(),kucoin=kucoinFlowSnapshot();
- const rows=[...gate.rows,...okx.rows,...kucoin.rows].sort((a,b)=>
+ const rows=[...gate.rows,...okx.rows,...kucoin.rows]
+  .filter(row=>row.mode==="ALIŞ BASKISI ARTIYOR"||row.mode==="SATIŞ BASKISI ARTIYOR")
+  .map(row=>({...row,marketCapUsd:eligibleMarketCap(row.symbol)}))
+  .filter(row=>row.marketCapUsd!==null)
+  .sort((a,b)=>
   Number(b.mode.includes("ARTIYOR"))-Number(a.mode.includes("ARTIYOR"))||
   Math.abs(b.imbalancePercent)-Math.abs(a.imbalancePercent));
  res.json({connected:gate.connected||okx.connected||kucoin.connected,updatedAt:Date.now(),
@@ -25,7 +30,8 @@ app.get("/api/flow-radar",(req,res)=>{
   exchanges:{gate:{connected:gate.connected,tracked:gate.trackedSymbols,error:gate.lastError,subscriptionError:gate.subscriptionError},
    okx:{connected:okx.connected,tracked:okx.trackedSymbols,error:okx.lastError},
    kucoin:{connected:kucoin.connected,tracked:kucoin.trackedSymbols,error:kucoin.lastError}},
-  rows:rows.slice(0,200),notice:"Gerçekleşen işlemler; her coin ve borsada eksiksiz kapsama garanti edilmez."});
+  marketCap:marketCapStatus(),
+  shown:rows.length,rows:rows.slice(0,200),notice:"Gerçekleşen işlemler; her coin ve borsada eksiksiz kapsama garanti edilmez."});
 });
 const PORT = process.env.PORT || 3000;
 
@@ -8161,6 +8167,7 @@ async function backgroundMinuteRadarLoop() {
 setTimeout(backgroundMinuteRadarLoop, 45 * 1000);
 
 
-startFlowRadar();
-startOkxFlow();
-startKucoinFlow();
+refreshMarketCaps().then(()=>{
+  startFlowRadar();startOkxFlow();startKucoinFlow();
+}).catch(e=>console.error("Piyasa değeri ilk yükleme:",e.message));
+setInterval(()=>refreshMarketCaps().catch(e=>console.error("Piyasa değeri:",e.message)),60*60*1000);
