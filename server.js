@@ -19,7 +19,7 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 const app = express();
 app.get("/api/crossings/status",(req,res)=>{res.set("Cache-Control","no-store");res.json(crossingStatus());});
-app.post("/api/crossings/scan",async(req,res)=>{res.set("Cache-Control","no-store");try{res.json(await scanCrossings());}catch(e){res.status(503).json({error:e.message});}});
+app.post("/api/crossings/scan",async(req,res)=>{res.set("Cache-Control","no-store");try{scanCrossings().catch(e=>console.error("Kesişim taraması:",e.message));res.json({started:true,...crossingStatus()});}catch(e){res.status(503).json({error:e.message});}});
 app.get("/api/flow-measurements",(req,res)=>{res.set("Cache-Control","no-store");res.json(flowMeasurementStats());});
 app.get("/api/flow-radar",(req,res)=>{
  res.set("Cache-Control","no-store");
