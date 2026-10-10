@@ -1,6 +1,6 @@
 import {detectFirstReaction} from "./first-reaction-engine.js";
 import {detectFastBuy} from "./fast-buy-detector.js";
-import {eligibleMarketCap} from "./market-cap-filter.js";
+
 import WebSocket from "ws";
 // OKX public trades feed; a trade side identifies the aggressive taker.
 let ws=null,connected=false,lastMessage=0,error=null,started=false;
@@ -10,13 +10,14 @@ async function discover(){
   {signal:AbortSignal.timeout(15000)});
  if(!response.ok)throw Error("OKX discovery HTTP "+response.status);
  const json=await response.json();
- markets=(json.data||[]).filter(t=>/^[A-Z0-9]+-USDT$/.test(t.instId)&&Number(t.volCcy24h)>=1000&&eligibleMarketCap(t.instId)!==null)
-  .sort((a,b)=>Number(b.volCcy24h)-Number(a.volCcy24h)).slice(0,150).map(t=>t.instId);
+ markets=(json.data||[]).filter(t=>/^[A-Z0-9]+-USDT$/.test(t.instId)&&Number(t.volCcy24h)>=1000)
+  .sort((a,b)=>Number(b.volCcy24h)-Number(a.volCcy24h)).slice(0,300).map(t=>t.instId);
 }
 function connect(){
  if(!started)return;
  discover().then(()=>{
-  ws=new WebSocket("wss://ws.okx.com:8443/ws/v5/public");
+  if(!markets.length)throw Error("OKX uygun işlem çifti bulunamadı");
+  ws=new WebSocket("wss://ws.okx.com/ws/v5/public");
   ws.on("open",()=>{
    connected=true;error=null;
    for(let i=0;i<markets.length;i+=20){
