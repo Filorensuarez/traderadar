@@ -1,10 +1,10 @@
 import {startPre15Scanner,pre15Status,inspectHistorical15} from "./pre15-scanner.js";
 import {recordFlowObservations,flowMeasurementStats} from "./flow-measurements.js";
 import {refreshMarketCaps,eligibleMarketCap,marketCapStatus} from "./market-cap-filter.js";
-import {startKucoinFlow,kucoinFlowSnapshot} from "./kucoin-flow.js";
-import {startOkxFlow,okxFlowSnapshot} from "./okx-flow.js";
+import {startKucoinFlow,kucoinFlowSnapshot,kucoinFirstReactionSnapshot} from "./kucoin-flow.js";
+import {startOkxFlow,okxFlowSnapshot,okxFirstReactionSnapshot} from "./okx-flow.js";
 import {startFlowRadar,flowSnapshot,firstReactionSnapshot} from "./flow-radar.js";
-import {startBinanceTrFirstReaction,binanceTrSnapshot} from "./binance-tr-first-reaction.js";
+
 import express from "express";
 import webpush from "web-push";
 import fs from "fs";
@@ -39,7 +39,19 @@ app.get("/api/flow-radar",(req,res)=>{
   marketCap:marketCapStatus(),
   shown:rows.length,rows:rows.slice(0,200),notice:"Gerçekleşen işlemler; her coin ve borsada eksiksiz kapsama garanti edilmez."});
 });
-app.get("/api/first-reaction",(req,res)=>{res.set("Cache-Control","no-store");const gate=firstReactionSnapshot(),tr=binanceTrSnapshot();res.json({connected:gate.connected||tr.connected,updatedAt:Date.now(),trackedSymbols:gate.trackedSymbols+tr.trackedSymbols,lastMessage:Math.max(gate.lastMessage||0,tr.lastMessage||0),lastError:[gate.lastError,tr.lastError].filter(Boolean).join(" | ")||null,rows:[...tr.rows,...gate.rows].sort((a,b)=>b.observedAt-a.observedAt).slice(0,150),sources:{binanceTr:{connected:tr.connected,tracked:tr.trackedSymbols,error:tr.lastError},gate:{connected:gate.connected,tracked:gate.trackedSymbols,error:gate.lastError}},notice:"Binance TR TRY ve Gate.io USDT işlemleri ayrı piyasalardır."});});
+app.get("/api/first-reaction",(req,res)=>{
+ res.set("Cache-Control","no-store");
+ const gate=firstReactionSnapshot(),okx=okxFirstReactionSnapshot(),kucoin=kucoinFirstReactionSnapshot();
+ const sources={gate:{connected:gate.connected,tracked:gate.trackedSymbols,error:gate.lastError},
+  okx:{connected:okx.connected,tracked:okx.trackedSymbols,error:okx.lastError},
+  kucoin:{connected:kucoin.connected,tracked:kucoin.trackedSymbols,error:kucoin.lastError}};
+ res.json({connected:gate.connected||okx.connected||kucoin.connected,updatedAt:Date.now(),
+  trackedSymbols:gate.trackedSymbols+okx.trackedSymbols+kucoin.trackedSymbols,
+  lastMessage:Math.max(gate.lastMessage||0,okx.lastMessage||0,kucoin.lastMessage||0),
+  lastError:[gate.lastError,okx.lastError,kucoin.lastError].filter(Boolean).join(" | ")||null,
+  rows:[...gate.rows,...okx.rows,...kucoin.rows].sort((a,b)=>b.volumeAcceleration-a.volumeAcceleration).slice(0,150),
+  sources,notice:"OKX, KuCoin ve Gate.io USDT işlem akışları ayrı değerlendirilir. Kapsama sınırlıdır."});
+});
 app.get("/api/pre15/status",(req,res)=>{
  res.set("Cache-Control","no-store");res.json(pre15Status());
 });
@@ -8117,7 +8129,8 @@ setInterval(
 /* Legacy scenario, minute radar and trade-flow jobs are retired.
    Daily confirmation and X Manager endpoints remain available. */
 startFlowRadar();
-startBinanceTrFirstReaction();
+startOkxFlow();
+startKucoinFlow();
 refreshMarketCaps().then(()=>startPre15Scanner())
  .catch(e=>console.error("15 dakika öncesi radar başlangıcı:",e.message));
 setInterval(()=>refreshMarketCaps().catch(e=>
