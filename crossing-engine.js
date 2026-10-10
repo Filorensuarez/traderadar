@@ -22,10 +22,12 @@ export function detectCrossing(input,now=Date.now()){
  const fastVolume=lastVolumeRatio>=2&&positiveCandle;
  const above99=bars[i].close>=e99[i]*.995;
  const preparing=gap<=1.5&&near99<=5&&rising&&above99;
- if(!crossedRecently&&!preparing)return null;
- const status=crossed?"YENİ KESİŞİM":crossedRecently?"Kesişim Sonrası":"KESİŞİM ADAYI";
- const decision=crossedRecently&&rising&&above99&&fastVolume?"ALIM KOŞULLARI OLUŞUYOR":"BEKLE";
+ const trendActive=e7[i]>e25[i]&&e7[i]>=e7[i-1]*.995;
+ const endConfirmed=e7[i]<e25[i]&&e7[i-1]<e25[i-1];
+ if(!crossedRecently&&!preparing&&!trendActive&&!endConfirmed)return null;
+ const status=endConfirmed?"YÜKSELİŞ SONA ERDİ":crossed?"YENİ KESİŞİM":trendActive?"YÜKSELİŞ DEVAM EDİYOR":crossedRecently?"Kesişim Sonrası":"KESİŞİM ADAYI";
+ const decision=!endConfirmed&&crossedRecently&&rising&&above99&&fastVolume?"ALIM KOŞULLARI OLUŞUYOR":"BEKLE";
  return {status,decision,price:bars[i].close,ema7:e7[i],ema25:e25[i],ema99:e99[i],
-  gapPct:+gap.toFixed(2),volumeRatio:+volRatio.toFixed(2),lastVolumeRatio:+lastVolumeRatio.toFixed(2),volumeLevel,risingVolume,positiveCandle,near99Pct:+near99.toFixed(2),
+  trendActive,endConfirmed,gapPct:+gap.toFixed(2),volumeRatio:+volRatio.toFixed(2),lastVolumeRatio:+lastVolumeRatio.toFixed(2),volumeLevel,risingVolume,positiveCandle,near99Pct:+near99.toFixed(2),
   candleTime:bars[i].time,reason:decision==="BEKLE"?"Kesişim, EMA99 konumu veya son mumda en az 2 kat pozitif hacim teyidi eksik.":"EMA7/25 kesişimi, yükselen ortalamalar ve hacim teyidi var. İşlem riski ayrıca kontrol edilmeli."};
 }
