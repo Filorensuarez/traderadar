@@ -8115,6 +8115,7 @@ setInterval(
 
 /* Legacy scenario, minute radar and trade-flow jobs are retired.
    Daily confirmation and X Manager endpoints remain available. */
+startFlowRadar();
 refreshMarketCaps().then(()=>startPre15Scanner())
  .catch(e=>console.error("15 dakika öncesi radar başlangıcı:",e.message));
 setInterval(()=>refreshMarketCaps().catch(e=>
