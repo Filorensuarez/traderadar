@@ -1,3 +1,4 @@
+import {startKucoinFlow,kucoinFlowSnapshot} from "./kucoin-flow.js";
 import {startOkxFlow,okxFlowSnapshot} from "./okx-flow.js";
 import {startFlowRadar,flowSnapshot} from "./flow-radar.js";
 import express from "express";
@@ -14,15 +15,16 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 const app = express();
 app.get("/api/flow-radar",(req,res)=>{
  res.set("Cache-Control","no-store");
- const gate=flowSnapshot(),okx=okxFlowSnapshot();
- const rows=[...gate.rows,...okx.rows].sort((a,b)=>
+ const gate=flowSnapshot(),okx=okxFlowSnapshot(),kucoin=kucoinFlowSnapshot();
+ const rows=[...gate.rows,...okx.rows,...kucoin.rows].sort((a,b)=>
   Number(b.mode.includes("ARTIYOR"))-Number(a.mode.includes("ARTIYOR"))||
   Math.abs(b.imbalancePercent)-Math.abs(a.imbalancePercent));
- res.json({connected:gate.connected||okx.connected,updatedAt:Date.now(),
-  trackedSymbols:gate.trackedSymbols+okx.trackedSymbols,
-  lastMessage:Math.max(gate.lastMessage||0,okx.lastMessage||0),
+ res.json({connected:gate.connected||okx.connected||kucoin.connected,updatedAt:Date.now(),
+  trackedSymbols:gate.trackedSymbols+okx.trackedSymbols+kucoin.trackedSymbols,
+  lastMessage:Math.max(gate.lastMessage||0,okx.lastMessage||0,kucoin.lastMessage||0),
   exchanges:{gate:{connected:gate.connected,tracked:gate.trackedSymbols,error:gate.lastError,subscriptionError:gate.subscriptionError},
-   okx:{connected:okx.connected,tracked:okx.trackedSymbols,error:okx.lastError}},
+   okx:{connected:okx.connected,tracked:okx.trackedSymbols,error:okx.lastError},
+   kucoin:{connected:kucoin.connected,tracked:kucoin.trackedSymbols,error:kucoin.lastError}},
   rows:rows.slice(0,200),notice:"Gerçekleşen işlemler; her coin ve borsada eksiksiz kapsama garanti edilmez."});
 });
 const PORT = process.env.PORT || 3000;
@@ -8159,4 +8161,5 @@ async function backgroundMinuteRadarLoop() {
 setTimeout(backgroundMinuteRadarLoop, 45 * 1000);
 
 \nstartFlowRadar();
-startOkxFlow();\n
+startOkxFlow();
+startKucoinFlow();\n
