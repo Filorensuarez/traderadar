@@ -379,17 +379,20 @@
  <div class="info-box"><h3>Hedef ve risk sınırları</h3><p id="capitalSummary"></p><p id="capitalLimits"></p><p id="capitalWarnings" aria-live="polite"></p></div>
  <div class="info-box">
  <h3>İşlem büyüklüğü hesaplayıcısı</h3>
- <label for="capitalSymbol">Coin / Parite</label><input class="x-field" id="capitalSymbol" placeholder="Örnek: ARPA/USDT" maxlength="30">
- <label for="capitalEntry">Planlanan giriş fiyatı</label><input class="x-field" id="capitalEntry" type="number" step="any" min="0" placeholder="Örnek: 0.04">
- <label for="capitalStop">Zarar-kes fiyatı</label><input class="x-field" id="capitalStop" type="number" step="any" min="0" placeholder="Örnek: 0.038">
- <label for="capitalTarget">Hedef fiyat</label><input class="x-field" id="capitalTarget" type="number" step="any" min="0" placeholder="Örnek: 0.044">
+ <p id="capitalSelected" class="description">İlk Tepki radarından coin seçebilir veya bilgileri elle girebilirsiniz.</p>
+ <p id="capitalExchange" class="description"></p>
+ <div class="capital-field"><label for="capitalSymbol">Coin / Parite</label><input class="x-field" id="capitalSymbol" placeholder="Örnek: ARPA/USDT" maxlength="30"></div>
+ <div class="capital-field"><label for="capitalEntry">Planlanan giriş fiyatı</label><input class="x-field" id="capitalEntry" type="number" step="any" min="0" placeholder="Örnek: 0.04"></div>
+ <div class="capital-field"><label for="capitalStop">Zarar-kes fiyatı</label><input class="x-field" id="capitalStop" type="number" step="any" min="0" placeholder="Örnek: 0.038"></div>
+ <div class="capital-field"><label for="capitalTarget">Hedef fiyat</label><input class="x-field" id="capitalTarget" type="number" step="any" min="0" placeholder="Örnek: 0.044"></div>
+ <button class="refresh-button" id="capitalScenario" type="button">Örnek Risk Senaryosu Oluştur</button>
  <button class="refresh-button" id="capitalCalculate" type="button">Riski Hesapla</button>
  <p id="capitalPlan" aria-live="polite">İşlem bilgilerini girerek hesaplayın.</p>
  <button class="refresh-button" id="capitalRecord" type="button" disabled>Planı Günlüğe Kaydet</button>
  </div>
  <div class="info-box"><h3>Manuel işlem günlüğü</h3>
  <p class="description">Yalnız gerçekleşmiş işlemlerin net TL kârını veya zararını kaydedin. Kayıtlar bu tarayıcıda tutulur; borsa hesabıyla bağlantı yoktur.</p>
- <label for="capitalPnl">Gerçekleşen net kâr / zarar (TL)</label><input class="x-field" id="capitalPnl" type="number" step="0.01" placeholder="Örnek: -500">
+ <div class="capital-field"><label for="capitalPnl">Gerçekleşen net kâr / zarar (TL)</label><input class="x-field" id="capitalPnl" type="number" step="0.01" placeholder="Örnek: -500"></div>
  <button id="capitalAddPnl" class="refresh-button" type="button">Sonucu Kaydet</button>
  <button id="capitalExport" class="refresh-button" type="button">Günlüğü Dışa Aktar</button>
  <p id="capitalLedger" aria-live="polite"></p></div>
