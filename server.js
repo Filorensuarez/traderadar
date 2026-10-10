@@ -21,10 +21,11 @@ app.get("/api/flow-radar",(req,res)=>{
  const gate=flowSnapshot(),okx=okxFlowSnapshot(),kucoin=kucoinFlowSnapshot();
  recordFlowObservations([...gate.rows,...okx.rows,...kucoin.rows]);
  const rows=[...gate.rows,...okx.rows,...kucoin.rows]
-  .filter(row=>row.fastBuyAlert||row.mode==="ALIŞ BASKISI ARTIYOR"||row.mode==="SATIŞ BASKISI ARTIYOR")
+  .filter(row=>row.earlyBuyWatch||row.fastBuyAlert||row.mode==="ALIŞ BASKISI ARTIYOR"||row.mode==="SATIŞ BASKISI ARTIYOR")
   .map(row=>({...row,marketCapUsd:eligibleMarketCap(row.symbol)}))
   .filter(row=>row.marketCapUsd!==null)
   .sort((a,b)=>
+  Number(Boolean(b.earlyBuyWatch))-Number(Boolean(a.earlyBuyWatch))||
   Number(b.mode.includes("ARTIYOR"))-Number(a.mode.includes("ARTIYOR"))||
   Math.abs(b.imbalancePercent)-Math.abs(a.imbalancePercent));
  res.json({connected:gate.connected||okx.connected||kucoin.connected,updatedAt:Date.now(),
@@ -8176,3 +8177,31 @@ refreshMarketCaps().then(()=>{
 setInterval(()=>refreshMarketCaps().catch(e=>console.error("Piyasa değeri:",e.message)),60*60*1000);
 
 setInterval(()=>{const gate=flowSnapshot(),okx=okxFlowSnapshot(),kucoin=kucoinFlowSnapshot();recordFlowObservations([...gate.rows,...okx.rows,...kucoin.rows]);},10000);
+
+/* 5-second server-side early watch; operates with the browser closed.
+   Notifications are hypotheses, not a guaranteed 2-minute lead. */
+const earlyAlertCooldown=new Map();
+let earlyWatchRunning=false;
+setInterval(async()=>{
+ if(earlyWatchRunning)return;
+ earlyWatchRunning=true;
+ try{
+  const all=[...flowSnapshot().rows,...okxFlowSnapshot().rows,...kucoinFlowSnapshot().rows];
+  const now=Date.now();
+  for(const row of all){
+   if(!row.earlyBuyWatch||!Number.isFinite(row.earlyScore)||row.earlyScore<60)continue;
+   const cap=eligibleMarketCap(row.symbol);
+   if(cap===null)continue;
+   const key=row.exchange+":"+row.symbol;
+   if(now-(earlyAlertCooldown.get(key)||0)<15*60*1000)continue;
+   earlyAlertCooldown.set(key,now);
+   await sendPush({title:"TradeRadar • ERKEN YÜKSELİŞ İZLEME",
+    body:row.symbol+" ("+row.exchange+") alış ivmesi "+(row.buySpeed10s??"-")+
+      "x, alış payı %"+(row.buySharePercent??"-")+
+      ". Yükseliş kesin değildir.",
+    url:"/#flow"});
+  }
+  for(const [key,t] of earlyAlertCooldown)if(now-t>24*60*60*1000)earlyAlertCooldown.delete(key);
+ }catch(error){console.error("Erken alış izleme:",error.message);}
+ finally{earlyWatchRunning=false;}
+},5000);
