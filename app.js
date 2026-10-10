@@ -102,7 +102,7 @@ function openView(view) {
   const xmanager = view === "xmanager";
   const decision = view === "decision";
   const flow = view === "flow";
-  const minute20 = view === "minute20";
+
 
 
   dailySection.hidden =
@@ -120,7 +120,7 @@ function openView(view) {
   document.querySelector("#xmanager").hidden = !xmanager;
   document.querySelector("#decision").hidden = !decision;
   document.querySelector("#flow").hidden = !flow;
-  document.querySelector("#minute20").hidden = !minute20;
+
 
 
   dailyButton.classList.toggle(
@@ -146,7 +146,7 @@ function openView(view) {
   document.querySelector("#xManagerButton").classList.toggle("active", xmanager);
   document.querySelector("#decisionButton").classList.toggle("active", decision);
   document.querySelector("#flowButton").classList.toggle("active", flow);
-  document.querySelector("#minute20Button").classList.toggle("active", minute20);
+
   if (decision) { loadMediumWatch(); }
 
 
@@ -177,7 +177,7 @@ function openView(view) {
   }
 }
 document.querySelector("#xManagerButton").addEventListener("click", () => openView("xmanager"));
-document.querySelector("#minute20Button").addEventListener("click", () => openView("minute20"));
+
 document.querySelector("#decisionButton").addEventListener("click",()=>openView("decision"));
 
 dailyButton.addEventListener(
@@ -2714,4 +2714,4 @@ document.querySelector("#mediumWatchRefresh").addEventListener("click",loadMediu
 
 document.querySelector("#flowButton").addEventListener("click",()=>openView("flow"));
 
-document.querySelector("#pre15Button").addEventListener("click",()=>openView("pre15"));
+
