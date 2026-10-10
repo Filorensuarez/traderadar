@@ -8,6 +8,10 @@ export function detectCrossing(input,now=Date.now()){
  if(now-bars.at(-1).time>3*3600000)return null;
  const closes=bars.map(x=>x.close),e7=ema(closes,7),e25=ema(closes,25),e99=ema(closes,99),i=bars.length-1;
  const crossed=e7[i-1]<=e25[i-1]&&e7[i]>e25[i];
+ let lastCrossIndex=-1;
+ for(let j=i;j>=1;j--){if(e7[j-1]<=e25[j-1]&&e7[j]>e25[j]){lastCrossIndex=j;break;}}
+ const crossAgeHours=lastCrossIndex<0?null:i-lastCrossIndex;
+ const crossTime=lastCrossIndex<0?null:bars[lastCrossIndex].time+3600000;
  const crossedRecently=Array.from({length:4},(_,n)=>i-n).some(j=>j>1&&e7[j-1]<=e25[j-1]&&e7[j]>e25[j]);
  const gap=Math.abs(e7[i]-e25[i])/e25[i]*100;
  const near99=Math.abs(bars[i].close-e99[i])/e99[i]*100;
@@ -26,8 +30,22 @@ export function detectCrossing(input,now=Date.now()){
  const endConfirmed=e7[i]<e25[i]&&e7[i-1]<e25[i-1];
  if(!crossedRecently&&!preparing&&!trendActive&&!endConfirmed)return null;
  const status=endConfirmed?"YÜKSELİŞ SONA ERDİ":crossed?"YENİ KESİŞİM":trendActive?"YÜKSELİŞ DEVAM EDİYOR":crossedRecently?"Kesişim Sonrası":"KESİŞİM ADAYI";
- const decision=!endConfirmed&&crossedRecently&&rising&&above99&&fastVolume?"ALIM KOŞULLARI OLUŞUYOR":"BEKLE";
+ const checks={
+  recentCross:crossedRecently,
+  risingAverages:rising,
+  aboveEma99:above99,
+  volumeAtLeast2x:lastVolumeRatio>=2,
+  positiveCandle,
+  risingVolume
+ };
+ const missingReasons=[];
+ if(!checks.recentCross)missingReasons.push("Yeni EMA7/25 kesişimi yok (son 4 mum)");
+ if(!checks.risingAverages)missingReasons.push("EMA7 ve EMA25 birlikte yükselmiyor");
+ if(!checks.aboveEma99)missingReasons.push("Fiyat EMA99 seviyesini teyit etmiyor");
+ if(!checks.volumeAtLeast2x)missingReasons.push("Son mum hacmi 20 mum ortalamasının 2 katına ulaşmadı");
+ if(!checks.positiveCandle)missingReasons.push("Son tamamlanmış mum pozitif kapanmadı");
+ const decision=!endConfirmed&&missingReasons.length===0?"ALIM KOŞULLARI OLUŞUYOR":"BEKLE";
  return {status,decision,price:bars[i].close,ema7:e7[i],ema25:e25[i],ema99:e99[i],
-  trendActive,endConfirmed,gapPct:+gap.toFixed(2),volumeRatio:+volRatio.toFixed(2),lastVolumeRatio:+lastVolumeRatio.toFixed(2),volumeLevel,risingVolume,positiveCandle,near99Pct:+near99.toFixed(2),
-  candleTime:bars[i].time,reason:decision==="BEKLE"?"Kesişim, EMA99 konumu veya son mumda en az 2 kat pozitif hacim teyidi eksik.":"EMA7/25 kesişimi, yükselen ortalamalar ve hacim teyidi var. İşlem riski ayrıca kontrol edilmeli."};
+  trendActive,endConfirmed,crossAgeHours,crossTime,checks,missingReasons,gapPct:+gap.toFixed(2),volumeRatio:+volRatio.toFixed(2),lastVolumeRatio:+lastVolumeRatio.toFixed(2),volumeLevel,risingVolume,positiveCandle,near99Pct:+near99.toFixed(2),
+  candleTime:bars[i].time,reason:decision==="BEKLE"?(missingReasons.join("; ")||"Kesişim sonlanma koşulu oluştu."):"Yeni kesişim, yükselen ortalamalar, EMA99 ve pozitif hacim teyidi mevcut. Bu kesin alım emri değildir."};
 }
