@@ -11,11 +11,11 @@ async function refresh(){
   status.textContent="Bağlantı: "+(d.connected?"Aktif":"Kesik")+
    " | İzlenen: "+d.trackedSymbols+" | Son işlem: "+
    (d.lastMessage?new Date(d.lastMessage).toLocaleTimeString("tr-TR"):"Yok")+
-   (d.lastError?" | Hata: "+d.lastError:"");
+   (d.lastError?" | Hata: "+d.lastError:"")+" | "+Object.entries(d.sources||{}).map(([name,v])=>name.toUpperCase()+": "+(v.connected?"aktif":"kesik")+" ("+v.tracked+")").join(" • ");
   cards.replaceChildren();
   for(const x of d.rows||[]){
    const card=document.createElement("article");card.className="coin-card";
-   const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.status;card.append(h);
+   const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.exchange+" • "+x.status;card.append(h);
    const p=document.createElement("p");
    p.textContent="Fiyat: "+x.price+" | 5 sn: %"+x.change5Pct+
     " | 10 sn: %"+x.change10Pct+" | 30 sn: %"+x.change30Pct+
