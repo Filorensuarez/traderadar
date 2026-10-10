@@ -1,12 +1,18 @@
 import WebSocket from "ws";
 let socket=null,connected=false,error=null,lastMessage=0,started=false;
-let symbols=[];const trades=new Map();
+let symbols=[];const trades=new Map();let pingTimer=null;
 async function connect(){
  try{
   const response=await fetch("https://api.kucoin.com/api/v1/bullet-public",{method:"POST"});
   const body=await response.json(),server=body.data?.instanceServers?.[0];
   if(!server)throw Error("KuCoin token unavailable");
-  symbols=["BTC-USDT","ETH-USDT","SOL-USDT","XRP-USDT","DOGE-USDT","ADA-USDT","SUI-USDT","LINK-USDT"];
+  const tickerResponse=await fetch("https://api.kucoin.com/api/v1/market/allTickers",
+   {signal:AbortSignal.timeout(15000)});
+  const tickers=await tickerResponse.json();
+  symbols=(tickers.data?.ticker||[]).filter(t=>/^[A-Z0-9]+-USDT$/.test(t.symbol)&&
+   Number(t.volValue)>=50000)
+   .sort((a,b)=>Number(b.volValue)-Number(a.volValue)).slice(0,100).map(t=>t.symbol);
+  if(!symbols.length)throw Error("KuCoin uygun USDT piyasası bulunamadı");
   socket=new WebSocket(server.endpoint+"?token="+encodeURIComponent(body.data.token));
   socket.on("open",()=>{connected=true;error=null;
    socket.send(JSON.stringify({id:String(Date.now()),type:"subscribe",
@@ -24,8 +30,8 @@ async function connect(){
    trades.set(d.symbol,list);lastMessage=Date.now();
   });
   socket.on("error",e=>{error=e.message;});
-  socket.on("close",()=>{connected=false;if(started)setTimeout(connect,7000);});
-  setInterval(()=>{if(socket?.readyState===WebSocket.OPEN)
+  socket.on("close",()=>{connected=false;clearInterval(pingTimer);if(started)setTimeout(connect,7000);});
+  clearInterval(pingTimer);pingTimer=setInterval(()=>{if(socket?.readyState===WebSocket.OPEN)
    socket.send(JSON.stringify({id:String(Date.now()),type:"ping"}));},18000);
  }catch(e){error=e.message;if(started)setTimeout(connect,10000);}
 }
