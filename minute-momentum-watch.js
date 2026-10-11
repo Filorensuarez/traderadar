@@ -34,16 +34,16 @@ function detect(raw,now=Date.now()){
 async function universe(exchange){
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
-  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&+x.volCcy24h>2000000)
+  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&+x.volCcy24h>=1000000)
    .sort((a,b)=>+b.volCcy24h-+a.volCcy24h).map(x=>x.instId);
  }
  if(exchange==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/allTickers");
-  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&+x.volValue>2000000)
+  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&+x.volValue>=1000000)
    .sort((a,b)=>+b.volValue-+a.volValue).map(x=>x.symbol);
  }
  const d=await get("https://api.gateio.ws/api/v4/spot/tickers");
- return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&+x.quote_volume>2000000)
+ return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&+x.quote_volume>=1000000)
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).map(x=>x.currency_pair);
 }
 async function candles(e,s){
