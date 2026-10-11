@@ -2669,7 +2669,8 @@ async function getCoinbaseDailyCandles(symbol) {
 }
 async function getBybitDailySymbols() {
   let d;
-  try { d = await getExternalJSON("https://api.bybit.com/v5/market/tickers?category=spot", "Bybit"); }\n  catch (firstError) { d = await getExternalJSON("https://api.bytick.com/v5/market/tickers?category=spot", "Bybit"); }
+  try { d = await getExternalJSON("https://api.bybit.com/v5/market/tickers?category=spot", "Bybit"); }
+  catch (firstError) { d = await getExternalJSON("https://api.bytick.com/v5/market/tickers?category=spot", "Bybit"); }
   if(Number(d.retCode)!==0) throw Error("Bybit API: "+(d.retMsg||"hata"));
   return (d.result?.list||[]).filter(x=>/^[A-Z0-9]+USDT$/.test(x.symbol)&&Number(x.turnover24h)>=200000&&
     !/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
@@ -2677,7 +2678,8 @@ async function getBybitDailySymbols() {
 }
 async function getBybitDailyCandles(symbol) {
   let d;
-  try { d = await getExternalJSON("https://api.bybit.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(symbol)+"&interval=D&limit=230", "Bybit"); }\n  catch (firstError) { d = await getExternalJSON("https://api.bytick.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(symbol)+"&interval=D&limit=230", "Bybit"); }
+  try { d = await getExternalJSON("https://api.bybit.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(symbol)+"&interval=D&limit=230", "Bybit"); }
+  catch (firstError) { d = await getExternalJSON("https://api.bytick.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(symbol)+"&interval=D&limit=230", "Bybit"); }
   if(Number(d.retCode)!==0) throw Error("Bybit API: "+(d.retMsg||"hata"));
   return (d.result?.list||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]})).sort((a,b)=>a.time-b.time);
 }
