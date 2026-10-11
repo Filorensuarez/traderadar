@@ -32,6 +32,16 @@ function detect(raw,now=Date.now()){
   previousAverage:previous,currentAverage:latest};
 }
 async function universe(exchange){
+ if(exchange==="BINANCE"){
+  const [info,tickers]=await Promise.all([
+   get("https://data-api.binance.vision/api/v3/exchangeInfo"),
+   get("https://data-api.binance.vision/api/v3/ticker/24hr")
+  ]);
+  const volumes=new Map((tickers||[]).map(x=>[x.symbol,Number(x.quoteVolume)]));
+  return (info.symbols||[]).filter(x=>x.status==="TRADING"&&x.quoteAsset==="USDT"&&x.isSpotTradingAllowed!==false&&
+   (volumes.get(x.symbol)||0)>=1000000&&!/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
+   .sort((a,b)=>(volumes.get(b.symbol)||0)-(volumes.get(a.symbol)||0)).map(x=>x.symbol);
+ }
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
   return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&Number(x.volCcy24h)>=1000000&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.instId))
@@ -47,6 +57,10 @@ async function universe(exchange){
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).map(x=>x.currency_pair);
 }
 async function candles(e,s){
+ if(e==="BINANCE"){
+  const d=await get("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=50","BINANCE");
+  return (d||[]).map(x=>({time:+x[0],close:+x[4]}));
+ }
  if(e==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=50","OKX");
   return (d.data||[]).map(x=>({time:+x[0],close:+x[4]}));
@@ -74,7 +88,7 @@ export async function scanMinuteMomentum(){
   const eligible=new Set(Object.entries(markets).flatMap(([exchange,symbols])=>symbols.map(symbol=>exchange+":"+symbol)));
   for(const key of active.keys())if(!eligible.has(key))active.delete(key);
   state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
-  for(const e of ["OKX","KUCOIN","GATE.IO"]){
+  for(const e of ["BINANCE","OKX","KUCOIN","GATE.IO"]){
    const symbols=markets[e]||[];
    let next=0;
    async function worker(){
