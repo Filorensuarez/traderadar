@@ -21,13 +21,34 @@
   try{
    const info=await get("https://data-api.binance.vision/api/v3/exchangeInfo",signal);
    const symbols=info.symbols.filter(x=>x.status==="TRADING"&&x.quoteAsset==="USDT"&&x.isSpotTradingAllowed!==false).map(x=>x.symbol);
-   let checked=0,failed=0,candidates=0,insufficient=0;
-   const results=[];
-   for(const symbol of symbols){
-    if(signal.aborted)break;
-    try{
+   let checked=0,failed=0,candidates=0,insufficient=0,next=0,halt=false;
+   let waitUntil=0;
+   const cards=$("whaleEarlyCards");
+   function render(x){
+    const el=document.createElement("article");el.className="info-box";
+    const price=n=>Number.isFinite(n)&&n>0?Number(n).toLocaleString("tr-TR",{maximumSignificantDigits:9}):"Hesaplanamadı";
+    el.innerHTML="<h3>"+escape(x.symbol)+" · Erken birikim adayı</h3>"+
+     "<p>Durum: "+escape(x.category)+" · Son tamamlanmış mum: "+new Date(x.asof).toLocaleString("tr-TR")+"</p>"+
+     "<p>Referans kapanış: "+price(x.entry)+" USDT · Son 30 dk direnç: "+price(x.resistance)+" USDT</p>"+
+     "<p>Örnek zarar-kes: "+price(x.stop)+" USDT · 2:1 varsayımsal hedef: "+price(x.target)+" USDT</p>"+
+     "<p>Risk/getiri: "+(x.rr?fmt(x.rr)+":1":"Hesaplanamadı")+" · Direnç kırılımı: "+(x.breakout?"Var":"Yok")+"</p>"+
+     "<p>1 dk alış payı: %"+fmt(x.m1.ratio)+" · 5 dk: %"+fmt(x.m5.ratio)+" · 15 dk: %"+fmt(x.m15.ratio)+"</p>"+
+     "<p>15 dk hacim / önceki 30 dk normalize hacmi: "+fmt(x.ratio)+" kat</p>"+
+     "<p>15 dk fiyat değişimi: %"+fmt(x.m15.change)+" · 5 dk net agresif alış: "+fmt(x.m5.delta)+" USDT</p>"+
+     "<small>Kaynak: Binance Spot tamamlanmış 1 dakikalık mumları. Net agresif alış, taker alış hacminin iki katından toplam hacmin çıkarılmasıyla hesaplanır. Referans kapanış anlık alış fiyatı değildir. Zarar-kes son 10 mumun en düşük seviyesidir; hedef varsayımsal 2:1 hesaplamasıdır. Komisyon, kayma ve emir defteri hesaba katılmaz. Kesin alım önerisi değildir.</small>";
+    cards.prepend(el);
+   }
+   async function worker(){
+     while(!signal.aborted&&!halt){
+       const index=next++;
+       if(index>=symbols.length)return;
+       const symbol=symbols[index];
+       try{
+         if(Date.now()<waitUntil)await new Promise(r=>setTimeout(r,waitUntil-Date.now()));
+         if(signal.aborted||halt)return;
      const candles=await get("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=66",signal);
-     const closed=candles.filter(x=>Number(x[6])<Date.now());\n     if(closed.length && Date.now()-Number(closed[closed.length-1][6])>120000){insufficient++;continue;}
+     const closed=candles.filter(x=>Number(x[6])<Date.now());
+     if(closed.length && Date.now()-Number(closed[closed.length-1][6])>120000){insufficient++;continue;}
      if(closed.length<60){insufficient++;continue;}
      const recent=closed.slice(-15),baseline=closed.slice(-45,-15);
      const m1=measure(recent,1),m5=measure(recent,5),m15=measure(recent,15);
@@ -48,30 +69,28 @@
      const deltaBoost=m5.delta>0&&m5.delta>prior5.delta;
      // Filtre: önceki 30 dakikaya göre hacim artışı, alış üstünlüğü, sınırlı fiyat değişimi
      if(m5.ratio>=60&&m15.ratio>=55&&ratio>=1.5&&m15.change>=-0.5&&m15.change<=2&&deltaBoost&&m15.vol>=10000){
-       candidates++;\n       render({symbol,m1,m5,m15,ratio,deltaBoost,category,entry,stop,target,rr,resistance,breakout,asof:Number(recent[14][6])});
+       candidates++;
+       render({symbol,m1,m5,m15,ratio,deltaBoost,category,entry,stop,target,rr,resistance,breakout,asof:Number(recent[14][6])});
      }
-    }catch(e){if(signal.aborted)break;failed++;}
-    checked++;
-    $("whaleEarlyStatus").textContent=checked+"/"+symbols.length+" incelendi · "+candidates+" aday · "+failed+" hata · "+insufficient+" yetersiz geçmiş";
+
+       }catch(e){
+         if(signal.aborted)return;
+         failed++;
+         if(e.status===429||e.status===418){
+           halt=true;
+           waitUntil=Date.now()+Math.max(10000,e.retryAfter*1000);
+           $("whaleEarlyStatus").textContent="Binance istek sınırı. Tarama durduruldu; sonra tekrar deneyin.";
+         }
+       }finally{
+         checked++;
+         if(!halt)$("whaleEarlyStatus").textContent=checked+"/"+symbols.length+" incelendi · "+candidates+" aday · "+failed+" hata · "+insufficient+" yetersiz geçmiş";
+       }
+     }
    }
-   }
-   function render(x){
-    const el=document.createElement("article");el.className="info-box";
-    const price=n=>Number.isFinite(n)&&n>0?Number(n).toLocaleString("tr-TR",{maximumSignificantDigits:9}):"Hesaplanamadı";
-    el.innerHTML="<h3>"+escape(x.symbol)+" · Erken birikim adayı</h3>"+
-     "<p>Durum: "+escape(x.category)+" · Son tamamlanmış mum: "+new Date(x.asof).toLocaleString("tr-TR")+"</p>"+
-     "<p>Referans kapanış: "+price(x.entry)+" USDT · Son 30 dk direnç: "+price(x.resistance)+" USDT</p>"+
-     "<p>Örnek zarar-kes: "+price(x.stop)+" USDT · 2:1 varsayımsal hedef: "+price(x.target)+" USDT</p>"+
-     "<p>Risk/getiri: "+(x.rr?fmt(x.rr)+":1":"Hesaplanamadı")+" · Direnç kırılımı: "+(x.breakout?"Var":"Yok")+"</p>"+
-     "<p>1 dk alış payı: %"+fmt(x.m1.ratio)+" · 5 dk: %"+fmt(x.m5.ratio)+" · 15 dk: %"+fmt(x.m15.ratio)+"</p>"+
-     "<p>15 dk hacim / önceki 30 dk normalize hacmi: "+fmt(x.ratio)+" kat</p>"+
-     "<p>15 dk fiyat değişimi: %"+fmt(x.m15.change)+" · 5 dk net agresif alış: "+fmt(x.m5.delta)+" USDT</p>"+
-     "<small>Kaynak: Binance Spot tamamlanmış 1 dakikalık mumları. Net agresif alış, taker alış hacminin iki katından toplam hacmin çıkarılmasıyla hesaplanır. Referans kapanış anlık alış fiyatı değildir. Zarar-kes son 10 mumun en düşük seviyesidir; hedef varsayımsal 2:1 hesaplamasıdır. Komisyon, kayma ve emir defteri hesaba katılmaz. Kesin alım önerisi değildir.</small>";
-    cards.prepend(el);
-   }
-   if(!signal.aborted){
-    $("whaleEarlyStatus").textContent+=" · Tarama tamamlandı.";
-    if(!candidates)cards.textContent="Koşulları sağlayan aday bulunamadı.";
+   await Promise.all(Array.from({length:6},()=>worker()));
+   if(!signal.aborted&&!halt){
+     $("whaleEarlyStatus").textContent+=" · Tarama tamamlandı.";
+     if(!candidates)cards.textContent="Koşulları sağlayan aday bulunamadı.";
    }
   }catch(e){if(!signal.aborted)$("whaleEarlyStatus").textContent="Veri hatası: "+e.message;}
   finally{running=false;btn.disabled=false;}
