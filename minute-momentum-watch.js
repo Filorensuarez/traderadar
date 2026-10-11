@@ -4,8 +4,8 @@ const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[]
 const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
-const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0,BINANCE:0};
-const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2};
+const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0,BINANCE:0,COINBASE:0};
+const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2,COINBASE:2};
 async function get(url,e){
  for(let attempt=0;attempt<3;attempt++){
   if(e&&backoffUntil[e]>Date.now())await pause(backoffUntil[e]-Date.now());
@@ -32,6 +32,15 @@ function detect(raw,now=Date.now()){
   previousAverage:previous,currentAverage:latest};
 }
 async function universe(exchange){
+ if(exchange==="COINBASE"){
+  const d=await get("https://api.coinbase.com/api/v3/brokerage/market/products?product_type=SPOT&limit=250&get_all_products=true","COINBASE");
+  const products=d.products||[];
+  return products.filter(x=>x.status==="online"&&x.product_type==="SPOT"&&x.quote_currency_id==="USD"&&
+   !x.is_disabled&&!x.trading_disabled&&Number(x.volume_24h||0)*Number(x.price||0)>=1000000&&
+   !/(UP|DOWN|BULL|BEAR|[235][SL])$/i.test(x.base_currency_id||""))
+   .sort((a,b)=>(Number(b.volume_24h||0)*Number(b.price||0))-(Number(a.volume_24h||0)*Number(a.price||0)))
+   .map(x=>x.product_id);
+ }
  if(exchange==="BINANCE"){
   const [info,tickers]=await Promise.all([
    get("https://data-api.binance.vision/api/v3/exchangeInfo"),
@@ -57,6 +66,11 @@ async function universe(exchange){
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).map(x=>x.currency_pair);
 }
 async function candles(e,s){
+ if(e==="COINBASE"){
+  const end=Math.floor(Date.now()/1000),start=end-3600;
+  const d=await get("https://api.coinbase.com/api/v3/brokerage/market/products/"+encodeURIComponent(s)+"/candles?start="+start+"&end="+end+"&granularity=ONE_MINUTE","COINBASE");
+  return (d.candles||[]).map(x=>({time:+x.start*1000,close:+x.close}));
+ }
  if(e==="BINANCE"){
   const d=await get("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=50","BINANCE");
   return (d||[]).map(x=>({time:+x[0],close:+x[4]}));
@@ -80,7 +94,7 @@ export async function scanMinuteMomentum(){
  state.checked=0;state.successful=0;state.failed=0;state.missing=0;state.attempted=0;state.errors=[];
  try{
   if(Date.now()-lastDiscovery>15*60000){
-   for(const e of ["BINANCE","OKX","KUCOIN","GATE.IO"]){
+   for(const e of ["BINANCE","COINBASE","OKX","KUCOIN","GATE.IO"]){
     try{markets[e]=await universe(e);}catch(err){errors.push(e+" semboller: "+err.message);}
    }
    lastDiscovery=Date.now();
@@ -88,7 +102,7 @@ export async function scanMinuteMomentum(){
   const eligible=new Set(Object.entries(markets).flatMap(([exchange,symbols])=>symbols.map(symbol=>exchange+":"+symbol)));
   for(const key of active.keys())if(!eligible.has(key))active.delete(key);
   state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
-  for(const e of ["BINANCE","OKX","KUCOIN","GATE.IO"]){
+  for(const e of ["BINANCE","COINBASE","OKX","KUCOIN","GATE.IO"]){
    const symbols=markets[e]||[];
    let next=0;
    async function worker(){
