@@ -33,7 +33,7 @@
         json("https://data-api.binance.vision/api/v3/ticker/24hr",signal)
       ]);
       const active=new Set(info.symbols.filter(x=>x.status==="TRADING"&&x.quoteAsset==="USDT"&&x.isSpotTradingAllowed!==false).map(x=>x.symbol));
-      const symbols=tickers.filter(x=>active.has(x.symbol)&&Number(x.quoteVolume)>=1000000)
+      const symbols=tickers.filter(x=>active.has(x.symbol))
         .sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume));
       const minTrade=Math.max(1000,Number($("whaleMin").value)||10000);
       const cards=$("whaleCards");
