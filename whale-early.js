@@ -31,7 +31,7 @@
      const prior5=measure(closed.slice(-20,-15),5);
      const close=Number(recent[14][4]);
      const resistance=Math.max(...closed.slice(-35,-5).map(x=>Number(x[2])));
-     const support=Math.min(...recent.slice(-10).map(x=>Number(x[3])));
+     const support=Math.min(...recent.slice(-11,-1).map(x=>Number(x[3])));
      const last3=recent.slice(-3),last3Vol=last3.reduce((s,x)=>s+Number(x[7]),0);
      const avgPrevVol=base.vol/30;
      const breakout=close>resistance && last3Vol>3*avgPrevVol*1.2;
