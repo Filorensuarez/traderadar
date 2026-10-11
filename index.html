@@ -405,6 +405,7 @@
     <p class="description">Tüm aktif Binance Spot USDT pariteleri, coin sayısı veya günlük hacim alt sınırı olmadan taranır. Her paritede yalnızca son 1000 toplulaştırılmış işlem incelenir. CVD, emir defteri ve fon kimliği bu sürümde ölçülmez. Sıralama 24 saatlik hacme göredir.</p>
     <p id="whaleStatus" aria-live="polite">Taramayı başlatın.</p>
     <div id="whaleCards" class="coin-grid"></div>
+    <div class="info-box"><h3>Erken Birikim Adayları — Sabit Zaman Analizi</h3><p>Son 1, 5 ve 15 tamamlanmış dakikadaki agresif alış oranını ölçer. Son 15 dakikanın hacmini önceki 30 dakikayla dakikaya göre normalize ederek karşılaştırır. Alış oranı, hacim ivmesi ve sınırlı fiyat değişimi birlikte aranır. Bu bir yatırımcı kimliği tespiti veya kesin yükseliş sinyali değildir.</p><button id="whaleEarlyScan" type="button" class="refresh-button">Erken Birikim Tara</button> <button id="whaleEarlyStop" type="button" class="refresh-button">Durdur</button><p id="whaleEarlyStatus" aria-live="polite">Tarama başlatılmadı.</p></div><div id="whaleEarlyCards" class="coin-grid"></div>
   </section>
   </main>
 
@@ -420,6 +421,7 @@
 
   <script src="./app.js"></script>
   <script defer src="./whale-monitor.js"></script>
+  <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./minute-momentum-ui.js"></script>
 
