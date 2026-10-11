@@ -106,3 +106,19 @@ export async function scanMinuteMomentum(){
    await Promise.all(Array.from({length:Math.min(concurrency[e],symbols.length)},()=>worker()));
   }
 
+  state.checked=checked;state.successful=successful;state.failed=failed;
+  state.updatedAt=Date.now();state.errors=errors;
+  state.closest=closest.sort((a,b)=>b.changePct-a.changePct).slice(0,12);
+  state.maxChangePct=state.closest.length?state.closest[0].changePct:null;
+  state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
+ }finally{state.running=false;}
+ return minuteMomentumStatus();
+}
+export function minuteMomentumStatus(){
+ return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
+  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. En az 1 milyon USDT günlük hacimli pariteler taranır. Sabit coin sayısı sınırı yoktur."};
+}
+export function startMinuteMomentum(){
+ scanMinuteMomentum().catch(console.error);
+ setInterval(()=>scanMinuteMomentum().catch(console.error),60000);
+}
