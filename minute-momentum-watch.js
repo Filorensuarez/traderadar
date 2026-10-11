@@ -4,8 +4,8 @@ const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[]
 const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
-const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0};
-const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2};
+const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0,BINANCE:0};
+const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2};
 async function get(url,e){
  for(let attempt=0;attempt<3;attempt++){
   if(e&&backoffUntil[e]>Date.now())await pause(backoffUntil[e]-Date.now());
@@ -66,7 +66,7 @@ export async function scanMinuteMomentum(){
  state.checked=0;state.successful=0;state.failed=0;state.missing=0;state.attempted=0;state.errors=[];
  try{
   if(Date.now()-lastDiscovery>15*60000){
-   for(const e of ["OKX","KUCOIN","GATE.IO"]){
+   for(const e of ["BINANCE","OKX","KUCOIN","GATE.IO"]){
     try{markets[e]=await universe(e);}catch(err){errors.push(e+" semboller: "+err.message);}
    }
    lastDiscovery=Date.now();
