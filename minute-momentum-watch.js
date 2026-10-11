@@ -1,6 +1,6 @@
 // 1-minute 10-vs-30 moving-average momentum watch, with hysteresis.
 // Only completed candles count. Exchange symbols are kept separate.
-const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[],rows:[],universe:{},closest:[],maxChangePct:null};
+const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[],rows:[],universe:{},closest:[],maxChangePct:null,missing:0,attempted:0};
 const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
@@ -34,16 +34,16 @@ function detect(raw,now=Date.now()){
 async function universe(exchange){
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
-  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&+x.volCcy24h>=1000000)
+  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId))
    .sort((a,b)=>+b.volCcy24h-+a.volCcy24h).map(x=>x.instId);
  }
  if(exchange==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/allTickers");
-  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&+x.volValue>=1000000)
+  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol))
    .sort((a,b)=>+b.volValue-+a.volValue).map(x=>x.symbol);
  }
  const d=await get("https://api.gateio.ws/api/v4/spot/tickers");
- return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&+x.quote_volume>=1000000)
+ return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair))
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).map(x=>x.currency_pair);
 }
 async function candles(e,s){
@@ -62,7 +62,7 @@ let lastDiscovery=0,markets={};
 export async function scanMinuteMomentum(){
  if(state.running)return minuteMomentumStatus();
  state.running=true;
- const errors=[],closest=[];let checked=0,successful=0,failed=0;
+ const errors=[],closest=[];let checked=0,successful=0,failed=0,missing=0;\n state.checked=0;state.successful=0;state.failed=0;state.missing=0;state.attempted=0;state.errors=[];
  try{
   if(Date.now()-lastDiscovery>15*60000){
    for(const e of ["OKX","KUCOIN","GATE.IO"]){
@@ -82,7 +82,7 @@ export async function scanMinuteMomentum(){
      const key=e+":"+symbol;
      try{
       const result=detect(await candles(e,symbol));
-      if(!result)throw Error("Yeterli ardışık kapanmış mum yok");
+      if(!result){missing++;continue;}
       successful++;
       closest.push({exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result});
       const previous=active.get(key);
@@ -97,7 +97,7 @@ export async function scanMinuteMomentum(){
       if(errors.length<12)errors.push(e+" "+symbol+": "+err.message);
      }finally{
       checked++;
-      state.checked=checked;state.successful=successful;state.failed=failed;
+      state.checked=checked;state.successful=successful;state.failed=failed;state.missing=missing;state.attempted=checked;state.missing=missing;state.attempted=checked;state.errors=[...errors];
       state.closest=[...closest].sort((a,b)=>b.changePct-a.changePct).slice(0,12);
       state.maxChangePct=state.closest[0]?.changePct??null;
      }
@@ -116,7 +116,7 @@ export async function scanMinuteMomentum(){
 }
 export function minuteMomentumStatus(){
  return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
-  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. En az 1 milyon USDT günlük hacimli pariteler taranır. Sabit coin sayısı sınırı yoktur."};
+  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. Aktif USDT spot pariteleri hacim ve coin sayısı sınırı olmadan taranır. Eksik mum verisi olanlar ayrı sayılır; analiz edilemeyen coinler başarılı taranmış sayılmaz."};
 }
 export function startMinuteMomentum(){
  scanMinuteMomentum().catch(console.error);
