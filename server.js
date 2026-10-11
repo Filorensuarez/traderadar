@@ -2005,6 +2005,17 @@ let cache = {
    HTTP
 ========================= */
 
+async function getExternalJSON(url, label = "Dış borsa") {
+  const response = await fetch(url, {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "TradeRadar/1.0"
+    },
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!response.ok) throw new Error(label + " HTTP " + response.status);
+  return response.json();
+}
 async function getJSON(url) {
 
   const response =
@@ -2634,17 +2645,17 @@ async function getGateSymbols() {
    BINANCE / COINBASE / BYBIT GÜNLÜK VERİLERİ
 ========================= */
 async function getBinanceDailySymbols() {
-  const tickers = await getJSON("https://data-api.binance.vision/api/v3/ticker/24hr");
+  const tickers = await getExternalJSON("https://data-api.binance.vision/api/v3/ticker/24hr", "Binance");
   return (tickers || []).filter(x => /^[A-Z0-9]+USDT$/.test(String(x.symbol||"")) &&
     Number(x.quoteVolume) >= 200000 && !/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
     .sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).map(x=>x.symbol);
 }
 async function getBinanceDailyCandles(symbol) {
-  const rows = await getJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=230");
+  const rows = await getExternalJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=230", "Binance");
   return (rows||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
 }
 async function getCoinbaseDailySymbols() {
-  const d = await getJSON("https://api.coinbase.com/api/v3/brokerage/market/products?product_type=SPOT&limit=250&get_all_products=true");
+  const d = await getExternalJSON("https://api.coinbase.com/api/v3/brokerage/market/products?product_type=SPOT&limit=250&get_all_products=true", "Coinbase");
   return (d.products||[]).filter(x=>x.status==="online"&&x.product_type==="SPOT"&&
     ["USD","USDT"].includes(String(x.quote_currency_id||""))&&!x.is_disabled&&!x.trading_disabled&&
     Number(x.volume_24h||0)*Number(x.price||0)>=200000&&
@@ -2653,18 +2664,18 @@ async function getCoinbaseDailySymbols() {
     .map(x=>x.product_id);
 }
 async function getCoinbaseDailyCandles(symbol) {
-  const rows = await getJSON("https://api.exchange.coinbase.com/products/"+encodeURIComponent(symbol)+"/candles?granularity=86400");
+  const rows = await getExternalJSON("https://api.exchange.coinbase.com/products/"+encodeURIComponent(symbol)+"/candles?granularity=86400", "Coinbase");
   return (rows||[]).map(x=>({time:+x[0]*1000,low:+x[1],high:+x[2],open:+x[3],close:+x[4],volume:+x[5]})).sort((a,b)=>a.time-b.time);
 }
 async function getBybitDailySymbols() {
-  const d = await getJSON("https://api.bybit.com/v5/market/tickers?category=spot");
+  let d;\n  try { d = await getExternalJSON("https://api.bybit.com/v5/market/tickers?category=spot", "Bybit"); }\n  catch (firstError) { d = await getExternalJSON("https://api.bytick.com/v5/market/tickers?category=spot", "Bybit"); }
   if(Number(d.retCode)!==0) throw Error("Bybit API: "+(d.retMsg||"hata"));
   return (d.result?.list||[]).filter(x=>/^[A-Z0-9]+USDT$/.test(x.symbol)&&Number(x.turnover24h)>=200000&&
     !/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
     .sort((a,b)=>Number(b.turnover24h)-Number(a.turnover24h)).map(x=>x.symbol);
 }
 async function getBybitDailyCandles(symbol) {
-  const d = await getJSON("https://api.bybit.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(symbol)+"&interval=D&limit=230");
+  let d;\n  try { d = await getExternalJSON("https://api.bybit.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(symbol)+"&interval=D&limit=230", "Bybit"); }\n  catch (firstError) { d = await getExternalJSON("https://api.bytick.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(symbol)+"&interval=D&limit=230", "Bybit"); }
   if(Number(d.retCode)!==0) throw Error("Bybit API: "+(d.retMsg||"hata"));
   return (d.result?.list||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]})).sort((a,b)=>a.time-b.time);
 }
