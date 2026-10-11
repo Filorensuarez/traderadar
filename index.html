@@ -77,6 +77,7 @@
   <button id="flowButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
   <button id="momentumButton" class="tab" type="button" data-view="momentum">1 Dakikalık Momentum</button>
+  <button id="pullbackButton" class="tab" type="button" data-view="hourlyPullback">Büyük Geri Çekilmeler</button>
   <button id="capitalButton" class="tab" type="button" data-view="capital">Sermaye Yönetimi</button>
   <button id="whaleButton" class="tab" data-view="whale" type="button">Büyük Yatırımcı Takibi</button>
 </nav>
@@ -394,6 +395,18 @@
  <p id="capitalLedger" aria-live="polite"></p></div>
  <p class="description">Kaldıraç yok. İşlem başına azami planlanan risk %0,5; günlük zarar limiti %2; toplam düşüş uyarısı %10. Fiyat kayması ve komisyonlar gerçek zararı artırabilir.</p>
 </section>
+<section id="hourlyPullback" hidden>
+ <div class="section-head">
+  <div>
+   <h2>Büyük Geri Çekilmeler — Saatlik Alım Fırsatı</h2>
+   <p class="description">Son 168 tamamlanmış 1 saatlik mumun en yüksek fiyatından %20'den fazla düşen coinleri takip eder. Düşüş tespit edildikten sonraki tamamlanmış yeşil 1 saatlik mum kapanınca “ALIM FIRSATI” olarak işaretler.</p>
+  </div>
+  <button id="pullbackScan" class="refresh-button" type="button">Şimdi Tara</button>
+ </div>
+ <div class="info-box"><span>BINANCE, COINBASE, BYBIT, OKX, KUCOIN ve GATE.IO Spot piyasaları taranır. Borsa başına günlük hacmi en az 1 milyon USD/USDT olan en yüksek hacimli 80 parite kontrol edilir. Bu bir uyarıdır; otomatik alım yapılmaz ve sinyal kâr garantisi değildir.</span></div>
+ <p id="pullbackStatus" aria-live="polite">Veriler bekleniyor.</p>
+ <div id="pullbackCards" class="coin-grid"></div>
+</section>
 <section id="momentum" hidden>
  <h2>1 Dakikalık Momentum</h2>
  <p class="description">Son 10 tamamlanmış 1 dakikalık mumun ortalama kapanışı, önceki 30 mumun ortalamasına göre %2 yükseldiğinde takibe alır; %-2 düştüğünde takipten çıkarır. Yalnızca son 24 saatlik işlem hacmi 1.000.000 USDT ve üzerinde olan pariteler taranır.</p>
@@ -427,6 +440,7 @@
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./minute-momentum-ui.js"></script>
+  <script type="module" src="./hourly-pullback-ui.js"></script>
 
 </body>
 </html>
