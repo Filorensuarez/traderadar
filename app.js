@@ -208,54 +208,17 @@ scenarioButton.addEventListener(
 );
 
 function selectExchange(exchange) {
-
-  selectedExchange =
-    exchange;
-
-  okxButton.classList.toggle(
-    "active",
-    exchange === "okx"
-  );
-
-  kucoinButton.classList.toggle(
-    "active",
-    exchange === "kucoin"
-  );
-gateButton.classList.toggle(
-  "active",
-  exchange === "gate"
-);
-  if (lastData) {
-    renderExchange(
-      lastData
-    );
+  selectedExchange = exchange;
+  for (const key of ["okx","kucoin","gate","binance","coinbase","bybit"]) {
+    const button = document.querySelector("#"+key+"Button");
+    if (button) button.classList.toggle("active",exchange===key);
   }
+  if (lastData) renderExchange(lastData);
 }
-
-
-okxButton.addEventListener(
-  "click",
-  () =>
-    selectExchange(
-      "okx"
-    )
-);
-
-
-kucoinButton.addEventListener(
-  "click",
-  () =>
-    selectExchange(
-      "kucoin"
-    )
-);
-gateButton.addEventListener(
-  "click",
-  () =>
-    selectExchange(
-      "gate"
-    )
-);
+for (const key of ["okx","kucoin","gate","binance","coinbase","bybit"]) {
+  const button = document.querySelector("#"+key+"Button");
+  if (button) button.addEventListener("click",()=>selectExchange(key));
+}
 /* =========================
    SAYI GÖSTERİMİ
 ========================= */
@@ -557,13 +520,7 @@ function renderExchange(data) {
   lastData =
     data;
 
-  const exchangeData =
-  selectedExchange === "gate"
-    ? data.gate
-    : selectedExchange === "kucoin"
-      ? data.kucoin
-      : data.okx;
-
+  const exchangeData = data[selectedExchange];
 
   if (!exchangeData) {
 
@@ -591,13 +548,7 @@ function renderExchange(data) {
       : [];
 
 
-  const exchangeName =
-  selectedExchange === "gate"
-    ? "GATE.IO"
-    : selectedExchange === "kucoin"
-      ? "KUCOIN"
-      : "OKX";
-
+  const exchangeName = ({okx:"OKX",kucoin:"KUCOIN",gate:"GATE.IO",binance:"BINANCE",coinbase:"COINBASE",bybit:"BYBIT"})[selectedExchange] || selectedExchange.toUpperCase();
 
   if (exchangeData.ok) {
 
