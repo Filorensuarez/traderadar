@@ -9,7 +9,7 @@ async function refresh(){
   const r=await fetch("/api/minute-momentum",{cache:"no-store"});
   if(!r.ok)throw Error("HTTP "+r.status);
   const d=await r.json();
-  status.textContent=(d.running?"Tarama sürüyor | ":"")+
+  status.textContent="Borsalar: "+Object.entries(d.universe||{}).map(([name,count])=>name+" "+count).join(" | ")+"\n"+(d.running?"Tarama sürüyor | ":"")+
    "Son tarama: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yok")+
    " | Denenen: "+d.checked+"/"+Object.values(d.universe||{}).reduce((a,b)=>a+Number(b||0),0)+" | Analiz edilen: "+d.successful+" | Eksik mum: "+(d.missing||0)+" | Hatalı: "+d.failed+
    " | Takipte: "+d.rows.length+" | En yüksek değişim: "+(d.maxChangePct===null?"Veri yok":"%"+d.maxChangePct)+(d.errors.length?" | İlk hata: "+d.errors[0]:"");
