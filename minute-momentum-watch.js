@@ -23,8 +23,8 @@ async function get(url,e){
 function detect(raw,now=Date.now()){
  const a=raw.map(x=>({time:+x.time,close:+x.close})).filter(x=>Number.isFinite(x.time)&&Number.isFinite(x.close)&&x.close>0&&x.time+INTERVAL<=now)
   .sort((x,y)=>x.time-y.time);
- const b=a.slice(-40);
- if(b.length!==40||now-(b.at(-1).time+INTERVAL)>120000)return null;
+ const b=a.slice(-35);
+ if(b.length!==35||now-(b.at(-1).time+INTERVAL)>120000)return null;
  for(let i=1;i<b.length;i++)if(b[i].time-b[i-1].time!==INTERVAL)return null;
  const avg=x=>x.reduce((s,v)=>s+v.close,0)/x.length;
  const previous=avg(b.slice(0,30)),latest=avg(b.slice(30));
@@ -156,7 +156,7 @@ export async function scanMinuteMomentum(){
 }
 export function minuteMomentumStatus(){
  return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
-  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. Günlük işlem hacmi en az 1 milyon USDT olan aktif USDT spot pariteleri taranır; 3S/3L/5S/5L ve UP/DOWN kaldıraçlı tokenlar hariç tutulur. Eksik mum verisi olanlar ayrı sayılır; analiz edilemeyen coinler başarılı taranmış sayılmaz."};
+  notice:"Son 5 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. Günlük işlem hacmi en az 1 milyon USDT olan aktif USDT spot pariteleri taranır; 3S/3L/5S/5L ve UP/DOWN kaldıraçlı tokenlar hariç tutulur. Eksik mum verisi olanlar ayrı sayılır; analiz edilemeyen coinler başarılı taranmış sayılmaz."};
 }
 export function startMinuteMomentum(){
  scanMinuteMomentum().catch(console.error);
