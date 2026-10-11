@@ -65,12 +65,12 @@ async function universe(exchange){
 async function candles(exchange,symbol){
  if(exchange==="BINANCE"){
   const d=await get("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1h&limit=180",exchange);
-  return (d||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4]}));
+  return (d||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
  }
  if(exchange==="COINBASE"){
   const end=Math.floor(Date.now()/1000),start=end-180*3600;
   const d=await get("https://api.coinbase.com/api/v3/brokerage/market/products/"+encodeURIComponent(symbol)+"/candles?start="+start+"&end="+end+"&granularity=ONE_HOUR",exchange);
-  return (d.candles||[]).map(x=>({time:+x.start*1000,open:+x.open,high:+x.high,low:+x.low,close:+x.close}));
+  return (d.candles||[]).map(x=>({time:+x.start*1000,open:+x.open,high:+x.high,low:+x.low,close:+x.close,volume:+x.volume}));
  }
  if(exchange==="BYBIT"){
   let d,last;
@@ -79,15 +79,15 @@ async function candles(exchange,symbol){
    try{d=await get(host+"/v5/market/kline?"+q,exchange);if(Number(d.retCode)!==0)throw Error(d.retMsg||"API hatası");break;}catch(e){last=e;d=null;}
   }
   if(!d)throw last||Error("Bybit mumları alınamadı");
-  return (d.result?.list||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4]}));
+  return (d.result?.list||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
  }
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar=1H&limit=180",exchange);
-  return (d.data||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4]}));
+  return (d.data||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
  }
  if(exchange==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol="+encodeURIComponent(symbol),exchange);
-  return (d.data||[]).map(x=>({time:+x[0]*1000,open:+x[1],close:+x[2],high:+x[3],low:+x[4]}));
+  return (d.data||[]).map(x=>({time:+x[0]*1000,open:+x[1],close:+x[2],high:+x[3],low:+x[4],volume:+x[5]}));
  }
  const d=await get("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(symbol)+"&interval=1h&limit=180",exchange);
  return (d||[]).map(x=>({time:+x[0]*1000,volume:+x[1],close:+x[2],high:+x[3],low:+x[4],open:+x[5]}));
@@ -99,11 +99,14 @@ function analyze(exchange,symbol,raw,now=Date.now()){
  const data=dedup.slice(-168);
  if(data.length<48)return null;
  const last=data[data.length-1];
+ const previous=data[data.length-2];
+ const priorVolumes=data.slice(-21,-1).map(x=>Number(x.volume)).filter(v=>Number.isFinite(v)&&v>=0);
+ const averageVolume=priorVolumes.length?priorVolumes.reduce((a,b)=>a+b,0)/priorVolumes.length:0;
  const peak=Math.max(...data.slice(0,-1).map(x=>x.high));
  if(!Number.isFinite(peak)||peak<=0)return null;
  return {exchange,symbol:symbol.replace(/[-_]/,"/"),rawSymbol:symbol,price:last.close,peakPrice:peak,
   pullbackPct:+((peak-last.close)/peak*100).toFixed(2),candleTime:last.time,green:last.close>last.open,
-  candleOpen:last.open,candleClose:last.close};
+  candleOpen:last.open,candleClose:last.close,previousHigh:previous.high,volume:Number(last.volume)||0,averageVolume,greenConfirmed:last.close>last.open&&last.close>previous.high&&(averageVolume<=0||Number(last.volume)>=averageVolume)};
 }
 let markets={},lastDiscovery=0;
 export async function scanHourlyPullbacks(){
@@ -129,8 +132,8 @@ export async function scanHourlyPullbacks(){
       if(setup&&result.pullbackPct<15){setups.delete(key);setup=null;}
       if(setup){
        setup.lastCheckedAt=Date.now();setup.pullbackPct=result.pullbackPct;setup.price=result.price;setup.lastCandleTime=result.candleTime;
-       if(!setup.alerted&&result.candleTime>setup.triggerCandleTime&&result.green){
-        setup.alerted=true;setup.alertedAt=Date.now();setup.signalCandleTime=result.candleTime;setup.signalPrice=result.price;
+       if(!setup.alerted&&result.candleTime>setup.triggerCandleTime&&result.greenConfirmed){
+        setup.alerted=true;setup.alertedAt=Date.now();setup.signalCandleTime=result.candleTime;setup.signalPrice=result.price;setup.signalVolume=result.volume;setup.signalPreviousHigh=result.previousHigh;
        }
       }else if(result.pullbackPct>=20){
        setups.set(key,{...result,triggeredAt:Date.now(),triggerCandleTime:result.candleTime,lastCandleTime:result.candleTime,
@@ -151,7 +154,7 @@ export function hourlyPullbackStatus(){
  for(const [key,x] of setups)if(now-x.triggeredAt>7*DAY)setups.delete(key);
  const rows=[...setups.values()].filter(x=>!x.alerted||now-x.alertedAt<48*3600000)
   .sort((a,b)=>Number(b.alerted)-Number(a.alerted)||b.triggeredAt-a.triggeredAt);
- return {...state,rows,notice:"BINANCE, COINBASE, BYBIT, OKX, KUCOIN ve GATE.IO Spot pariteleri taranır. Günlük hacim en az 1 milyon USD/USDT olan her borsadaki en yüksek hacimli 80 parite incelenir. %20 düşüş, son 168 tamamlanmış saatlik mumdaki en yüksek fiyata göre hesaplanır. Alım fırsatı yalnız düşüş tespitinden sonraki tamamlanmış yeşil 1 saatlik mumda işaretlenir; otomatik emir gönderilmez."};
+ return {...state,rows,notice:"BINANCE, COINBASE, BYBIT, OKX, KUCOIN ve GATE.IO Spot pariteleri taranır. Günlük hacim en az 1 milyon USD/USDT olan her borsadaki en yüksek hacimli 80 parite incelenir. %20 düşüş, son 168 tamamlanmış saatlik mumdaki en yüksek fiyata göre hesaplanır. Alım fırsatı yalnız düşüş tespitinden sonraki tamamlanmış yeşil 1 saatlik mum önceki mumun tepesinin üzerinde kapanır ve hacim önceki 20 mum ortalamasına eşit/üstü olursa işaretlenir; otomatik emir gönderilmez."};
 }
 export function startHourlyPullbacks(){
  scanHourlyPullbacks().catch(e=>console.error("Saatlik geri çekilme taraması:",e.message));
