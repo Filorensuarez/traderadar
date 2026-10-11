@@ -2631,6 +2631,44 @@ async function getGateSymbols() {
     }));
 }
 /* =========================
+   BINANCE / COINBASE / BYBIT GÜNLÜK VERİLERİ
+========================= */
+async function getBinanceDailySymbols() {
+  const tickers = await getJSON("https://data-api.binance.vision/api/v3/ticker/24hr");
+  return (tickers || []).filter(x => /^[A-Z0-9]+USDT$/.test(String(x.symbol||"")) &&
+    Number(x.quoteVolume) >= 200000 && !/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
+    .sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).map(x=>x.symbol);
+}
+async function getBinanceDailyCandles(symbol) {
+  const rows = await getJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=230");
+  return (rows||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
+}
+async function getCoinbaseDailySymbols() {
+  const d = await getJSON("https://api.coinbase.com/api/v3/brokerage/market/products?product_type=SPOT&limit=250&get_all_products=true");
+  return (d.products||[]).filter(x=>x.status==="online"&&x.product_type==="SPOT"&&
+    ["USD","USDT"].includes(String(x.quote_currency_id||""))&&!x.is_disabled&&!x.trading_disabled&&
+    Number(x.volume_24h||0)*Number(x.price||0)>=200000&&
+    !/(UP|DOWN|BULL|BEAR|[235][SL])$/i.test(x.base_currency_id||""))
+    .sort((a,b)=>(Number(b.volume_24h||0)*Number(b.price||0))-(Number(a.volume_24h||0)*Number(a.price||0)))
+    .map(x=>x.product_id);
+}
+async function getCoinbaseDailyCandles(symbol) {
+  const rows = await getJSON("https://api.exchange.coinbase.com/products/"+encodeURIComponent(symbol)+"/candles?granularity=86400");
+  return (rows||[]).map(x=>({time:+x[0]*1000,low:+x[1],high:+x[2],open:+x[3],close:+x[4],volume:+x[5]})).sort((a,b)=>a.time-b.time);
+}
+async function getBybitDailySymbols() {
+  const d = await getJSON("https://api.bybit.com/v5/market/tickers?category=spot");
+  if(Number(d.retCode)!==0) throw Error("Bybit API: "+(d.retMsg||"hata"));
+  return (d.result?.list||[]).filter(x=>/^[A-Z0-9]+USDT$/.test(x.symbol)&&Number(x.turnover24h)>=200000&&
+    !/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
+    .sort((a,b)=>Number(b.turnover24h)-Number(a.turnover24h)).map(x=>x.symbol);
+}
+async function getBybitDailyCandles(symbol) {
+  const d = await getJSON("https://api.bybit.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(symbol)+"&interval=D&limit=230");
+  if(Number(d.retCode)!==0) throw Error("Bybit API: "+(d.retMsg||"hata"));
+  return (d.result?.list||[]).map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]})).sort((a,b)=>a.time-b.time);
+}
+/* =========================
    OKX GÜNLÜK MUMLAR
 ========================= */
 
@@ -5808,607 +5846,78 @@ reasons
 let mediumWatchCache={updatedAt:0,scanned:0,rows:[]};
 
 async function scanMarket() {
-
-  if (scanning) {
-    return;
-  }
-
+  if (scanning) return;
   scanning = true;
-  const mediumCandidates=[];
-  let mediumScanned=0;
-  const utcDayStart=Math.floor(Date.now()/86400000)*86400000;
-  function collectMedium(symbol,source,candles){
-    const closed=candles.filter(x=>Number(x.time)<utcDayStart);
-    const setup=detectMediumPreBreakout(closed);
-    if(!setup)return;
+  const mediumCandidates = [];
+  let mediumScanned = 0;
+  const utcDayStart = Math.floor(Date.now()/86400000)*86400000;
+  function collectMedium(symbol, source, candles) {
+    const closed = candles.filter(x => Number(x.time) < utcDayStart);
+    const setup = detectMediumPreBreakout(closed);
+    if (!setup) return;
     mediumScanned++;
-    if(setup.score>=50 && setup.status!=="GEÇ KALINDI"){
-      mediumCandidates.push({symbol:String(symbol).replace(/[-_]USDT$/,"/USDT"),
-        source,...setup});
+    if (setup.score >= 50 && setup.status !== "GEÇ KALINDI") {
+      mediumCandidates.push({symbol:String(symbol).replace(/[-_]USDT$/,"/USDT"),source,...setup});
     }
   }
-
-  console.log(
-    "Bağımsız borsa taraması başladı."
-  );
-
+  const providers = [
+    {key:"okx",name:"OKX",symbols:getSymbols,candles:getCandles,normalize:s=>String(s).replace("-USDT","")+"/USDT"},
+    {key:"kucoin",name:"KUCOIN",symbols:async()=> (await getKucoinSymbols()).map(x=>x.symbol),candles:getKucoinCandles,normalize:s=>String(s).replace("-USDT","")+"/USDT"},
+    {key:"gate",name:"GATE.IO",symbols:async()=> (await getGateSymbols()).map(x=>x.symbol),candles:getGateCandles,normalize:s=>String(s).replace("_USDT","")+"/USDT"},
+    {key:"binance",name:"BINANCE",symbols:getBinanceDailySymbols,candles:getBinanceDailyCandles,normalize:s=>String(s).replace(/USDT$/,"")+"/USDT"},
+    {key:"coinbase",name:"COINBASE",symbols:getCoinbaseDailySymbols,candles:getCoinbaseDailyCandles,normalize:s=>String(s).replace("-","/")},
+    {key:"bybit",name:"BYBIT",symbols:getBybitDailySymbols,candles:getBybitDailyCandles,normalize:s=>String(s).replace(/USDT$/,"")+"/USDT"}
+  ];
+  const results = {};
+  const counts = {};
+  for (const p of providers) {
+    results[p.key] = [];
+    counts[p.key] = {symbols:[],error:null};
+  }
+  console.log("Günlük yükseliş teyidi: altı borsa taraması başladı.");
   try {
-
-    /* =========================
-       OKX
-    ========================= */
-
-    let okxSymbols = [];
-    let okxResults = [];
-    let okxError = null;
-
-    try {
-
-      okxSymbols =
-        await getSymbols();
-
-      const batchSize = 5;
-
-      for (
-        let i = 0;
-        i < okxSymbols.length;
-        i += batchSize
-      ) {
-
-        const batch =
-          okxSymbols.slice(
-            i,
-            i + batchSize
-          );
-
-        const responses =
-          await Promise.allSettled(
-
-            batch.map(
-              async symbol => {
-
-                const candles =
-                  await getCandles(
-                    symbol
-                  );
-                collectMedium(symbol,"OKX",candles);
-
-                const result =
-                  analyze(
-                    symbol,
-                    candles
-                  );
-
-                if (!result) {
-                  return null;
-                }
-
-                result.source =
-                  "OKX";
-
-                return result;
-              }
-            )
-          );
-
-
-        for (
-          const response
-          of responses
-        ) {
-
-          if (
-            response.status !==
-            "fulfilled"
-          ) {
-            continue;
+    for (const p of providers) {
+      try {
+        const symbols = await p.symbols();
+        counts[p.key].symbols = symbols;
+        const batchSize = 5;
+        for (let i=0;i<symbols.length;i+=batchSize) {
+          const batch = symbols.slice(i,i+batchSize);
+          const responses = await Promise.allSettled(batch.map(async symbol=>{
+            const candles = await p.candles(symbol);
+            collectMedium(symbol,p.name,candles);
+            const result = analyze(p.normalize(symbol),candles);
+            if (!result) return null;
+            result.source = p.name;
+            return result;
+          }));
+          for (const response of responses) {
+            if (response.status !== "fulfilled") continue;
+            const result = response.value;
+            if (result && (result.confirmed || result.candidate)) results[p.key].push(result);
           }
-
-          const result =
-            response.value;
-
-          if (
-            result &&
-            (
-              result.confirmed ||
-              result.candidate
-            )
-          ) {
-
-            okxResults.push(
-              result
-            );
-          }
+          await new Promise(resolve=>setTimeout(resolve,150));
         }
-
-
-        await new Promise(
-          resolve =>
-            setTimeout(
-              resolve,
-              150
-            )
-        );
+      } catch (error) {
+        counts[p.key].error = error.message;
+        console.error(p.name+" günlük tarama hatası:",error.message);
       }
-
-    } catch (error) {
-
-      okxError =
-        error.message;
-
-      console.error(
-        "OKX tarama hatası:",
-        error.message
-      );
+      results[p.key].sort((a,b)=>Number(b.confirmed)-Number(a.confirmed)||b.score-a.score);
+      counts[p.key].confirmed = results[p.key].filter(x=>x.confirmed).length;
+      counts[p.key].candidates = results[p.key].filter(x=>x.candidate).length;
     }
-/* =========================
-   KUCOIN
-========================= */
-
-let kucoinSymbols = [];
-let kucoinResults = [];
-let kucoinError = null;
-
-try {
-
-  kucoinSymbols =
-    await getKucoinSymbols();
-
-  const batchSize = 5;
-
-  for (
-    let i = 0;
-    i < kucoinSymbols.length;
-    i += batchSize
-  ) {
-
-    const batch =
-      kucoinSymbols.slice(
-        i,
-        i + batchSize
-      );
-
-    const responses =
-      await Promise.allSettled(
-
-        batch.map(
-          async item => {
-
-            const candles =
-              await getKucoinCandles(
-                item.symbol
-              );
-                collectMedium(item.symbol,"KUCOIN",candles);
-
-            const base =
-              item.symbol.replace(
-                "-USDT",
-                ""
-              );
-
-            const result =
-              analyze(
-                `${base}/USDT`,
-                candles
-              );
-
-            if (!result) {
-              return null;
-            }
-
-            result.source =
-              "KUCOIN";
-
-            return result;
-          }
-        )
-      );
-
-
-    for (
-      const response
-      of responses
-    ) {
-
-      if (
-        response.status !==
-        "fulfilled"
-      ) {
-        continue;
-      }
-
-      const result =
-        response.value;
-
-      if (
-        result &&
-        (
-          result.confirmed ||
-          result.candidate
-        )
-      ) {
-
-        kucoinResults.push(
-          result
-        );
-      }
+    mediumWatchCache = {updatedAt:Date.now(),scanned:mediumScanned,rows:mediumCandidates.sort((a,b)=>b.score-a.score).slice(0,100)};
+    recordSignals("daily",providers.flatMap(p=>results[p.key]).filter(row=>row.confirmed));
+    const out = {ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanned:providers.reduce((n,p)=>n+counts[p.key].symbols.length,0),rows:results.okx.slice(0,30),error:counts.okx.error};
+    for (const p of providers) {
+      out[p.key] = {ok:!counts[p.key].error,error:counts[p.key].error,scanned:counts[p.key].symbols.length,confirmed:counts[p.key].confirmed||0,candidates:counts[p.key].candidates||0,rows:results[p.key].slice(0,30)};
+      console.log(p.name+": "+counts[p.key].symbols.length+" coin / "+(counts[p.key].confirmed||0)+" teyit / "+(counts[p.key].candidates||0)+" aday / "+(counts[p.key].error||"OK"));
     }
-
-
-    await new Promise(
-      resolve =>
-        setTimeout(
-          resolve,
-          150
-        )
-    );
-  }
-
-} catch (error) {
-
-  kucoinError =
-    error.message;
-
-  console.error(
-    "KuCoin tarama hatası:",
-    error.message
-  );
-}
-    /* =========================
-   GATE.IO
-========================= */
-
-let gateSymbols = [];
-let gateResults = [];
-let gateError = null;
-
-try {
-
-  gateSymbols =
-    await getGateSymbols();
-
-  const batchSize = 5;
-
-  for (
-    let i = 0;
-    i < gateSymbols.length;
-    i += batchSize
-  ) {
-
-    const batch =
-      gateSymbols.slice(
-        i,
-        i + batchSize
-      );
-
-    const responses =
-      await Promise.allSettled(
-
-        batch.map(
-          async item => {
-
-            const candles =
-              await getGateCandles(
-                item.symbol
-              );
-                collectMedium(item.symbol,"GATE",candles);
-
-            const base =
-              item.symbol.replace(
-                "_USDT",
-                ""
-              );
-
-            const result =
-              analyze(
-                `${base}/USDT`,
-                candles
-              );
-
-            if (!result) {
-              return null;
-            }
-
-            result.source =
-              "GATE";
-
-            return result;
-          }
-        )
-      );
-
-
-    for (
-      const response
-      of responses
-    ) {
-
-      if (
-        response.status !==
-        "fulfilled"
-      ) {
-        continue;
-      }
-
-      const result =
-        response.value;
-
-      if (
-        result &&
-        (
-          result.confirmed ||
-          result.candidate
-        )
-      ) {
-
-        gateResults.push(
-          result
-        );
-      }
-    }
-
-
-    await new Promise(
-      resolve =>
-        setTimeout(
-          resolve,
-          150
-        )
-    );
-  }
-
-} catch (error) {
-
-  gateError =
-    error.message;
-
-  console.error(
-    "Gate.io tarama hatası:",
-    error.message
-  );
-}
-    /* =========================
-       SIRALAMA
-    ========================= */
-
-    const sortResults =
-      (rows) => {
-
-        rows.sort(
-          (a, b) => {
-
-            if (
-              a.confirmed &&
-              !b.confirmed
-            ) {
-              return -1;
-            }
-
-            if (
-              b.confirmed &&
-              !a.confirmed
-            ) {
-              return 1;
-            }
-
-            return (
-              b.score -
-              a.score
-            );
-          }
-        );
-
-        return rows;
-      };
-
-
-    okxResults =
-      sortResults(
-        okxResults
-      );
-
-    kucoinResults =
-      sortResults(
-        kucoinResults
-      );
-
-gateResults =
-  sortResults(
-    gateResults
-  );
-    /* =========================
-       SAYILAR
-    ========================= */
-
-    const okxConfirmed =
-      okxResults.filter(
-        row =>
-          row.confirmed
-      ).length;
-
-    const okxCandidates =
-      okxResults.filter(
-        row =>
-          row.candidate
-      ).length;
-
-
-    const kucoinConfirmed =
-      kucoinResults.filter(
-        row =>
-          row.confirmed
-      ).length;
-
-    const kucoinCandidates =
-      kucoinResults.filter(
-        row =>
-          row.candidate
-      ).length;
-
-const gateConfirmed =
-  gateResults.filter(
-    row =>
-      row.confirmed
-  ).length;
-
-const gateCandidates =
-  gateResults.filter(
-    row =>
-      row.candidate
-  ).length;
-    /* =========================
-       CACHE
-    ========================= */
-
-    mediumWatchCache={
-      updatedAt:Date.now(),scanned:mediumScanned,
-      rows:mediumCandidates.sort((a,b)=>b.score-a.score).slice(0,100)
-    };
-
-    recordSignals("daily", [...okxResults, ...kucoinResults, ...gateResults].filter(row => row.confirmed));
-
-    cache = {
-
-      ok:
-        !okxError,
-
-      source:
-        "MULTI",
-
-      updatedAt:
-        Date.now(),
-
-      scanned:
-  okxSymbols.length +
-  kucoinSymbols.length +
-  gateSymbols.length,
-
-
-      /* OKX */
-
-      okx: {
-
-        ok:
-          !okxError,
-
-        error:
-          okxError,
-
-        scanned:
-          okxSymbols.length,
-
-        confirmed:
-          okxConfirmed,
-
-        candidates:
-          okxCandidates,
-
-        rows:
-          okxResults.slice(
-            0,
-            30
-          )
-      },
-
-
-      /* KUCOIN */
-
-      kucoin: {
-
-        ok:
-          !kucoinError,
-
-        error:
-          kucoinError,
-
-        scanned:
-          kucoinSymbols.length,
-
-        confirmed:
-          kucoinConfirmed,
-
-        candidates:
-          kucoinCandidates,
-
-        rows:
-          kucoinResults.slice(
-            0,
-            30
-          )
-      },
-gate: {
-
-  ok:
-    !gateError,
-
-  error:
-    gateError,
-
-  scanned:
-    gateSymbols.length,
-
-  confirmed:
-    gateConfirmed,
-
-  candidates:
-    gateCandidates,
-
-  rows:
-    gateResults.slice(
-      0,
-      30
-    )
-},
-
-      /*
-        Eski arayüzün geçici olarak
-        çalışmaya devam etmesi için
-        OKX sonuçlarını rows içinde
-        de tutuyoruz.
-      */
-
-      rows:
-        okxResults.slice(
-          0,
-          30
-        ),
-
-      error:
-        okxError
-    };
-
-
-    console.log(
-      `OKX: ${okxSymbols.length} coin / ${okxConfirmed} teyit / ${okxCandidates} aday`
-    );
-
-    console.log(
-      `KuCoin: ${kucoinSymbols.length} coin / ${kucoinConfirmed} teyit / ${kucoinCandidates} aday / ${kucoinError || "OK"}`
-    );
-
-console.log(
-  `Gate.io: ${gateSymbols.length} coin / ${gateConfirmed} teyit / ${gateCandidates} aday / ${gateError || "OK"}`
-);
-    
+    cache = out;
   } catch (error) {
-
-    console.error(
-      "Genel tarama hatası:",
-      error.message
-    );
-
-    cache = {
-      ...cache,
-
-      ok: false,
-
-      error:
-        error.message
-    };
-
-
+    console.error("Genel günlük tarama hatası:",error.message);
+    cache = {...cache,ok:false,error:error.message};
   } finally {
-
     scanning = false;
   }
 }
