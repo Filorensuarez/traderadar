@@ -4,8 +4,8 @@ const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[]
 const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
-const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0,BINANCE:0,COINBASE:0};
-const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2,COINBASE:2};
+const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0,BINANCE:0,COINBASE:0,BYBIT:0};
+const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2,COINBASE:2,BYBIT:2};
 async function get(url,e){
  for(let attempt=0;attempt<3;attempt++){
   if(e&&backoffUntil[e]>Date.now())await pause(backoffUntil[e]-Date.now());
@@ -51,6 +51,12 @@ async function universe(exchange){
    (volumes.get(x.symbol)||0)>=1000000&&!/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
    .sort((a,b)=>(volumes.get(b.symbol)||0)-(volumes.get(a.symbol)||0)).map(x=>x.symbol);
  }
+ if(exchange==="BYBIT"){
+  const d=await get("https://api.bybit.com/v5/market/tickers?category=spot","BYBIT");
+  if(Number(d.retCode)!==0)throw Error("Bybit API: "+(d.retMsg||"hata"));
+  return (d.result?.list||[]).filter(x=>/^[A-Z0-9]+USDT$/.test(x.symbol)&&Number(x.turnover24h)>=1000000&&!/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
+   .sort((a,b)=>+b.turnover24h-+a.turnover24h).map(x=>x.symbol);
+ }
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
   return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&Number(x.volCcy24h)>=1000000&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.instId))
@@ -75,6 +81,11 @@ async function candles(e,s){
   const d=await get("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=50","BINANCE");
   return (d||[]).map(x=>({time:+x[0],close:+x[4]}));
  }
+ if(e==="BYBIT"){
+  const d=await get("https://api.bybit.com/v5/market/kline?category=spot&symbol="+encodeURIComponent(s)+"&interval=1&limit=50","BYBIT");
+  if(Number(d.retCode)!==0)throw Error("Bybit API: "+(d.retMsg||"hata"));
+  return (d.result?.list||[]).map(x=>({time:+x[0],close:+x[4]}));
+ }
  if(e==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=50","OKX");
   return (d.data||[]).map(x=>({time:+x[0],close:+x[4]}));
@@ -94,7 +105,7 @@ export async function scanMinuteMomentum(){
  state.checked=0;state.successful=0;state.failed=0;state.missing=0;state.attempted=0;state.errors=[];
  try{
   if(Date.now()-lastDiscovery>15*60000){
-   for(const e of ["BINANCE","COINBASE","OKX","KUCOIN","GATE.IO"]){
+   for(const e of ["BINANCE","COINBASE","BYBIT","OKX","KUCOIN","GATE.IO"]){
     try{markets[e]=await universe(e);}catch(err){errors.push(e+" semboller: "+err.message);}
    }
    lastDiscovery=Date.now();
@@ -102,7 +113,7 @@ export async function scanMinuteMomentum(){
   const eligible=new Set(Object.entries(markets).flatMap(([exchange,symbols])=>symbols.map(symbol=>exchange+":"+symbol)));
   for(const key of active.keys())if(!eligible.has(key))active.delete(key);
   state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
-  for(const e of ["BINANCE","COINBASE","OKX","KUCOIN","GATE.IO"]){
+  for(const e of ["BINANCE","COINBASE","BYBIT","OKX","KUCOIN","GATE.IO"]){
    const symbols=markets[e]||[];
    let next=0;
    async function worker(){
