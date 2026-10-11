@@ -1,4 +1,5 @@
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
+import {startHourlyPullbacks,scanHourlyPullbacks,hourlyPullbackStatus} from "./hourly-pullback-watch.js";
 
 import {recordFlowObservations,flowMeasurementStats} from "./flow-measurements.js";
 import {refreshMarketCaps,eligibleMarketCap,marketCapStatus} from "./market-cap-filter.js";
@@ -20,6 +21,8 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 const app = express();
 app.get("/api/minute-momentum",(req,res)=>{res.set("Cache-Control","no-store");res.json(minuteMomentumStatus());});
 app.post("/api/minute-momentum/scan",(req,res)=>{res.set("Cache-Control","no-store");scanMinuteMomentum().catch(console.error);res.json({started:true,...minuteMomentumStatus()});});
+app.get("/api/hourly-pullback",(req,res)=>{res.set("Cache-Control","no-store");res.json(hourlyPullbackStatus());});
+app.post("/api/hourly-pullback/scan",(req,res)=>{res.set("Cache-Control","no-store");scanHourlyPullbacks().catch(console.error);res.json({started:true,...hourlyPullbackStatus()});});
 app.get("/api/flow-measurements",(req,res)=>{res.set("Cache-Control","no-store");res.json(flowMeasurementStats());});
 app.get("/api/flow-radar",(req,res)=>{
  res.set("Cache-Control","no-store");
@@ -7686,6 +7689,7 @@ startFlowRadar();
 startOkxFlow();
 startKucoinFlow();
 startMinuteMomentum();
+startHourlyPullbacks();
 setInterval(()=>refreshMarketCaps().catch(e=>
  console.error("Piyasa değeri güncellemesi:",e.message)),60*60*1000);
 // Historical five-candle notification job removed.
