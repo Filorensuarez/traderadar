@@ -34,16 +34,16 @@ function detect(raw,now=Date.now()){
 async function universe(exchange){
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
-  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.instId))
+  return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&Number(x.volCcy24h)>=1000000&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.instId))
    .sort((a,b)=>+b.volCcy24h-+a.volCcy24h).map(x=>x.instId);
  }
  if(exchange==="KUCOIN"){
   const d=await get("https://api.kucoin.com/api/v1/market/allTickers");
-  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.symbol))
+  return (d.data?.ticker||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.symbol)&&Number(x.volValue)>=1000000&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.symbol))
    .sort((a,b)=>+b.volValue-+a.volValue).map(x=>x.symbol);
  }
  const d=await get("https://api.gateio.ws/api/v4/spot/tickers");
- return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.currency_pair))
+ return d.filter(x=>/^[A-Z0-9]+_USDT$/.test(x.currency_pair)&&Number(x.quote_volume)>=1000000&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.currency_pair))
   .sort((a,b)=>+b.quote_volume-+a.quote_volume).map(x=>x.currency_pair);
 }
 async function candles(e,s){
@@ -117,7 +117,7 @@ export async function scanMinuteMomentum(){
 }
 export function minuteMomentumStatus(){
  return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
-  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. Aktif USDT spot pariteleri coin sayısı ve işlem hacmi sınırı olmadan taranır. Eksik mum verisi olanlar ayrı sayılır; analiz edilemeyen coinler başarılı taranmış sayılmaz."};
+  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. Günlük işlem hacmi en az 1 milyon USDT olan aktif USDT spot pariteleri taranır; 3S/3L/5S/5L ve UP/DOWN kaldıraçlı tokenlar hariç tutulur. Eksik mum verisi olanlar ayrı sayılır; analiz edilemeyen coinler başarılı taranmış sayılmaz."};
 }
 export function startMinuteMomentum(){
  scanMinuteMomentum().catch(console.error);
