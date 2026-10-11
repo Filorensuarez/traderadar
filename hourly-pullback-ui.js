@@ -17,7 +17,7 @@ async function refresh(){
    " | Geri çekilme takibi: "+(d.rows||[]).filter(x=>!x.alerted).length+" | Alım fırsatı: "+(d.rows||[]).filter(x=>x.alerted).length+
    (d.errors?.length?" | İlk hata: "+d.errors[0]:"");
   cards.replaceChildren();
-  const rows=d.rows||[];
+  const rows=[...(d.rows||[])].sort((a,b)=>Number(Boolean(b.alerted))-Number(Boolean(a.alerted))||Number(b.pullbackPct||0)-Number(a.pullbackPct||0));
   for(const x of rows){
    const card=document.createElement("article");card.className="coin-card";
    const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange;card.append(title);
