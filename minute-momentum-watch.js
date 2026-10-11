@@ -62,7 +62,8 @@ let lastDiscovery=0,markets={};
 export async function scanMinuteMomentum(){
  if(state.running)return minuteMomentumStatus();
  state.running=true;
- const errors=[],closest=[];let checked=0,successful=0,failed=0,missing=0;\n state.checked=0;state.successful=0;state.failed=0;state.missing=0;state.attempted=0;state.errors=[];
+ const errors=[],closest=[];let checked=0,successful=0,failed=0,missing=0;
+ state.checked=0;state.successful=0;state.failed=0;state.missing=0;state.attempted=0;state.errors=[];
  try{
   if(Date.now()-lastDiscovery>15*60000){
    for(const e of ["OKX","KUCOIN","GATE.IO"]){
