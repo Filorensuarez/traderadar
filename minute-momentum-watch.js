@@ -5,7 +5,7 @@ const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
 const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0};
-const requestSpacing={OKX:280,KUCOIN:160,"GATE.IO":160};
+const concurrency={OKX:4,KUCOIN:4,"GATE.IO":4};
 async function get(url,e){
  for(let attempt=0;attempt<3;attempt++){
   if(e&&backoffUntil[e]>Date.now())await pause(backoffUntil[e]-Date.now());
@@ -74,38 +74,35 @@ export async function scanMinuteMomentum(){
   for(const key of active.keys())if(!eligible.has(key))active.delete(key);
   state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
   for(const e of ["OKX","KUCOIN","GATE.IO"]){
-   for(const symbol of markets[e]||[]){
-    checked++;
-    const key=e+":"+symbol;
-    try{
-     const result=detect(await candles(e,symbol));
-     if(!result)throw Error("Yeterli ardışık kapanmış mum yok");
-     successful++;
-     closest.push({exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result});
-     const previous=active.get(key);
-     if(previous){
-      if(result.changePct<=-2){active.delete(key);}
-      else active.set(key,{...previous,...result,lastCheckedAt:Date.now()});
-     }else if(result.changePct>=2){
-      active.set(key,{exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result,firstSeenAt:Date.now(),lastCheckedAt:Date.now()});
+   const symbols=markets[e]||[];
+   let next=0;
+   async function worker(){
+    while(next<symbols.length){
+     const symbol=symbols[next++];
+     const key=e+":"+symbol;
+     try{
+      const result=detect(await candles(e,symbol));
+      if(!result)throw Error("Yeterli ardışık kapanmış mum yok");
+      successful++;
+      closest.push({exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result});
+      const previous=active.get(key);
+      if(previous){
+       if(result.changePct<=-2)active.delete(key);
+       else active.set(key,{...previous,...result,lastCheckedAt:Date.now()});
+      }else if(result.changePct>=2){
+       active.set(key,{exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result,firstSeenAt:Date.now(),lastCheckedAt:Date.now()});
+      }
+     }catch(err){
+      failed++;
+      if(errors.length<12)errors.push(e+" "+symbol+": "+err.message);
+     }finally{
+      checked++;
+      state.checked=checked;state.successful=successful;state.failed=failed;
+      state.closest=[...closest].sort((a,b)=>b.changePct-a.changePct).slice(0,12);
+      state.maxChangePct=state.closest[0]?.changePct??null;
      }
-    }catch(err){failed++;if(errors.length<12)errors.push(e+" "+symbol+": "+err.message);}
-    state.checked=checked;state.successful=successful;state.failed=failed;
-    if(checked%10===0){state.closest=[...closest].sort((a,b)=>b.changePct-a.changePct).slice(0,12);state.maxChangePct=state.closest[0]?.changePct??null;}
-    await pause(requestSpacing[e]);
+    }
    }
+   await Promise.all(Array.from({length:Math.min(concurrency[e],symbols.length)},()=>worker()));
   }
-  state.checked=checked;state.successful=successful;state.failed=failed;
-  state.updatedAt=Date.now();state.errors=errors;
-  state.closest=closest.sort((a,b)=>b.changePct-a.changePct).slice(0,12);
-  state.maxChangePct=state.closest.length?state.closest[0].changePct:null;
-  state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
- }finally{state.running=false;}
- return minuteMomentumStatus();
-}
-export function minuteMomentumStatus(){
- return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
-  notice:"Son 10 kapanmış 1 dakikalık mumun ortalama kapanışı, onlardan önceki 30 mumun ortalamasından en az %2 yüksekse takip başlar; en az %2 düşükse takipten çıkar. İki eşik arasında takip korunur. Borsalarda son 24 saatlik USDT karşılığı işlem hacmi 5 milyon doların üzerinde olan bütün USDT spot çiftleri kapsamda; sabit coin sayısı sınırı yoktur. API hız sınırları nedeniyle tam tarama birkaç dakika veya daha uzun sürebilir."};
-}
-export function startMinuteMomentum(){scanMinuteMomentum().catch(console.error);
- setInterval(()=>scanMinuteMomentum().catch(console.error),60000);}
+
