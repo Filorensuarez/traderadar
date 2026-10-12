@@ -1,0 +1,28 @@
+const section=document.querySelector("#dailyPlans"),button=document.querySelector("#dailyPlansButton");
+const status=document.querySelector("#dailyPlansStatus"),cards=document.querySelector("#dailyPlansCards");
+async function refreshPlans(){
+ if(section.hidden)return;
+ try{
+  const r=await fetch("/api/daily-plans",{cache:"no-store"});if(!r.ok)throw Error("HTTP "+r.status);
+  const d=await r.json();status.textContent="Son kontrol: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yok")+" | Açık plan: "+d.plans.length+" | Kapanan: "+d.history.length;
+  cards.replaceChildren();
+  if(!d.plans.length){const p=document.createElement("p");p.textContent="Şu anda uygun fiyat ve hacim sinyali bulunamadı. İşlem açmak zorunlu değildir.";cards.append(p);}
+  for(const x of d.plans){
+   const card=document.createElement("article");card.className="coin-card";
+   const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange;card.append(title);
+   const line=document.createElement("p");line.textContent="İZLEME PLANI | Alış referansı: "+x.entry+" | Hedef satış (+%3): "+x.target+" | Zarar durdurma (-%1,5): "+x.stop;card.append(line);
+   const meta=document.createElement("p");meta.className="description";meta.textContent="Durum: "+x.status+" | Son fiyat: "+x.lastPrice+" | Tespit: "+new Date(x.createdAt).toLocaleString("tr-TR")+" | 24 saat geçerli";card.append(meta);
+   cards.append(card);
+  }
+  if(d.history.length){const h=document.createElement("h3");h.textContent="Listeden çıkarılan planlar (son 100)";cards.append(h);
+   for(const x of d.history.slice(0,15)){const p=document.createElement("p");p.textContent=x.symbol+" | "+x.status+" | Alış: "+x.entry+" | Hedef: "+x.target+" | Stop: "+x.stop;cards.append(p);}
+  }
+ }catch(e){status.textContent="Portföy planları alınamadı: "+e.message;}
+}
+button?.addEventListener("click",()=>{
+ document.querySelectorAll("main > section").forEach(el=>el.hidden=el!==section);
+ document.querySelectorAll("nav.tabs .tab").forEach(el=>el.classList.toggle("active",el===button));
+ refreshPlans();
+});
+document.querySelectorAll("nav.tabs .tab:not(#dailyPlansButton)").forEach(el=>el.addEventListener("click",()=>{section.hidden=true;button.classList.remove("active");}));
+setInterval(refreshPlans,5000);
