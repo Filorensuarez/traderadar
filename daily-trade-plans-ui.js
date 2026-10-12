@@ -26,3 +26,16 @@ button?.addEventListener("click",()=>{
 });
 document.querySelectorAll("nav.tabs .tab:not(#dailyPlansButton)").forEach(el=>el.addEventListener("click",()=>{section.hidden=true;button.classList.remove("active");}));
 setInterval(refreshPlans,5000);
+
+const scanButton=document.querySelector("#dailyPlansScan");
+scanButton?.addEventListener("click",async()=>{
+ scanButton.disabled=true;
+ scanButton.textContent="Tarama başlatılıyor...";
+ status.textContent="TL coin taraması başlatılıyor. Sonuçlar geldikçe güncellenecek.";
+ try{
+  const r=await fetch("/api/daily-plans/scan",{method:"POST",cache:"no-store"});
+  if(!r.ok)throw Error("HTTP "+r.status);
+  await refreshPlans();
+ }catch(e){status.textContent="Tarama başlatılamadı: "+e.message;}
+ finally{scanButton.disabled=false;scanButton.textContent="Şimdi Tara";}
+});
