@@ -79,6 +79,7 @@
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
   <button id="momentumButton" class="tab" type="button" data-view="momentum">1 Dakikalık Momentum</button>
   <button id="earlyPumpButton" class="tab" type="button" data-view="earlypump">Erken Yükseliş Radarı</button>
+  <button id="vBottomButton" class="tab" type="button" data-view="vbottom">V Tipi Dip • Tam Teyit</button>
   <button id="dailyPlansButton" class="tab" type="button" data-view="dailyplans">USDT Coin İşlem Planları</button>
   <button id="pullbackButton" class="tab" type="button" data-view="hourlyPullback" style="display:none" aria-hidden="true">Büyük Geri Çekilmeler</button>
   <button id="capitalButton" class="tab" type="button" data-view="capital" style="display:none" aria-hidden="true">Sermaye Yönetimi</button>
@@ -410,6 +411,23 @@
  <div id="pullbackCards" class="coin-grid"></div>
 </section>
 <section id="dailyPlans" hidden><div class="section-head"><div><h2>USDT Coin İşlem Planları</h2><p class="description">Binance, OKX, KuCoin, Gate.io ve Bitget borsalarının yalnızca USDT spot işlem çiftleri ayrı ayrı kontrol edilir. Bir borsada uygun USDT piyasası yoksa uydurma USD/USDT dönüşümü yapılmaz. EMA 7/25, RSI, hacim artışı ve alış-satış makası birlikte değerlendirilir. Sinyaller için USDT cinsinden örnek alış, %3 brüt hedef ve %1,5 stop seviyesi gösterilir. 72 saatlik başarı oranı sadece sanal sonuçlara dayanır. Fiyat hedefinin görülmesi gerçek işlem ya da kesin getiri değildir.</p></div></div><button id="dailyPlansScan" class="refresh-button" type="button">Şimdi Tara</button><p id="dailyPlansStatus" aria-live="polite">USDT taraması başlatılıyor.</p><div id="dailyPlansCards" class="coin-grid"></div></section>
+<section id="vbottom" hidden>
+  <div class="section-head">
+    <div>
+      <h2>V Tipi Dip — Çoklu Zaman Dilimi Teyidi</h2>
+      <p class="description">V biçimli sert düşüş ve dipten güçlü dönüşü 1, 5 ve 15 dakikalık kapanmış mumlarda birlikte ölçer. RSI 7, Stokastik RSI, MACD histogramı, EMA 7/25, 60 dakikalık VWAP, hacim, dip yapısı ve risk/getiri şartlarının hepsi zorunludur.</p>
+      <p class="description">Tam teknik teyit için 12/12 kontrol geçmelidir. Eksik veride, geç kalınmış fiyat hareketinde veya risk/getiri zayıfsa teyit verilmez. Tam teknik teyit kesin fiyat dönüşü, kazanç garantisi veya otomatik alım emri değildir.</p>
+      <p class="description">Binance, OKX, KuCoin, Gate.io, Bitget: likit USDT spot pariteleri dönüşümlü taranır. 24 saat hacmi en az 1 milyon USDT, alış-satış makası en çok %0,30 olmalıdır; tam teyitte makas sınırı %0,20'dir.</p>
+    </div>
+    <button id="vBottomScan" class="refresh-button" type="button">Şimdi Tara</button>
+  </div>
+  <label style="display:flex;gap:9px;align-items:center;margin:10px 0;font-size:14px">
+    <input id="vBottomCandidates" type="checkbox" style="height:18px;width:18px">
+    Adayları ve geç kalınmış hareketleri de göster (varsayılan: yalnızca tam teyit)
+  </label>
+  <p id="vBottomStatus" aria-live="polite">İlk tarama bekleniyor.</p>
+  <div id="vBottomCards" class="coin-grid"></div>
+</section>
 <section id="earlypump" hidden>
  <div class="section-head">
   <div>
@@ -456,6 +474,7 @@
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./minute-momentum-ui.js?v=potential2"></script>
   <script type="module" src="./early-pump-ui.js?v=vcp3"></script>
+  <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>
   <script type="module" src="./daily-trade-plans-ui.js?v=usdt5"></script>
   <script defer src="./tab-navigation-fix.js"></script>
   <script type="module" src="./hourly-pullback-ui.js"></script>

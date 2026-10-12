@@ -2,6 +2,7 @@ import {paperStats} from "./paper-performance-72h.js";
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
 import {startMicroMomentum,scanMicroMomentum,microMomentumStatus} from "./micro-momentum-watch.js";
 import {startEarlyPump,scanEarlyPump,earlyPumpStatus} from "./early-pump-watch.js";
+import {startVBottom,scanVBottom,vBottomStatus} from "./v-bottom-watch.js";
 import {startTryPlans,scanTryPlans,tryPlanStatus} from "./try-market-plans.js";
 import {startHourlyPullbacks,scanHourlyPullbacks,hourlyPullbackStatus} from "./hourly-pullback-watch.js";
 
@@ -27,6 +28,8 @@ app.get("/api/paper-performance-72h",(req,res)=>{res.set("Cache-Control","no-sto
 app.get("/api/daily-plans",(req,res)=>{res.set("Cache-Control","no-store");res.json(tryPlanStatus());});
 app.post("/api/daily-plans/scan",(req,res)=>{res.set("Cache-Control","no-store");scanTryPlans().catch(console.error);res.json({started:true,...tryPlanStatus()});});
 app.get("/api/early-pump",(req,res)=>{res.set("Cache-Control","no-store");res.json(earlyPumpStatus());});
+app.get("/api/v-bottom",(req,res)=>{res.set("Cache-Control","no-store");res.json(vBottomStatus());});
+app.post("/api/v-bottom/scan",(req,res)=>{res.set("Cache-Control","no-store");const wasRunning=vBottomStatus().running;scanVBottom().catch(err=>console.error("V tipi dip tarama hatası:",err));res.json({started:!wasRunning,running:true});});
 app.post("/api/early-pump/scan",(req,res)=>{res.set("Cache-Control","no-store");scanEarlyPump().catch(console.error);res.json({started:true,...earlyPumpStatus()});});
 app.get("/api/minute-momentum",(req,res)=>{res.set("Cache-Control","no-store");res.json({...minuteMomentumStatus(),early:microMomentumStatus()});});
 app.post("/api/minute-momentum/scan",(req,res)=>{res.set("Cache-Control","no-store");scanMinuteMomentum().catch(console.error);scanMicroMomentum().catch(console.error);res.json({started:true,...minuteMomentumStatus(),early:microMomentumStatus()});});
@@ -7656,6 +7659,7 @@ startKucoinFlow();
 startMinuteMomentum();
 startMicroMomentum();
 startEarlyPump();
+startVBottom();
 startTryPlans();
 startHourlyPullbacks();
 setInterval(()=>refreshMarketCaps().catch(e=>
