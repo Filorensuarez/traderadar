@@ -15,7 +15,7 @@ async function refreshPlans(){
    cards.append(card);
   }
   if(d.history.length){const h=document.createElement("h3");h.textContent="Listeden çıkarılan planlar (son 100)";cards.append(h);
-   for(const x of d.history.slice(0,15)){const p=document.createElement("p");p.textContent=x.symbol+" | "+x.status+" | Alış: "+x.entry+" | Hedef: "+x.target+" TL | Stop: "+x.stop+" TL;cards.append(p);}
+   for(const x of d.history.slice(0,15)){const p=document.createElement("p");p.textContent=x.symbol+" | "+x.status+" | Alış: "+x.entry+" | Hedef: "+x.target+" TL | Stop: "+x.stop+" TL";cards.append(p);}
   }
  }catch(e){status.textContent="Portföy planları alınamadı: "+e.message;}
 }
