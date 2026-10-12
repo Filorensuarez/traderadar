@@ -1,3 +1,4 @@
+import {paperStats} from "./paper-performance-72h.js";
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
 import {startEarlyPump,scanEarlyPump,earlyPumpStatus} from "./early-pump-watch.js";
 import {startTryPlans,scanTryPlans,tryPlanStatus} from "./try-market-plans.js";
@@ -21,6 +22,7 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 
 const app = express();
+app.get("/api/paper-performance-72h",(req,res)=>{res.set("Cache-Control","no-store");res.json(paperStats());});
 app.get("/api/daily-plans",(req,res)=>{res.set("Cache-Control","no-store");res.json(tryPlanStatus());});
 app.post("/api/daily-plans/scan",(req,res)=>{res.set("Cache-Control","no-store");scanTryPlans().catch(console.error);res.json({started:true,...tryPlanStatus()});});
 app.get("/api/early-pump",(req,res)=>{res.set("Cache-Control","no-store");res.json(earlyPumpStatus());});
