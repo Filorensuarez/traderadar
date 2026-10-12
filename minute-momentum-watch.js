@@ -111,7 +111,7 @@ async function scanExchange(p,nearest){
   let next=0;
   async function worker(){
    while(next<selected.length){
-    if(Date.now()<(limitUntil.get(p.name)||0))break;
+    if(Date.now()<(limitUntil.get(p.name)||0)){stat.error="Borsa hız sınırı; yeni veri bekleniyor";break;}
     const ticker=selected[next++],key=p.name+":"+ticker.symbol;
     try{
      const [seconds,minutes]=await Promise.all([getSeconds(p,ticker.symbol),getMinutes(p,ticker.symbol)]);
