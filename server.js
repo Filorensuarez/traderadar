@@ -2645,7 +2645,7 @@ async function getGateSymbols() {
     }));
 }
 /* =========================
-   BINANCE / COINBASE / BYBIT GÜNLÜK VERİLERİ
+   BINANCE / COINBASE GÜNLÜK VERİLERİ
 ========================= */
 async function getBinanceDailySymbols() {
   const tickers = await getExternalJSON("https://data-api.binance.vision/api/v3/ticker/24hr", "Binance");
@@ -2669,49 +2669,6 @@ async function getCoinbaseDailySymbols() {
 async function getCoinbaseDailyCandles(symbol) {
   const rows = await getExternalJSON("https://api.exchange.coinbase.com/products/"+encodeURIComponent(symbol)+"/candles?granularity=86400", "Coinbase");
   return (rows||[]).map(x=>({time:+x[0]*1000,low:+x[1],high:+x[2],open:+x[3],close:+x[4],volume:+x[5]})).sort((a,b)=>a.time-b.time);
-}
-async function getBybitDailySymbols() {
-  const endpoints = [
-    "https://api.bybit.tr/v5/market/tickers?category=spot",
-    "https://api.bybit.com/v5/market/tickers?category=spot",
-    "https://api.bytick.com/v5/market/tickers?category=spot"
-  ];
-  let d, lastError;
-  for (const url of endpoints) {
-    try {
-      d = await getExternalJSON(url, "Bybit");
-      if (Number(d.retCode) !== 0) throw new Error("Bybit API: " + (d.retMsg || "hata") + " (" + d.retCode + ")");
-      break;
-    } catch (error) {
-      lastError = error;
-      d = null;
-    }
-  }
-  if (!d) throw new Error("Bybit coin listesi alınamadı: " + (lastError?.message || "bilinmeyen hata"));
-  return (d.result?.list || []).filter(x => /^[A-Z0-9]+USDT$/.test(x.symbol) && Number(x.turnover24h) >= 200000 &&
-    !/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
-    .sort((a, b) => Number(b.turnover24h) - Number(a.turnover24h)).map(x => x.symbol);
-}
-async function getBybitDailyCandles(symbol) {
-  const query = "category=spot&symbol=" + encodeURIComponent(symbol) + "&interval=D&limit=230";
-  const endpoints = [
-    "https://api.bybit.tr/v5/market/kline?" + query,
-    "https://api.bybit.com/v5/market/kline?" + query,
-    "https://api.bytick.com/v5/market/kline?" + query
-  ];
-  let d, lastError;
-  for (const url of endpoints) {
-    try {
-      d = await getExternalJSON(url, "Bybit");
-      if (Number(d.retCode) !== 0) throw new Error("Bybit API: " + (d.retMsg || "hata") + " (" + d.retCode + ")");
-      break;
-    } catch (error) {
-      lastError = error;
-      d = null;
-    }
-  }
-  if (!d) throw new Error("Bybit günlük mumları alınamadı: " + (lastError?.message || "bilinmeyen hata"));
-  return (d.result?.list || []).map(x => ({ time: +x[0], open: +x[1], high: +x[2], low: +x[3], close: +x[4], volume: +x[5] })).sort((a, b) => a.time - b.time);
 }
 /* =========================
    OKX GÜNLÜK MUMLAR
@@ -5910,8 +5867,7 @@ async function scanMarket() {
     {key:"kucoin",name:"KUCOIN",symbols:async()=> (await getKucoinSymbols()).map(x=>x.symbol),candles:getKucoinCandles,normalize:s=>String(s).replace("-USDT","")+"/USDT"},
     {key:"gate",name:"GATE.IO",symbols:async()=> (await getGateSymbols()).map(x=>x.symbol),candles:getGateCandles,normalize:s=>String(s).replace("_USDT","")+"/USDT"},
     {key:"binance",name:"BINANCE",symbols:getBinanceDailySymbols,candles:getBinanceDailyCandles,normalize:s=>String(s).replace(/USDT$/,"")+"/USDT"},
-    {key:"coinbase",name:"COINBASE",symbols:getCoinbaseDailySymbols,candles:getCoinbaseDailyCandles,normalize:s=>String(s).replace("-","/")},
-    {key:"bybit",name:"BYBIT",symbols:getBybitDailySymbols,candles:getBybitDailyCandles,normalize:s=>String(s).replace(/USDT$/,"")+"/USDT"}
+    {key:"coinbase",name:"COINBASE",symbols:getCoinbaseDailySymbols,candles:getCoinbaseDailyCandles,normalize:s=>String(s).replace("-","/")}
   ];
   const results = {};
   const counts = {};
@@ -5919,7 +5875,7 @@ async function scanMarket() {
     results[p.key] = [];
     counts[p.key] = {symbols:[],error:null};
   }
-  console.log("Günlük yükseliş teyidi: altı borsa taraması başladı.");
+  console.log("Günlük yükseliş teyidi: beş borsa taraması başladı.");
   try {
     for (const p of providers) {
       try {
