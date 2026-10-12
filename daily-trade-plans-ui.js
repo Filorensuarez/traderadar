@@ -17,6 +17,7 @@ async function refreshPlans(){
    const signal=document.createElement("p");signal.style.fontWeight="700";signal.textContent="DURUM: "+x.status;card.append(signal);
    const line=document.createElement("p");line.textContent="İZLEME PLANI | Alış referansı: "+x.entry+" TL | Hedef satış (+%3): "+x.target+" TL | Zarar durdurma (-%1,5): "+x.stop+" TL";card.append(line);
    const meta=document.createElement("p");meta.className="description";meta.textContent="Güncel alış kotasyonu: "+(x.currentAsk??"Bilinmiyor")+" TL | Son işlem fiyatı: "+x.lastPrice+" TL | Gerekçe: "+(x.reason||"Yeniden kontrol ediliyor")+" | Son kontrol: "+new Date(x.lastCheckedAt).toLocaleTimeString("tr-TR")+" | Tespit: "+new Date(x.createdAt).toLocaleString("tr-TR");card.append(meta);
+   const risk=document.createElement("p");risk.className="description";risk.textContent="Teknik filtre: EMA7 "+(x.ema7??"-")+" / EMA25 "+(x.ema25??"-")+" | RSI14: "+(x.rsi??"-")+" | Hacim katsayısı: "+(x.volumeRatio??"-")+" | Alış-satış makası: %"+(x.spreadPct??"-")+" | Tahmini maliyet sonrası %3 hedef getirisi: %"+(x.estimatedNetTargetPct??"-")+" (varsayımsal komisyon ve kayma) | İşlem başı örnek risk üst sınırı: sermayenin %"+(x.riskPerTradePct??"-")+"; gerçek emir yok.";card.append(risk);
    cards.append(card);
   }
   if(d.history.length){const h=document.createElement("h3");h.textContent="Listeden çıkarılan planlar (son 100)";cards.append(h);
