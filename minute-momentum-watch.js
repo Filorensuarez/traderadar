@@ -159,7 +159,7 @@ export async function scanMinuteMomentum(){
   await Promise.all(PROVIDERS.filter(p=>p.seconds).map(p=>scanExchange(p,closest)));
   publish(closest);
   console.log("30s/30m momentum: "+Object.entries(state.sources).map(([name,v])=>
-   name+" "+(v.supported?v.checked+"/"+v.eligible+(v.error?" HATA "+v.error:""):"1s kullanılmıyor")).join(" | ")+
+   name+" "+(v.supported?v.checked+"/"+v.eligible+" geçerli="+v.successful+" eksik="+v.missing+" hata="+v.failed+(v.lastError?" ["+v.lastError+"]":"")+(v.error?" HATA "+v.error:""):"1s kullanılmıyor")).join(" | ")+
    " | Teyit "+state.rows.length+" | API sorunları "+state.errors.slice(0,2).join("; "));
  }catch(e){
   state.errors.push("Genel 30 sn momentum hatası: "+String(e.message));
