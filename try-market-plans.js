@@ -1,3 +1,4 @@
+import {observePaperPlan} from "./paper-performance-72h.js";
 // TRY-quoted spot watchlist. Each exchange's prices and candles stay separate.
 const state={running:false,updatedAt:0,sources:{},plans:[],history:[]};
 const plans=new Map(),history=[];
@@ -89,6 +90,7 @@ export async function scanTryPlans(){
        const existing=plans.get(key);
        if(existing){
         existing.lastPrice=t.price;existing.currentAsk=t.ask;existing.lastCheckedAt=now();
+        observePaperPlan(existing,t.price);
         const next=planState(existing,t);existing.status=next.status;existing.reason=next.reason;
         if(next.terminal){existing.closedAt=now();plans.delete(key);history.unshift(existing);}
        }else if(!history.some(x=>x.key===key&&now()-x.createdAt<24*3600000)){
@@ -98,8 +100,9 @@ export async function scanTryPlans(){
          const estimatedRoundTripCostPct=2*(POLICY.feePerSidePct+POLICY.slippagePerSidePct);
          const estimatedNetTargetPct=round(3-estimatedRoundTripCostPct);
          const estimatedNetStopPct=round(-1.5-estimatedRoundTripCostPct);
-         plans.set(key,{key,symbol:t.symbol.replace(/[-]?TRY$/,"/TRY"),exchange:p.name,entry,target,stop,
-          lastPrice:t.price,currentAsk:t.ask,createdAt:now(),lastCheckedAt:now(),status:"BEKLE",reason:"Yeni sinyal; alış fiyatı teyidi bekleniyor",estimatedNetTargetPct,estimatedNetStopPct,estimatedRoundTripCostPct,riskPerTradePct:POLICY.riskPerTradePct,maxAllocationPct:POLICY.maxAllocationPct,spreadPct:round((t.ask-t.bid)/t.ask*100),...signal});
+         const candidate={key,symbol:t.symbol.replace(/[-]?TRY$/,"/TRY"),exchange:p.name,entry,target,stop,
+          lastPrice:t.price,currentAsk:t.ask,createdAt:now(),lastCheckedAt:now(),status:"BEKLE",reason:"Yeni sinyal; alış fiyatı teyidi bekleniyor",estimatedNetTargetPct,estimatedNetStopPct,estimatedRoundTripCostPct,riskPerTradePct:POLICY.riskPerTradePct,maxAllocationPct:POLICY.maxAllocationPct,spreadPct:round((t.ask-t.bid)/t.ask*100),...signal};
+         plans.set(key,candidate);observePaperPlan(candidate,t.price);
         }
        }
       }catch(e){stat.error=stat.error||e.message;}
