@@ -7,7 +7,7 @@ const WINDOW=72*3600000;
 let records=[];
 try{const parsed=JSON.parse(fs.readFileSync(file,"utf8"));if(Array.isArray(parsed))records=parsed;}catch{}
 function persist(){try{fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+".tmp";fs.writeFileSync(tmp,JSON.stringify(records));fs.renameSync(tmp,file);}catch(e){console.error("paper statistics not persisted:",e.message);}}
-function prune(){const t=Date.now();records=records.filter(r=>r.detectedAt>=t-WINDOW);if(records.length>5000)records=records.slice(-5000);}
+function prune(){const t=Date.now();records=records.filter(r=>r.detectedAt>=t-WINDOW&&String(r.symbol).endsWith("/USDT"));if(records.length>5000)records=records.slice(-5000);}
 export function observePaperPlan(plan,price){
  if(!plan?.key||!Number.isFinite(price)||price<=0)return;
  prune();
