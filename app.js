@@ -345,6 +345,52 @@ function dailyTradePlan(row) {
   return { entry, stop, target, ratio: 2 };
 }
 
+/* Günlük teknik yükseliş alanı: 14 günlük ATR ve 20 günlük direnç.
+   Gösterilen yüzde başarı olasılığı değil, gözlenen veriden türetilen senaryodur. */
+function dailyUpsidePotential(row) {
+  const last = Number(row.price);
+  const atrPct = Number(row.atrPct);
+  const resistance = Number(row.resistance);
+  const volumeRatio = Number(row.volumeRatio);
+  if (!(last > 0) || !(resistance > 0) ||
+      !(atrPct > 0) || !Number.isFinite(atrPct) || atrPct > 12) {
+    return null;
+  }
+
+  // Üç güne kadar yaklaşık iki ATR'lık hareketi üst senaryo olarak al;
+  // mevcut 20 günlük direnci aşan hedefi kırılım teyidi olmadan gösterme.
+  const atrScenarioPct = Math.min(12, atrPct * 2);
+  const resistanceGapPct = (resistance / last - 1) * 100;
+  let potentialPct, scenario, target;
+
+  if (resistanceGapPct > 0) {
+    potentialPct = Math.max(0, Math.min(atrScenarioPct, resistanceGapPct));
+    scenario = resistanceGapPct < atrScenarioPct
+      ? "20 günlük dirence kadar"
+      : "ATR ile sınırlandırılmış teknik alan";
+    target = last * (1 + potentialPct / 100);
+  } else if (row.confirmed === true &&
+             row.macdBullish === true &&
+             Number.isFinite(volumeRatio) && volumeRatio >= 1.15) {
+    // Eski direnç geçildiyse yalnızca teyitli adaylarda varsayımsal
+    // direnç üstü senaryo göster. Gerçek yeni direnç burada bilinmiyor.
+    potentialPct = Math.min(12, atrPct * 1.5);
+    scenario = "Kırılım sonrası ATR senaryosu (direnç üstü)";
+    target = last * (1 + potentialPct / 100);
+  } else {
+    return null;
+  }
+
+  if (!Number.isFinite(potentialPct) || !Number.isFinite(target) ||
+      potentialPct < 0 || target <= 0) return null;
+  return {
+    percent: potentialPct,
+    target,
+    scenario,
+    horizon: "1–3 gün"
+  };
+}
+
 /* =========================
    COİN KARTI
 ========================= */
@@ -360,6 +406,13 @@ function coinCard(row) {
 
 
   const plan = row.confirmed ? dailyTradePlan(row) : null;
+  const upside = dailyUpsidePotential(row);
+  const upsideText = upside
+    ? "%" + number(upside.percent, 2)
+    : "Hesaplanamadı";
+  const upsideDetail = upside
+    ? `Teknik hedef: ${price(upside.target)} · ${escapeHTML(upside.scenario)} · ${upside.horizon}`
+    : "Günlük verilerden güvenilir teknik hedef çıkarılamadı.";
 
   const reasonText =
     reasons.length
@@ -379,6 +432,9 @@ function coinCard(row) {
 
         <div class="coin-symbol">
           ${escapeHTML(row.symbol)}
+          <div class="description" style="font-size:0.78em;font-weight:500;margin-top:4px">
+            1–3 günlük potansiyel: ${upsideText}
+          </div>
         </div>
 
         <div class="score">
@@ -398,6 +454,12 @@ function coinCard(row) {
 
 
       <div class="metrics">
+
+        <div class="metric">
+          Tahmini yükseliş potansiyeli (1–3 gün)
+          <strong>${upsideText}</strong>
+          <small>${upsideDetail}</small>
+        </div>
 
         <div class="metric">
           Fiyat
@@ -489,6 +551,7 @@ function coinCard(row) {
 
 
       <div class="daily-trade-plan">
+        <small>Potansiyel artış, güncel olmayan son günlük fiyat üzerinden, 14 günlük ATR ve 20 günlük dirençle oluşturulmuş 1–3 günlük teknik senaryodur. Kesin getiri, olasılık veya alım önerisi değildir.</small>
         <h4>Alım / Satım Fiyat Planı</h4>
         ${plan ? `
           <div class="trade-levels">
