@@ -106,6 +106,7 @@ async function scanProvider(p,micro){
  try{
   const tickers=await getTickers(p);
   stat.eligible=tickers.length;
+  state.eligible+=tickers.length;
   observeEarlyRiseTickers(p.name,tickers,Date.now());
   const selected=shortlist(p,tickers,micro);
   let benchmark=null;
@@ -131,7 +132,8 @@ async function scanProvider(p,micro){
        rawSymbol:t.symbol,firstSeenAt:firstSeen.get(key),lastCheckedAt:Date.now()});
      }
     }catch(err){stat.failed++;if(state.errors.length<8)state.errors.push(p.name+" "+t.symbol+": "+String(err.message).slice(0,75));}
-    stat.checked++;
+    stat.checked++;state.checked++;
+    await new Promise(resolve=>setTimeout(resolve,220));
    }
   }
   await Promise.all(Array.from({length:WORKERS},()=>worker()));
@@ -142,7 +144,7 @@ async function scanProvider(p,micro){
 export function earlyPumpStatus(){return {...state,rows:[...state.rows],sources:{...state.sources},stats:earlyRiseStats()};}
 export async function scanEarlyPump(){
  if(state.running)return earlyPumpStatus();
- state.running=true;state.startedAt=Date.now();state.failed=0;state.errors=[];
+ state.running=true;state.startedAt=Date.now();state.checked=0;state.eligible=0;state.failed=0;state.errors=[];
  try{
   await loadEarlyRiseJournal();
   const micro=microMomentumStatus().rows||[];
