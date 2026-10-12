@@ -45,7 +45,8 @@ function volatilityZ(closed,price){
 export function evaluateEarlyRise(candles,ticker,benchmark=null,timestamp=Date.now()){
  if(!Array.isArray(candles)||candles.length<91)return null;
  const price=+ticker.price,ask=+ticker.ask,bid=+ticker.bid;
- if(!(price>0&&ask>0&&bid>0&&ask>=bid&&ticker.volume24h>=1000000))return null;
+ if(!(price>0&&ask>0&&bid>0&&ask>=bid&&ticker.volume24h>=1000000&&
+  (ask-bid)/ask<=0.005))return null;
  const minute=Math.floor(timestamp/60000)*60000;
  const closed=candles.filter(x=>x.time<minute&&x.time+60000<=timestamp).slice(-120);
  if(closed.length<90||closed.at(-1).time!==minute-60000)return null;
