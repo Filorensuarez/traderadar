@@ -2,7 +2,7 @@
 // USDT spot only. Never downgrade a missing 1s source to 1m or synthetic 1s bars.
 import {calculateMomentum30s,momentum30sThresholds} from "./momentum-30s-model.js";
 const SCAN_EVERY_MS=20000,UNIVERSE_TTL=75000,MIN_DAILY_USDT=1000000;
-const WINDOW_SIZE=44,MAX_ACTIVE_AGE=65000,WORKERS=4;
+const WINDOW_SIZE=28,MAX_ACTIVE_AGE=65000,WORKERS=3;
 const PROVIDERS=[
  {name:"BINANCE",kind:"binance",api:"https://data-api.binance.vision",seconds:true},
  {name:"OKX",kind:"okx",api:"https://www.okx.com",seconds:true},
@@ -16,11 +16,16 @@ const state={
  intervalSeconds:SCAN_EVERY_MS/1000,thresholds:momentum30sThresholds,
  notice:"Son 30 tamamlanmış 1 saniyelik mumun fiyat ortalaması, onlardan önceki 30 adet tamamlanmış 1 dakikalık mum ortalamasının en az %2 üzerindeyse ve 30 saniyelik gerçek hacim geçmişin en az 2,5 katı olup üç ayrı 10 saniyede hızlanıyorsa teyit. Sadece gerçek 1s mum desteği doğrulanan spot USDT borsaları taranır."
 };
-const active=new Map(),minuteCache=new Map(),limitUntil=new Map(),marketCache=new Map(),rotation=new Map();
+const active=new Map(),minuteCache=new Map(),limitUntil=new Map(),marketCache=new Map(),rotation=new Map(),nextFetchAt=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 function supports(symbol){return /^[A-Z0-9]+(?:-|)USDT$/.test(symbol)&&
  !/(UP|DOWN|BULL|BEAR|[235][SL])(?:-|)?USDT$/i.test(symbol);}
 async function get(url,exchange){
+ if(Date.now()<(limitUntil.get(exchange)||0))throw Error("Borsa hız sınırı nedeniyle beklemede");
+ // Shared per-exchange spacing prevents parallel workers from exhausting OKX IP quotas.
+ const next=Math.max(Date.now(),nextFetchAt.get(exchange)||0);
+ nextFetchAt.set(exchange,next+(exchange==="OKX"?300:130));
+ if(next>Date.now())await pause(next-Date.now());
  if(Date.now()<(limitUntil.get(exchange)||0))throw Error("Borsa hız sınırı nedeniyle beklemede");
  const response=await fetch(url,{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(9500)});
  if(response.status===429||response.status===418){
@@ -53,8 +58,8 @@ async function universe(p){
 function selectMarkets(p,all){
  const chosen=[],seen=new Set();
  const add=x=>{if(x&&!seen.has(x.symbol)&&chosen.length<WINDOW_SIZE){seen.add(x.symbol);chosen.push(x);}};
- for(const x of all.slice(0,16))add(x);
- for(const x of all.filter(x=>Number.isFinite(x.dayChange)).sort((a,b)=>b.dayChange-a.dayChange).slice(0,8))add(x);
+ for(const x of all.slice(0,11))add(x);
+ for(const x of all.filter(x=>Number.isFinite(x.dayChange)).sort((a,b)=>b.dayChange-a.dayChange).slice(0,5))add(x);
  const remaining=all.filter(x=>!seen.has(x.symbol));
  const offset=rotation.get(p.name)||0;
  for(let i=0;i<remaining.length&&chosen.length<WINDOW_SIZE;i++)add(remaining[(offset+i)%remaining.length]);
@@ -153,7 +158,7 @@ export async function scanMinuteMomentum(){
   publish(closest);
   console.log("30s/30m momentum: "+Object.entries(state.sources).map(([name,v])=>
    name+" "+(v.supported?v.checked+"/"+v.eligible+(v.error?" HATA "+v.error:""):"1s kullanılmıyor")).join(" | ")+
-   " | Teyit "+state.rows.length);
+   " | Teyit "+state.rows.length+" | API sorunları "+state.errors.slice(0,2).join("; "));
  }catch(e){
   state.errors.push("Genel 30 sn momentum hatası: "+String(e.message));
   console.error("30 saniyelik momentum:",e);
