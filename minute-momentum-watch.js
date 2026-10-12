@@ -1,8 +1,8 @@
 // 30 genuine closed 1-second candles vs the 30 prior closed 1-minute candles.
 // USDT spot only. Never downgrade a missing 1s source to 1m or synthetic 1s bars.
 import {calculateMomentum30s,momentum30sThresholds} from "./momentum-30s-model.js";
-const SCAN_EVERY_MS=20000,UNIVERSE_TTL=75000,MIN_DAILY_USDT=1000000;
-const WINDOW_SIZE=28,MAX_ACTIVE_AGE=65000,WORKERS=3;
+const SCAN_EVERY_MS=30000,UNIVERSE_TTL=75000,MIN_DAILY_USDT=1000000;
+const WINDOW_SIZE=28,MAX_ACTIVE_AGE=75000,WORKERS=3;
 const PROVIDERS=[
  {name:"BINANCE",kind:"binance",api:"https://data-api.binance.vision",seconds:true},
  {name:"OKX",kind:"okx",api:"https://www.okx.com",seconds:true},
@@ -19,12 +19,13 @@ const state={
 const active=new Map(),minuteCache=new Map(),limitUntil=new Map(),marketCache=new Map(),rotation=new Map(),nextFetchAt=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 function supports(symbol){return /^[A-Z0-9]+(?:-|)USDT$/.test(symbol)&&
- !/(UP|DOWN|BULL|BEAR|[235][SL])(?:-|)?USDT$/i.test(symbol);}
+ !/(UP|DOWN|BULL|BEAR|[235][SL])(?:-|)?USDT$/i.test(symbol)&&
+ !/^(USDC|USDE|FDUSD|TUSD|DAI|USDD|PYUSD|USD1|EURC)(?:-|)?USDT$/.test(symbol);}
 async function get(url,exchange){
  if(Date.now()<(limitUntil.get(exchange)||0))throw Error("Borsa hız sınırı nedeniyle beklemede");
  // Shared per-exchange spacing prevents parallel workers from exhausting OKX IP quotas.
  const next=Math.max(Date.now(),nextFetchAt.get(exchange)||0);
- nextFetchAt.set(exchange,next+(exchange==="OKX"?300:130));
+ nextFetchAt.set(exchange,next+(exchange==="OKX"?1050:130));
  if(next>Date.now())await pause(next-Date.now());
  if(Date.now()<(limitUntil.get(exchange)||0))throw Error("Borsa hız sınırı nedeniyle beklemede");
  const response=await fetch(url,{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(9500)});
@@ -56,10 +57,11 @@ async function universe(p){
  return rows;
 }
 function selectMarkets(p,all){
+ const selectedLimit=p.name==="OKX"?12:WINDOW_SIZE;
  const chosen=[],seen=new Set();
- const add=x=>{if(x&&!seen.has(x.symbol)&&chosen.length<WINDOW_SIZE){seen.add(x.symbol);chosen.push(x);}};
- for(const x of all.slice(0,11))add(x);
- for(const x of all.filter(x=>Number.isFinite(x.dayChange)).sort((a,b)=>b.dayChange-a.dayChange).slice(0,5))add(x);
+ const add=x=>{if(x&&!seen.has(x.symbol)&&chosen.length<selectedLimit){seen.add(x.symbol);chosen.push(x);}};
+ for(const x of all.slice(0,p.name==="OKX"?4:11))add(x);
+ for(const x of all.filter(x=>Number.isFinite(x.dayChange)).sort((a,b)=>b.dayChange-a.dayChange).slice(0,p.name==="OKX"?2:5))add(x);
  const remaining=all.filter(x=>!seen.has(x.symbol));
  const offset=rotation.get(p.name)||0;
  for(let i=0;i<remaining.length&&chosen.length<WINDOW_SIZE;i++)add(remaining[(offset+i)%remaining.length]);
