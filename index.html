@@ -442,7 +442,7 @@
 </section>
 <section id="momentum" hidden>
  <h2>1 Dakikalık Momentum</h2>
- <p class="description">Son 5 tamamlanmış 1 dakikalık mumun ortalama kapanışı, önceki 120 mumun ortalamasına göre %2 yükseldiğinde takibe alır; %-2 düştüğünde takipten çıkarır. Yalnızca son 24 saatlik işlem hacmi 1.000.000 USDT ve üzerinde olan pariteler taranır.</p>
+ <p class="description">Yeni yöntem: Son 30 tamamlanmış 1 saniyelik mumun ortalama kapanışı, bunlardan önceki 30 tamamlanmış 1 dakikalık mumun fiyat ortalamasının en az %2 üzerinde olmalı. Aynı 30 saniyedeki gerçek USDT işlem hacmi geçmiş 30 dakikanın normaline göre en az 2,5 kat yükselmeli ve 10+10+10 saniyelik hacim dilimlerinde artış hızı güçlenmelidir. Gerçek 1 saniyelik mumlar Binance ve OKX USDT spot piyasalarından alınır; desteklenmeyen borsalar 1 saniyelik gibi gösterilmez. Veriler yaklaşık 20 saniyede bir yeniden değerlendirilir; bu yöntem kesin alım veya getiri garantisi değildir.</p>
  <button id="momentumScan" class="refresh-button" type="button">Şimdi Tara</button>
  <p id="momentumStatus" aria-live="polite">Veriler bekleniyor.</p>
  <div id="momentumCards" class="coin-grid"></div>
@@ -472,7 +472,7 @@
   <script defer src="./whale-monitor.js"></script>
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
-  <script type="module" src="./minute-momentum-ui.js?v=potential2"></script>
+  <script type="module" src="./minute-momentum-ui.js?v=30s-30m-v1"></script>
   <script type="module" src="./early-pump-ui.js?v=vcp3"></script>
   <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>
   <script type="module" src="./daily-trade-plans-ui.js?v=usdt5"></script>
