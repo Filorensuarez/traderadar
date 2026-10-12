@@ -30,8 +30,9 @@ export function rememberEarlyRiseSignals(rows,timestamp){
   if(!["KIRILIM TEYİDİ","KIRILIM YAKIN"].includes(x.stage))continue;
   if(!(x.ask>0)||!x.rawSymbol)continue;
   const key=x.exchange+":"+x.rawSymbol+":"+x.stage;
-  if(entries.some(e=>e.key===key&&timestamp-e.at<45*60000))continue;
-  entries.push({key,exchange:x.exchange,rawSymbol:x.rawSymbol,at:timestamp,
+  const signalTime=Number.isFinite(x.lastCheckedAt)?x.lastCheckedAt:timestamp;
+  if(entries.some(e=>e.key===key&&signalTime-e.at<45*60000))continue;
+  entries.push({key,exchange:x.exchange,rawSymbol:x.rawSymbol,at:signalTime,
    stage:x.stage,entry:x.ask,resultPct:null,evaluatedAt:null});
   changed=true;
  }
