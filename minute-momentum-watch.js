@@ -5,7 +5,7 @@ const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
 const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0,BINANCE:0,COINBASE:0};
-const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2,COINBASE:2,BYBIT:2};
+const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2,COINBASE:2};
 async function get(url,e){
  for(let attempt=0;attempt<3;attempt++){
   if(e&&backoffUntil[e]>Date.now())await pause(backoffUntil[e]-Date.now());
