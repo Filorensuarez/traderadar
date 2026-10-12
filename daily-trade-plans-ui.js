@@ -9,6 +9,10 @@ async function refreshPlans(){
   const available=Object.entries(d.sources||{}).filter(([name,v])=>v.checked>0&&!v.error);
   const warning=blocked.length?" | ERİŞİM ENGELİ: "+blocked.map(([name])=>name).join(", ")+" (HTTP 451; bu borsa taranamıyor). Diğer borsalar bağımsız taranır.":"";
   status.textContent="Çalışan kaynak: "+available.map(([name])=>name).join(", ")+(available.length?"":"Henüz doğrulanmadı")+warning+" | Son kontrol: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yok")+" | Kaynaklar: "+Object.entries(d.sources||{}).map(([k,v])=>k+" "+v.checked+"/"+v.eligible+(v.error?" (hata: "+v.error+")":"")).join(" | ")+" | Açık plan: "+d.plans.length+" | Kapanan: "+d.history.length;
+  try{
+   const sr=await fetch("/api/paper-performance-72h",{cache:"no-store"});
+   if(sr.ok){const st=await sr.json();status.textContent+=" | SON 3 GÜN SANAL TEST: "+st.completed+" sonuçlanan (hedef "+st.wins+", stop "+st.losses+") | Başarı: "+(st.winRatePct===null?"Henüz hesaplanamadı":"%"+st.winRatePct)+" | Sinyal: "+st.totalSignals+" | Sanal giriş: "+st.virtualEntries+(st.persistence==="ephemeral"?" | UYARI: Kalıcı disk bağlı değil":"");}
+  }catch(e){status.textContent+=" | 3 günlük test verisi alınamadı";}
   cards.replaceChildren();
   if(!d.plans.length){const p=document.createElement("p");p.textContent="Şu anda uygun fiyat ve hacim sinyali bulunamadı. İşlem açmak zorunlu değildir.";cards.append(p);}
   for(const x of d.plans){
