@@ -14,6 +14,48 @@ async function refresh(){
    " | Denenen: "+d.checked+"/"+Object.values(d.universe||{}).reduce((a,b)=>a+Number(b||0),0)+" | Analiz edilen: "+d.successful+" | Eksik mum: "+(d.missing||0)+" | Hatalı: "+d.failed+
    " | Takipte: "+d.rows.length+" | En yüksek değişim: "+(d.maxChangePct===null?"Veri yok":"%"+d.maxChangePct)+(d.errors.length?" | İlk hata: "+d.errors[0]:"");
   cards.replaceChildren();
+  const micro=d.early||{};
+  const heading=document.createElement("h3");
+  heading.textContent="İlk saniyeler • USDT spot erken momentum ("+(micro.intervalSeconds||10)+" sn)";
+  cards.append(heading);
+  const microStatus=document.createElement("p");microStatus.className="description";
+  microStatus.textContent="Canlı kontrol: "+(micro.updatedAt?new Date(micro.updatedAt).toLocaleTimeString("tr-TR"):"İlk ölçüm bekleniyor")+
+   " | Borsa: "+(micro.checked??0)+"/5 | Parite: "+(micro.eligible??0)+
+   " | Alım teyidi: "+(micro.confirmed??0)+" | Erken uyarı: "+(micro.early??0)+
+   " | Geç kalındı: "+(micro.late??0)+(micro.running?" | Kontrol sürüyor":"");
+  cards.append(microStatus);
+  const sourceErrors=Object.entries(micro.sources||{}).filter(([,v])=>v.error);
+  if(sourceErrors.length){
+   const ep=document.createElement("p");ep.className="description";
+   ep.textContent="Veri erişimi: "+sourceErrors.map(([name,v])=>name+": "+v.error).join(" | ");
+   cards.append(ep);
+  }
+  if(!micro.rows?.length){
+   const p=document.createElement("p");
+   p.textContent=micro.updatedAt?"Henüz doğrulanmış erken hareket yok. Eşikler dolana kadar alım yapılmamalı.":"İlk 10–20 saniyelik fiyat örnekleri toplanıyor.";
+   cards.append(p);
+  }
+  for(const x of (micro.rows||[])){
+   const card=document.createElement("article");card.className="coin-card";
+   const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.exchange;card.append(h);
+   const dec=document.createElement("p");
+   dec.className="first-reaction-decision "+(x.status==="GEÇ KALINDI"?"decision-wait":"decision-watch-buy");
+   dec.textContent=x.status;card.append(dec);
+   const p=document.createElement("p");
+   p.textContent="Anlık fiyat: "+x.price+" USDT | Alış kotasyonu: "+x.ask+
+    " USDT | Kısa ivme: %"+x.speedPct+
+    " | Gözlenen değişim: %"+x.windowRisePct+
+    " | Zirveden geri çekilme: %"+x.retracePct;
+   card.append(p);
+   const t=document.createElement("p");t.className="description";
+   t.textContent="Makas: %"+x.spreadPct+
+    " | Hacim teyidi: "+(x.volumeRatio===null?"Henüz yok":x.volumeRatio+" kat")+
+    " | "+x.reason+
+    " | İlk uyarı: "+new Date(x.firstSeenAt).toLocaleTimeString("tr-TR")+
+    " | Son kontrol: "+new Date(x.lastCheckedAt).toLocaleTimeString("tr-TR");
+   card.append(t);cards.append(card);
+  }
+  const legacy=document.createElement("h3");legacy.textContent="Kapanmış mumlara göre 5/120 momentum takibi";cards.append(legacy);
   for(const x of d.rows){
    const card=document.createElement("article");card.className="coin-card";
    const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange;card.append(title);
@@ -31,7 +73,7 @@ async function refresh(){
    card.append(t);cards.append(card);
   }
   if(!d.rows.length){
-   const p=document.createElement("p");p.textContent="Henüz %2 eşiğini karşılayan takip sinyali yok. "+d.notice;cards.append(p);
+   const p=document.createElement("p");p.textContent="Kapanmış mumlara göre henüz %2 eşiğini karşılayan takip sinyali yok. "+d.notice;cards.append(p);
    if(d.closest?.length){
     const heading=document.createElement("h3");heading.textContent="Eşiğe en yakın coinler (takip sinyali değil)";cards.append(heading);
     for(const x of d.closest.slice(0,8)){
