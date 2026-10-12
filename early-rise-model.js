@@ -111,7 +111,7 @@ export function evaluateEarlyRise(candles,ticker,benchmark=null,timestamp=Date.n
  if(breakout&&rvol!==null&&rvol>=1.8)score+=6;
  score=Math.min(100,score);
  // Do not claim a classical VCP: these are 20-minute intraday contractions.
- const setup=decliningRange&&tight&&fallingVol&&nearPivot&&trendOk&&relativeOk;
+ const setup=decliningRange&&tight&&fallingVol&&(nearPivot||(breakout&&late))&&trendOk&&relativeOk;
  if(!setup||score<63)return null;
  const volumeConfirmed=rvol!==null&&rvol>=1.8&&rawLiveVolume>=1200;
  const anomalyConfirmed=zScore!==null&&zScore>=0.9&&zScore<=6;
