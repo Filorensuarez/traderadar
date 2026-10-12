@@ -58,25 +58,25 @@ async function getTickers(p){
 async function getCandles(p,s){
  let a,rows;
  if(p.kind==="binance"){
-  a=await json(p.base+"/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=16",p.name);
+  a=await json(p.base+"/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=34",p.name);
   if(!Array.isArray(a))return [];
-  rows=a.map(x=>({time:+x[0],close:+x[4],high:+x[2],quoteVolume:+x[7]}));
+  rows=a.map(x=>({time:+x[0],close:+x[4],high:+x[2],low:+x[3],quoteVolume:+x[7]}));
  }else if(p.kind==="okx"){
-  a=await json(p.base+"/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=16",p.name);
+  a=await json(p.base+"/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=34",p.name);
   if(a.code!=="0"||!Array.isArray(a.data))return [];
-  rows=a.data.map(x=>({time:+x[0],close:+x[4],high:+x[2],quoteVolume:+x[7]}));
+  rows=a.data.map(x=>({time:+x[0],close:+x[4],high:+x[2],low:+x[3],quoteVolume:+x[7]}));
  }else if(p.kind==="kucoin"){
   a=await json(p.base+"/api/v1/market/candles?type=1min&symbol="+encodeURIComponent(s),p.name);
   if(a.code!=="200000"||!Array.isArray(a.data))return [];
-  rows=a.data.map(x=>({time:+x[0]*1000,close:+x[2],high:+x[3],quoteVolume:+x[6]}));
+  rows=a.data.map(x=>({time:+x[0]*1000,close:+x[2],high:+x[3],low:+x[4],quoteVolume:+x[6]}));
  }else if(p.kind==="gate"){
-  a=await json(p.base+"/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(s)+"&interval=1m&limit=16",p.name);
+  a=await json(p.base+"/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(s)+"&interval=1m&limit=34",p.name);
   if(!Array.isArray(a))return [];
-  rows=a.map(x=>({time:+x[0]*1000,close:+x[2],high:+x[3],quoteVolume:+x[1]}));
+  rows=a.map(x=>({time:+x[0]*1000,close:+x[2],high:+x[3],low:+x[4],quoteVolume:+x[1]}));
  }else{
-  a=await json(p.base+"/api/v3/market/candles?category=SPOT&symbol="+encodeURIComponent(s)+"&interval=1m&limit=16",p.name);
+  a=await json(p.base+"/api/v3/market/candles?category=SPOT&symbol="+encodeURIComponent(s)+"&interval=1m&limit=34",p.name);
   if(a.code!=="00000"||!Array.isArray(a.data))return [];
-  rows=a.data.map(x=>({time:+x[0],close:+x[4],high:+x[2],quoteVolume:+x[6]}));
+  rows=a.data.map(x=>({time:+x[0],close:+x[4],high:+x[2],low:+x[3],quoteVolume:+x[6]}));
  }
  return rows.filter(x=>Number.isFinite(x.time)&&x.close>0&&Number.isFinite(x.quoteVolume))
   .sort((x,y)=>x.time-y.time);
@@ -101,6 +101,50 @@ function evaluateCandles(c,t,timestamp){
  return {confirmed,reason:confirmed?"Dakika hacmi doğrulandı":"Gerçek dakika hacmi yetersiz",
   volumeRatio:fix(ratio),minuteVolume:fix(live.quoteVolume,0),rise1:fix(rise1),rise3:fix(rise3)};
 }
+// Indicative 5–15 minute volatility scenario, NOT a probability or price prediction.
+// Based on the most recent 14 completed true ranges and 20 completed candle highs.
+function estimatePotential(c,t,timestamp,volumeRatio){
+ const reference=t.ask;
+ if(!(Number.isFinite(reference)&&reference>0))return null;
+ const minute=Math.floor(timestamp/60000)*60000;
+ const closed=c.filter(x=>x.time<minute&&x.time+60000<=timestamp)
+  .slice(-22);
+ if(closed.length<21||closed.at(-1).time!==minute-60000)return null;
+ for(let i=1;i<closed.length;i++){
+  const a=closed[i-1],b=closed[i];
+  if(b.time-a.time!==60000||![b.high,b.low,b.close].every(Number.isFinite)||
+   b.high<b.low||b.low<=0)return null;
+ }
+ const ranges=[];
+ for(let i=closed.length-14;i<closed.length;i++){
+  const x=closed[i],prev=closed[i-1].close;
+  ranges.push(Math.max(x.high-x.low,Math.abs(x.high-prev),Math.abs(x.low-prev)));
+ }
+ const atr=ranges.reduce((a,b)=>a+b,0)/ranges.length;
+ if(!(Number.isFinite(atr)&&atr>0))return null;
+ const atrPct=atr/reference*100;
+ const resistance=Math.max(...closed.slice(-20).map(x=>x.high));
+ const resistancePct=(resistance/reference-1)*100;
+ const volumeConfirmed=Number.isFinite(volumeRatio)&&volumeRatio>=2;
+ // 1.5–4 ATR expansion envelopes; upside is limited by nearby resistance
+ // unless minute-volume acceleration is confirmed.
+ let low=Math.min(4,atrPct*1.5);
+ let high=Math.min(6,atrPct*(volumeConfirmed?4:2.5));
+ if(resistancePct>0){
+  const ceiling=volumeConfirmed?resistancePct+atrPct:resistancePct;
+  high=Math.min(high,ceiling);
+  low=Math.min(low,high);
+ }
+ if(high<=0)return {lowerPct:0,upperPct:0,firstResistancePct:fix(resistancePct),atrPct:fix(atrPct,3),
+  referencePrice:reference,reason:"Yakın direncin üzerinde teyitli alan yok",window:"5–15 dakika"};
+ const lowerPct=fix(Math.max(0,low)),upperPct=fix(Math.max(0,high));
+ return {lowerPct,upperPct,referencePrice:reference,
+  lowerTarget:+Number(reference*(1+lowerPct/100)).toPrecision(10),
+  upperTarget:+Number(reference*(1+upperPct/100)).toPrecision(10),
+  firstResistancePct:fix(resistancePct),atrPct:fix(atrPct,3),
+  volumeConfirmed,window:"5–15 dakika",
+  reason:high<0.4?"Potansiyel işlem maliyetlerine göre düşük olabilir":"ATR ve yakın dirençten hesaplanan teknik senaryo"};
+}
 function snapshot(p,t,timestamp){
  const key=p.name+":"+t.symbol;
  const arr=samples.get(key)||[];
@@ -124,7 +168,7 @@ function snapshot(p,t,timestamp){
  if(!late&&speed<=0){firstSeen.delete(key);return null;}
  if(!firstSeen.has(key))firstSeen.set(key,timestamp);
  const seen=firstSeen.get(key);
- return {key,symbol:t.symbol.replace(/[-_]?USDT$/,"/USDT"),exchange:p.name,
+ return {key,symbol:t.symbol.replace(/[-_]?USDT$/,"/USDT"),exchange:p.name,potential:null,
   status:late?"GEÇ KALINDI":"ERKEN UYARI",price:t.price,ask:t.ask,
   spreadPct:fix(spread,3),speedPct:fix(speed),windowRisePct:fix(riseWindow),
   retracePct:fix(fall),observedSeconds:fix(observedMs/1000,0),
@@ -152,13 +196,16 @@ async function scanSource(p,timestamp){
    .sort((a,b)=>b.x.speedPct-a.x.speedPct).slice(0,MAX_CONFIRM_PER_EXCHANGE);
   await Promise.all(shortlist.map(async a=>{
    try{
-    const v=evaluateCandles(await getCandles(p,a.t.symbol),a.t,now());
+    const candleData=await getCandles(p,a.t.symbol);
+    const v=evaluateCandles(candleData,a.t,now());
     a.x.volumeRatio=v.volumeRatio??null;
     a.x.minuteVolume=v.minuteVolume??null;
     a.x.rise1Pct=v.rise1??null;
     a.x.rise3Pct=v.rise3??null;
     a.x.reason=v.reason;
-    if(v.late)a.x.status="GEÇ KALINDI";
+    const estimated=estimatePotential(candleData,a.t,now(),v.volumeRatio);
+    if(estimated&&a.x.status!=="GEÇ KALINDI")a.x.potential=estimated;
+    if(v.late){a.x.status="GEÇ KALINDI";a.x.potential=null;}
     else if(v.confirmed&&a.x.observedSeconds>=18&&a.x.spreadPct<=0.3){
      a.x.status="ALIM TEYİDİ";
      stat.verified++;
