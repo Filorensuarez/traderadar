@@ -8,11 +8,12 @@ const POLICY=Object.freeze({maxSpreadPct:0.35,minRsi:52,maxRsi:73,minVolumeRatio
 const mean=a=>a.reduce((n,x)=>n+x,0)/a.length;
 function ema(values,period){const k=2/(period+1);let v=mean(values.slice(0,period));for(const x of values.slice(period))v=x*k+v*(1-k);return v;}
 function rsi(values,period=14){const changes=values.slice(-period-1).map((x,i,a)=>i?x-a[i-1]:0).slice(1);const gains=mean(changes.map(x=>Math.max(0,x)));const losses=mean(changes.map(x=>Math.max(0,-x)));return losses===0?100:100-100/(1+gains/losses);}
-export function researchPositionSize(capital,entry,stop){if(![capital,entry,stop].every(Number.isFinite)||capital<=0||entry<=stop||stop<=0)return null;const riskBudget=capital*POLICY.riskPerTradePct/100;const byRisk=riskBudget/(entry-stop);const byAllocation=capital*POLICY.maxAllocationPct/100/entry;const quantity=Math.max(0,Math.min(byRisk,byAllocation));return {quantity:Number(quantity.toFixed(8)),allocationTRY:round(quantity*entry),riskBudgetTRY:round(riskBudget),maxEstimatedLossTRY:round(quantity*(entry-stop))};}
+export function researchPositionSize(capital,entry,stop){if(![capital,entry,stop].every(Number.isFinite)||capital<=0||entry<=stop||stop<=0)return null;const riskBudget=capital*POLICY.riskPerTradePct/100;const estimatedCostPerUnit=entry*(2*(POLICY.feePerSidePct+POLICY.slippagePerSidePct)/100);const byRisk=riskBudget/(entry-stop+estimatedCostPerUnit);const byAllocation=capital*POLICY.maxAllocationPct/100/entry;const quantity=Math.max(0,Math.min(byRisk,byAllocation));return {quantity:Number(quantity.toFixed(8)),allocationTRY:round(quantity*entry),riskBudgetTRY:round(riskBudget),maxEstimatedLossTRY:round(quantity*(entry-stop+estimatedCostPerUnit)),estimatedFeesAndSlippageTRY:round(quantity*estimatedCostPerUnit)};}
 
 function planState(p,t){
  if(!t||!Number.isFinite(t.price)||t.price<=0||!Number.isFinite(t.ask)||t.ask<=0)return {status:"SİNYAL GEÇERSİZ",reason:"Güncel alış fiyatı alınamadı",terminal:true};
  if(now()-p.lastCheckedAt>MAX_AGE)return {status:"SİNYAL GEÇERSİZ",reason:"Fiyat verisi güncel değil",terminal:true};
+ if(!Number.isFinite(t.bid)||t.bid<=0||(t.ask-t.bid)/t.ask*100>POLICY.maxSpreadPct)return {status:"BEKLE",reason:"Alış-satış makası yüksek veya güncel alış-satış kotasyonu eksik",terminal:false};
  if(now()-p.createdAt>24*3600000)return {status:"SİNYAL GEÇERSİZ",reason:"Planın 24 saatlik süresi doldu",terminal:true};
  if(t.price>=p.target)return {status:"HEDEF FİYAT GÖRÜLDÜ",reason:"Hedef fiyat görüldü; gerçekleşmiş satış anlamına gelmez",terminal:true};
  if(t.price<=p.stop)return {status:"SİNYAL GEÇERSİZ",reason:"Zarar durdurma seviyesi görüldü",terminal:true};
@@ -96,8 +97,9 @@ export async function scanTryPlans(){
          const entry=round(t.ask),target=round(entry*1.03),stop=round(entry*0.985);
          const estimatedRoundTripCostPct=2*(POLICY.feePerSidePct+POLICY.slippagePerSidePct);
          const estimatedNetTargetPct=round(3-estimatedRoundTripCostPct);
+         const estimatedNetStopPct=round(-1.5-estimatedRoundTripCostPct);
          plans.set(key,{key,symbol:t.symbol.replace(/[-]?TRY$/,"/TRY"),exchange:p.name,entry,target,stop,
-          lastPrice:t.price,currentAsk:t.ask,createdAt:now(),lastCheckedAt:now(),status:"BEKLE",reason:"Yeni sinyal; alış fiyatı teyidi bekleniyor",estimatedNetTargetPct,estimatedRoundTripCostPct,riskPerTradePct:POLICY.riskPerTradePct,maxAllocationPct:POLICY.maxAllocationPct,spreadPct:round((t.ask-t.bid)/t.ask*100),...signal});
+          lastPrice:t.price,currentAsk:t.ask,createdAt:now(),lastCheckedAt:now(),status:"BEKLE",reason:"Yeni sinyal; alış fiyatı teyidi bekleniyor",estimatedNetTargetPct,estimatedNetStopPct,estimatedRoundTripCostPct,riskPerTradePct:POLICY.riskPerTradePct,maxAllocationPct:POLICY.maxAllocationPct,spreadPct:round((t.ask-t.bid)/t.ask*100),...signal});
         }
        }
       }catch(e){stat.error=stat.error||e.message;}
