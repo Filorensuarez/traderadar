@@ -118,10 +118,10 @@ function snapshot(p,t,timestamp){
  const fall=(peak-t.price)/peak*100;
  const spread=(t.ask-t.bid)/t.ask*100;
  const observedMs=timestamp-earliest.time;
- const late=riseWindow>1.8||(fall>=0.5&&peak/earliest.price>1.008);
+ const late=speed>1.2||riseWindow>1.8||(fall>=0.5&&peak/earliest.price>1.008);
  // Never label a negative-price-reaction as an entry candidate.
- if(!late&&(speed<0.24||speed>1.2||riseWindow>1.5||spread>0.3))return null;
- if(!late&&speed<=0)return null;
+ if(!late&&(speed<0.24||riseWindow>1.5||spread>0.3)){firstSeen.delete(key);return null;}
+ if(!late&&speed<=0){firstSeen.delete(key);return null;}
  if(!firstSeen.has(key))firstSeen.set(key,timestamp);
  const seen=firstSeen.get(key);
  return {key,symbol:t.symbol.replace(/[-_]?USDT$/,"/USDT"),exchange:p.name,
