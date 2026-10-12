@@ -1,6 +1,6 @@
 import {paperStats} from "./paper-performance-72h.js";
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
-import {startMicroMomentum,microMomentumStatus} from "./micro-momentum-watch.js";
+import {startMicroMomentum,scanMicroMomentum,microMomentumStatus} from "./micro-momentum-watch.js";
 import {startEarlyPump,scanEarlyPump,earlyPumpStatus} from "./early-pump-watch.js";
 import {startTryPlans,scanTryPlans,tryPlanStatus} from "./try-market-plans.js";
 import {startHourlyPullbacks,scanHourlyPullbacks,hourlyPullbackStatus} from "./hourly-pullback-watch.js";
@@ -29,7 +29,7 @@ app.post("/api/daily-plans/scan",(req,res)=>{res.set("Cache-Control","no-store")
 app.get("/api/early-pump",(req,res)=>{res.set("Cache-Control","no-store");res.json(earlyPumpStatus());});
 app.post("/api/early-pump/scan",(req,res)=>{res.set("Cache-Control","no-store");scanEarlyPump().catch(console.error);res.json({started:true,...earlyPumpStatus()});});
 app.get("/api/minute-momentum",(req,res)=>{res.set("Cache-Control","no-store");res.json({...minuteMomentumStatus(),early:microMomentumStatus()});});
-app.post("/api/minute-momentum/scan",(req,res)=>{res.set("Cache-Control","no-store");scanMinuteMomentum().catch(console.error);res.json({started:true,...minuteMomentumStatus()});});
+app.post("/api/minute-momentum/scan",(req,res)=>{res.set("Cache-Control","no-store");scanMinuteMomentum().catch(console.error);scanMicroMomentum().catch(console.error);res.json({started:true,...minuteMomentumStatus(),early:microMomentumStatus()});});
 app.get("/api/hourly-pullback",(req,res)=>{res.set("Cache-Control","no-store");res.json(hourlyPullbackStatus());});
 app.post("/api/hourly-pullback/scan",(req,res)=>{res.set("Cache-Control","no-store");scanHourlyPullbacks().catch(console.error);res.json({started:true,...hourlyPullbackStatus()});});
 app.get("/api/flow-measurements",(req,res)=>{res.set("Cache-Control","no-store");res.json(flowMeasurementStats());});
