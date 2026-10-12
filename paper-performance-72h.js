@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 // A rolling 72-hour, paper-only observation ledger. Never interprets a quote as a fill.
-const file=process.env.TRADE_STATS_FILE||path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH||"/tmp","traderadar-paper-results.json");
+const storageDir=process.env.RAILWAY_VOLUME_MOUNT_PATH||(fs.existsSync("/data")?"/data":"/tmp");
+const file=process.env.TRADE_STATS_FILE||path.join(storageDir,"traderadar-paper-results.json");
 const WINDOW=72*3600000;
 let records=[];
 try{const parsed=JSON.parse(fs.readFileSync(file,"utf8"));if(Array.isArray(parsed))records=parsed;}catch{}
@@ -23,10 +24,27 @@ export function observePaperPlan(plan,price){
  else if(Date.now()-r.enteredAt>24*3600000){r.status="SÜRE DOLDU";r.closedAt=Date.now();}
  persist();
 }
+export function recoverPaperPlans(){
+ prune();
+ const current=Date.now();
+ return records.filter(r=>!r.closedAt&&current-r.detectedAt<24*3600000).map(r=>({
+  key:r.id.slice(0,r.id.lastIndexOf(":")),symbol:r.symbol,exchange:r.exchange,
+  entry:r.entry,target:r.target,stop:r.stop,createdAt:r.detectedAt,
+  lastCheckedAt:0,currentAsk:null,lastPrice:null,quote:"USDT",
+  status:"BEKLE",reason:"Sunucu yeniden başladı; güncel fiyat bekleniyor"
+ }));
+}
 export function paperStats(){
  prune();
+ const current=Date.now();let expired=false;
+ for(const r of records){
+  if(r.closedAt)continue;
+  if(r.enteredAt&&current-r.enteredAt>24*3600000){r.status="SÜRE DOLDU";r.closedAt=current;expired=true;}
+  else if(!r.enteredAt&&current-r.detectedAt>24*3600000){r.status="GİRİŞ OLMADI";r.closedAt=current;expired=true;}
+ }
+ if(expired)persist();
  const completed=records.filter(r=>r.status==="HEDEF"||r.status==="STOP");
  const wins=completed.filter(r=>r.status==="HEDEF").length;
  const losses=completed.filter(r=>r.status==="STOP").length;
- return {windowHours:72,startedAt:records.length?Math.min(...records.map(r=>r.detectedAt)):null,totalSignals:records.length,virtualEntries:records.filter(r=>r.enteredAt).length,completed:completed.length,wins,losses,winRatePct:completed.length?Number((wins/completed.length*100).toFixed(2)):null,pending:records.filter(r=>!r.closedAt).length,noEntry:records.filter(r=>r.status==="GİRİŞ OLMADI").length,unresolved:records.filter(r=>r.status==="SÜRE DOLDU").length,records:records.slice(-100).reverse(),method:"Yalnızca sinyal sonrasında gözlemlenen son işlem fiyatlarıyla sanal giriş ve hedef/stop ölçümü; emir gerçekleşmesi veya gerçek getiri değildir. Gözlemler arasındaki hareketler kaçabilir.",persistence:process.env.RAILWAY_VOLUME_MOUNT_PATH?"volume":"ephemeral"};
+ return {windowHours:72,startedAt:records.length?Math.min(...records.map(r=>r.detectedAt)):null,totalSignals:records.length,virtualEntries:records.filter(r=>r.enteredAt).length,completed:completed.length,wins,losses,winRatePct:completed.length?Number((wins/completed.length*100).toFixed(2)):null,pending:records.filter(r=>!r.closedAt).length,noEntry:records.filter(r=>r.status==="GİRİŞ OLMADI").length,unresolved:records.filter(r=>r.status==="SÜRE DOLDU").length,records:records.slice(-100).reverse(),method:"Yalnızca sinyal sonrasında gözlemlenen son işlem fiyatlarıyla sanal giriş ve hedef/stop ölçümü; emir gerçekleşmesi veya gerçek getiri değildir. Gözlemler arasındaki hareketler kaçabilir.",persistence:storageDir==="/tmp"?"ephemeral":"volume"};
 }
