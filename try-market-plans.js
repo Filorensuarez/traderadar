@@ -7,7 +7,7 @@ const providers=[
  {name:"OKX",kind:"okx",base:"https://www.okx.com"},
  {name:"KUCOIN",kind:"kucoin",base:"https://api.kucoin.com"},
  {name:"GATE.IO",kind:"gate",base:"https://api.gateio.ws"},
- {name:"COINBASE",kind:"coinbase",base:"https://api.coinbase.com"}
+ {name:"BITGET",kind:"bitget",base:"https://api.bitget.com"}
 ];
 const POLICY=Object.freeze({
  minDayQuoteVolume:1000000,minMinuteQuoteVolume:3500,minVolumeRatio:2.5,
@@ -47,11 +47,10 @@ async function markets(p){
   const d=await get(p.base+"/api/v4/spot/tickers");
   if(!Array.isArray(d))throw Error("Gate.io piyasa verisi alınamadı");
   rows=d.map(x=>row(x.currency_pair,x.last,x.highest_bid,x.lowest_ask,x.quote_volume));
- }else{
-  const d=await get(p.base+"/api/v3/brokerage/market/products?product_type=SPOT&limit=250&get_all_products=true");
-  if(!Array.isArray(d.products))throw Error("Coinbase piyasa verisi alınamadı");
-  rows=d.products.filter(x=>x.quote_currency_id==="USDT"&&x.product_type==="SPOT"&&x.status==="online"&&!x.is_disabled&&!x.trading_disabled)
-   .map(x=>row(x.product_id,x.price,x.best_bid,x.best_ask,Number(x.volume_24h)*Number(x.price)));
+ }else if(p.kind==="bitget"){
+  const d=await get(p.base+"/api/v3/market/tickers?category=SPOT");
+  if(d.code!=="00000"||!Array.isArray(d.data))throw Error(d.msg||"Bitget piyasa verisi alınamadı");
+  rows=d.data.filter(x=>x.category==="SPOT").map(x=>row(x.symbol,x.lastPrice,x.bid1Price,x.ask1Price,x.turnover24h));
  }
  return rows.filter(x=>validSymbol(x.symbol)&&!leveraged(x.symbol)&&Number.isFinite(x.volume)&&x.volume>=POLICY.minDayQuoteVolume&&x.price>0)
   .sort((a,b)=>b.volume-a.volume);
@@ -74,11 +73,10 @@ async function candles(p,s){
   d=await get(p.base+"/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(s)+"&interval=1m&limit=45");
   if(!Array.isArray(d))throw Error("Gate.io mum verisi yok");
   rows=d.map(x=>({time:+x[0]*1000,close:+x[2],quoteVolume:+x[1]}));
- }else{
-  const end=Math.floor(now()/1000),start=end-48*60;
-  d=await get(p.base+"/api/v3/brokerage/market/products/"+encodeURIComponent(s)+"/candles?start="+start+"&end="+end+"&granularity=ONE_MINUTE");
-  if(!Array.isArray(d.candles))throw Error("Coinbase mum verisi yok");
-  rows=d.candles.map(x=>({time:+x.start*1000,close:+x.close,quoteVolume:+x.volume*(+x.close)}));
+ }else if(p.kind==="bitget"){
+  d=await get(p.base+"/api/v3/market/candles?category=SPOT&symbol="+encodeURIComponent(s)+"&interval=1m&limit=45");
+  if(d.code!=="00000"||!Array.isArray(d.data))throw Error(d.msg||"Bitget mum verisi alınamadı");
+  rows=d.data.map(x=>({time:+x[0],close:+x[4],quoteVolume:+x[6]}));
  }
  return rows;
 }
