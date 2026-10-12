@@ -51,10 +51,10 @@ function evaluate(raw){
 export function tryPlanStatus(){return {...state,plans:[...state.plans],history:[...history]};}
 export async function scanTryPlans(){
  if(state.running)return tryPlanStatus();
- state.running=true;const sourceState={};
+ state.running=true;const sourceState={};state.sources=sourceState;
  try{
   for(const p of providers){
-   const stat={checked:0,eligible:0,error:null};sourceState[p.name]=stat;
+   const stat={checked:0,eligible:0,error:null};sourceState[p.name]=stat;state.sources={...sourceState};
    try{
     const tickers=normalize(p,await get(p.ticker)).filter(x=>x.volume>=3000000&&x.price>0&&Number.isFinite(x.volume)&&
      !/(UP|DOWN|BULL|BEAR|[235][SL])(?:-|)TRY$/.test(x.symbol)).sort((a,b)=>b.volume-a.volume).slice(0,80);
@@ -82,10 +82,12 @@ export async function scanTryPlans(){
        }
       }catch(e){stat.error=stat.error||e.message;}
       stat.checked++;
+      if(stat.checked%5===0){state.sources={...sourceState};state.plans=[...plans.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,50);state.updatedAt=now();}
      }
     }
     await Promise.all(Array.from({length:3},()=>worker()));
    }catch(e){stat.error=e.message;}
+   state.sources={...sourceState};state.plans=[...plans.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,50);state.updatedAt=now();
   }
   for(const [key,p] of plans)if(now()-p.createdAt>24*3600000){plans.delete(key);p.status="SÜRESİ DOLDU";p.closedAt=now();history.unshift(p);}
   history.length=Math.min(history.length,100);
