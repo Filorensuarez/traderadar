@@ -1,4 +1,4 @@
-import {observePaperPlan} from "./paper-performance-72h.js";
+import {observePaperPlan,recoverPaperPlans} from "./paper-performance-72h.js";
 
 // USDT-only spot scanner. Each exchange has independent prices, liquidity and candles.
 // The compatibility export names preserve the existing /api/daily-plans routes.
@@ -17,7 +17,7 @@ const POLICY=Object.freeze({
 const MAX_AGE=4*60000,MAX_PER_SOURCE=65;
 const now=()=>Date.now(),round=n=>Number(n.toPrecision(10));
 const state={running:false,updatedAt:0,startedAt:0,sources:{},plans:[],history:[],quote:"USDT",notice:"Yalnızca gerçek USDT spot işlem çiftleri; sanal işlem planları, otomatik emir değil."};
-const plans=new Map(),history=[];
+const plans=new Map(recoverPaperPlans().map(p=>[p.key,p])),history=[];
 const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
 function ema(a,n){const k=2/(n+1);let v=mean(a.slice(0,n));for(const x of a.slice(n))v=v*(1-k)+x*k;return v;}
 function rsi(a,n=14){const d=a.slice(-n-1).map((x,i,z)=>i?x-z[i-1]:0).slice(1);const gain=mean(d.map(x=>Math.max(x,0))),loss=mean(d.map(x=>Math.max(-x,0)));return loss===0?100:100-100/(1+gain/loss);}
@@ -190,6 +190,7 @@ export async function scanTryPlans(){
   }
   history.length=Math.min(history.length,100);
   publish();
+  console.log("USDT plan taraması: "+Object.entries(state.sources).map(([name,v])=>name+" "+v.checked+"/"+v.eligible+(v.error?" HATA: "+v.error:"")).join(" | ")+" | İzlenen: "+plans.size);
  }finally{state.running=false;}
  return tryPlanStatus();
 }
