@@ -10,8 +10,9 @@ async function refreshPlans(){
   for(const x of d.plans){
    const card=document.createElement("article");card.className="coin-card";
    const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange;card.append(title);
+   const signal=document.createElement("p");signal.style.fontWeight="700";signal.textContent="DURUM: "+x.status;card.append(signal);
    const line=document.createElement("p");line.textContent="İZLEME PLANI | Alış referansı: "+x.entry+" TL | Hedef satış (+%3): "+x.target+" TL | Zarar durdurma (-%1,5): "+x.stop+" TL";card.append(line);
-   const meta=document.createElement("p");meta.className="description";meta.textContent="Durum: "+x.status+" | Son fiyat: "+x.lastPrice+" TL | Tespit: "+new Date(x.createdAt).toLocaleString("tr-TR")+" | 24 saat geçerli";card.append(meta);
+   const meta=document.createElement("p");meta.className="description";meta.textContent="Güncel alış kotasyonu: "+(x.currentAsk??"Bilinmiyor")+" TL | Son işlem fiyatı: "+x.lastPrice+" TL | Gerekçe: "+(x.reason||"Yeniden kontrol ediliyor")+" | Son kontrol: "+new Date(x.lastCheckedAt).toLocaleTimeString("tr-TR")+" | Tespit: "+new Date(x.createdAt).toLocaleString("tr-TR");card.append(meta);
    cards.append(card);
   }
   if(d.history.length){const h=document.createElement("h3");h.textContent="Listeden çıkarılan planlar (son 100)";cards.append(h);
