@@ -1,52 +1,92 @@
-const section=document.querySelector("#dailyPlans"),button=document.querySelector("#dailyPlansButton");
-const status=document.querySelector("#dailyPlansStatus"),cards=document.querySelector("#dailyPlansCards");
+const section=document.querySelector("#dailyPlans");
+const button=document.querySelector("#dailyPlansButton");
+const status=document.querySelector("#dailyPlansStatus");
+const cards=document.querySelector("#dailyPlansCards");
+const scanButton=document.querySelector("#dailyPlansScan");
+let refreshing=false;
+
 async function refreshPlans(){
- if(section.hidden)return;
+ if(!section||section.hidden||refreshing)return;
+ refreshing=true;
  try{
-  const r=await fetch("/api/daily-plans",{cache:"no-store"});if(!r.ok)throw Error("HTTP "+r.status);
-  const d=await r.json();
-  const blocked=Object.entries(d.sources||{}).filter(([name,v])=>v.error&&/HTTP 451/.test(v.error));
-  const available=Object.entries(d.sources||{}).filter(([name,v])=>v.checked>0&&!v.error);
-  const warning=blocked.length?" | ERİŞİM ENGELİ: "+blocked.map(([name])=>name).join(", ")+" (HTTP 451; bu borsa taranamıyor). Diğer borsalar bağımsız taranır.":"";
-  status.textContent="Çalışan kaynak: "+available.map(([name])=>name).join(", ")+(available.length?"":"Henüz doğrulanmadı")+warning+" | Son kontrol: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yok")+" | Kaynaklar: "+Object.entries(d.sources||{}).map(([k,v])=>k+" "+v.checked+"/"+v.eligible+(v.error?" (hata: "+v.error+")":"")).join(" | ")+" | Açık plan: "+d.plans.length+" | Kapanan: "+d.history.length;
-  try{
-   const sr=await fetch("/api/paper-performance-72h",{cache:"no-store"});
-   if(sr.ok){const st=await sr.json();status.textContent+=" | SON 3 GÜN SANAL TEST: "+st.completed+" sonuçlanan (hedef "+st.wins+", stop "+st.losses+") | Başarı: "+(st.winRatePct===null?"Henüz hesaplanamadı":"%"+st.winRatePct)+" | Sinyal: "+st.totalSignals+" | Sanal giriş: "+st.virtualEntries+(st.persistence==="ephemeral"?" | UYARI: Kalıcı disk bağlı değil":"");}
-  }catch(e){status.textContent+=" | 3 günlük test verisi alınamadı";}
+  const [planResult,statsResult]=await Promise.allSettled([
+   fetch("/api/daily-plans",{cache:"no-store",signal:AbortSignal.timeout(9000)}),
+   fetch("/api/paper-performance-72h",{cache:"no-store",signal:AbortSignal.timeout(9000)})
+  ]);
+  if(planResult.status!=="fulfilled"||!planResult.value.ok)throw Error("Plan verileri alınamadı");
+  const d=await planResult.value.json();
+  const sourceText=Object.entries(d.sources||{}).map(([name,v])=>
+   name+": "+(v.error?"HATA ("+v.error+")":v.checked+"/"+v.eligible+" tarandı")).join(" | ");
+  status.textContent="USDT spot | "+(d.running?"Tarama sürüyor | ":"")+
+   "Son kontrol: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"İlk tarama bekleniyor")+
+   " | Kaynaklar: "+(sourceText||"Henüz tarama başlamadı")+
+   " | Açık plan: "+d.plans.length+" | Kapanan: "+d.history.length;
+  if(statsResult.status==="fulfilled"&&statsResult.value.ok){
+   const st=await statsResult.value.json();
+   status.textContent+=" | 3 GÜNLÜK SANAL TAKİP: "+st.completed+" sonuçlanan (hedef "+st.wins+", stop "+st.losses+
+    ") | Başarı: "+(st.winRatePct===null?"Hesaplanamadı":"%"+st.winRatePct)+
+    " | Sinyal: "+st.totalSignals+" | Sanal giriş: "+st.virtualEntries+
+    (st.persistence==="ephemeral"?" | Kalıcı disk yok":"");
+  }
   cards.replaceChildren();
-  if(!d.plans.length){const p=document.createElement("p");p.textContent="Şu anda uygun fiyat ve hacim sinyali bulunamadı. İşlem açmak zorunlu değildir.";cards.append(p);}
+  if(!d.plans.length){
+   const p=document.createElement("p");
+   p.textContent=d.running?"USDT borsaları taranıyor, adaylar bulundukça gösterilecek.":"Şu anda koşulları karşılayan USDT işlem adayı bulunamadı.";
+   cards.append(p);
+  }
   for(const x of d.plans){
    const card=document.createElement("article");card.className="coin-card";
    const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange;card.append(title);
-   const signal=document.createElement("p");signal.style.fontWeight="700";signal.textContent="DURUM: "+x.status;card.append(signal);
-   const line=document.createElement("p");line.textContent="İZLEME PLANI | Alış referansı: "+x.entry+" TL | Hedef satış (+%3): "+x.target+" TL | Zarar durdurma (-%1,5): "+x.stop+" TL";card.append(line);
-   const meta=document.createElement("p");meta.className="description";meta.textContent="Güncel alış kotasyonu: "+(x.currentAsk??"Bilinmiyor")+" TL | Son işlem fiyatı: "+x.lastPrice+" TL | Gerekçe: "+(x.reason||"Yeniden kontrol ediliyor")+" | Son kontrol: "+new Date(x.lastCheckedAt).toLocaleTimeString("tr-TR")+" | Tespit: "+new Date(x.createdAt).toLocaleString("tr-TR");card.append(meta);
-   const risk=document.createElement("p");risk.className="description";risk.textContent="Tahmini net hedef: "+(x.estimatedNetTargetPct??"—")+"% | Tahmini net stop: "+(x.estimatedNetStopPct??"—")+"% | Maksimum işlem payı: "+(x.maxAllocationPct??"—")+"% | İşlem başına risk bütçesi: "+(x.riskPerTradePct??"—")+"% (varsayımsal) | RSI: "+(x.rsi??"—")+" | Hacim çarpanı: "+(x.volumeRatio??"—");card.append(risk);
-   const risk=document.createElement("p");risk.className="description";risk.textContent="Teknik filtre: EMA7 "+(x.ema7??"-")+" / EMA25 "+(x.ema25??"-")+" | RSI14: "+(x.rsi??"-")+" | Hacim katsayısı: "+(x.volumeRatio??"-")+" | Alış-satış makası: %"+(x.spreadPct??"-")+" | Tahmini maliyet sonrası %3 hedef getirisi: %"+(x.estimatedNetTargetPct??"-")+" (varsayımsal komisyon ve kayma) | İşlem başı örnek risk üst sınırı: sermayenin %"+(x.riskPerTradePct??"-")+"; gerçek emir yok.";card.append(risk);
-   cards.append(card);
+   const state=document.createElement("p");state.style.fontWeight="700";state.textContent="DURUM: "+x.status;card.append(state);
+   const line=document.createElement("p");
+   line.textContent="Alış referansı: "+x.entry+" USDT | Hedef (+%3): "+x.target+
+    " USDT | Stop (-%1,5): "+x.stop+" USDT";
+   card.append(line);
+   const meta=document.createElement("p");meta.className="description";
+   meta.textContent="Alış kotasyonu: "+(x.currentAsk??"Veri yok")+" USDT | Son fiyat: "+x.lastPrice+
+    " USDT | "+(x.reason||"")+
+    " | Tespit: "+new Date(x.createdAt).toLocaleString("tr-TR")+
+    " | Kontrol: "+new Date(x.lastCheckedAt).toLocaleTimeString("tr-TR");
+   card.append(meta);
+   const risk=document.createElement("p");risk.className="description";
+   risk.textContent="EMA7/25: "+(x.ema7??"—")+"/"+(x.ema25??"—")+
+    " | RSI: "+(x.rsi??"—")+" | Hacim çarpanı: "+(x.volumeRatio??"—")+
+    " | Spread: %"+(x.spreadPct??"—")+
+    " | Tahmini net hedef: %"+(x.estimatedNetTargetPct??"—")+
+    " | Tahmini net stop: %"+(x.estimatedNetStopPct??"—")+
+    " | İşlem risk bütçesi: %"+(x.riskPerTradePct??"—")+
+    " | Azami işlem payı: %"+(x.maxAllocationPct??"—");
+   card.append(risk);cards.append(card);
   }
-  if(d.history.length){const h=document.createElement("h3");h.textContent="Listeden çıkarılan planlar (son 100)";cards.append(h);
-   for(const x of d.history.slice(0,15)){const p=document.createElement("p");p.textContent=x.symbol+" | "+x.status+" | Alış: "+x.entry+" | Hedef: "+x.target+" TL | Stop: "+x.stop+" TL";cards.append(p);}
+  if(d.history?.length){
+   const heading=document.createElement("h3");heading.textContent="Listeden çıkarılan planlar";cards.append(heading);
+   for(const x of d.history.slice(0,12)){
+    const p=document.createElement("p");
+    p.textContent=x.symbol+" • "+x.exchange+" | "+x.status+
+     " | Alış: "+x.entry+" USDT | Hedef: "+x.target+" USDT | Stop: "+x.stop+" USDT";
+    cards.append(p);
+   }
   }
- }catch(e){status.textContent="Portföy planları alınamadı: "+e.message;}
+ }catch(e){status.textContent="USDT planları alınamadı: "+e.message+" (Sayfayı yenileyin veya tekrar tarayın.)";}
+ finally{refreshing=false;}
 }
 button?.addEventListener("click",()=>{
  document.querySelectorAll("main > section").forEach(el=>el.hidden=el!==section);
  document.querySelectorAll("nav.tabs .tab").forEach(el=>el.classList.toggle("active",el===button));
  refreshPlans();
 });
-document.querySelectorAll("nav.tabs .tab:not(#dailyPlansButton)").forEach(el=>el.addEventListener("click",()=>{section.hidden=true;button.classList.remove("active");}));
-setInterval(refreshPlans,5000);
-
-const scanButton=document.querySelector("#dailyPlansScan");
+document.querySelectorAll("nav.tabs .tab:not(#dailyPlansButton)").forEach(el=>el.addEventListener("click",()=>{
+ section.hidden=true;button?.classList.remove("active");
+}));
 scanButton?.addEventListener("click",async()=>{
- scanButton.disabled=true;
- scanButton.textContent="Tarama başlatılıyor...";
- status.textContent="TL coin taraması başlatılıyor. Sonuçlar geldikçe güncellenecek.";
+ scanButton.disabled=true;scanButton.textContent="Tarama başlatılıyor...";
+ status.textContent="Beş borsada USDT taraması başlatılıyor...";
  try{
-  const r=await fetch("/api/daily-plans/scan",{method:"POST",cache:"no-store"});
+  const r=await fetch("/api/daily-plans/scan",{method:"POST",cache:"no-store",signal:AbortSignal.timeout(9000)});
   if(!r.ok)throw Error("HTTP "+r.status);
   await refreshPlans();
  }catch(e){status.textContent="Tarama başlatılamadı: "+e.message;}
  finally{scanButton.disabled=false;scanButton.textContent="Şimdi Tara";}
 });
+setInterval(refreshPlans,5000);
+refreshPlans();
