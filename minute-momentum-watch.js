@@ -4,8 +4,8 @@ const state={running:false,updatedAt:0,checked:0,successful:0,failed:0,errors:[]
 const active=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const INTERVAL=60000;
-const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0,BINANCE:0,COINBASE:0};
-const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2,COINBASE:2};
+const backoffUntil={OKX:0,KUCOIN:0,"GATE.IO":0,BINANCE:0,"BINANCE TR":0,COINBASE:0};
+const concurrency={OKX:2,KUCOIN:2,"GATE.IO":2,BINANCE:2,"BINANCE TR":2,COINBASE:2};
 async function get(url,e){
  for(let attempt=0;attempt<3;attempt++){
   if(e&&backoffUntil[e]>Date.now())await pause(backoffUntil[e]-Date.now());
@@ -51,6 +51,14 @@ async function universe(exchange){
    (volumes.get(x.symbol)||0)>=1000000&&!/(UP|DOWN|BULL|BEAR|[235][SL])USDT$/i.test(x.symbol))
    .sort((a,b)=>(volumes.get(b.symbol)||0)-(volumes.get(a.symbol)||0)).map(x=>x.symbol);
  }
+ if(exchange==="BINANCE TR"){
+  const d=await get("https://api.binance.me/api/v3/ticker/24hr","BINANCE TR");
+  const rows=Array.isArray(d)?d:Array.isArray(d.data)?d.data:[];
+  if(!rows.length)throw Error("Binance TR coin listesi alınamadı");
+  return rows.filter(x=>/^[A-Z0-9]+TRY$/.test(x.symbol)&&Number(x.quoteVolume)>=3000000&&
+   !/(UP|DOWN|BULL|BEAR|[235][SL])TRY$/i.test(x.symbol))
+   .sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).map(x=>x.symbol);
+ }
  if(exchange==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
   return (d.data||[]).filter(x=>/^[A-Z0-9]+-USDT$/.test(x.instId)&&Number(x.volCcy24h)>=1000000&&!/(^|[-_])(3S|3L|5S|5L|UP|DOWN)([-_]|$)/i.test(x.instId))
@@ -75,6 +83,12 @@ async function candles(e,s){
   const d=await get("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=140","BINANCE");
   return (d||[]).map(x=>({time:+x[0],close:+x[4]}));
  }
+ if(e==="BINANCE TR"){
+  const d=await get("https://api.binance.me/api/v1/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=140","BINANCE TR");
+  const rows=Array.isArray(d)?d:d.data;
+  if(!Array.isArray(rows))throw Error("Binance TR mum verisi alınamadı");
+  return rows.map(x=>({time:+x[0],close:+x[4]}));
+ }
  if(e==="OKX"){
   const d=await get("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=140","OKX");
   return (d.data||[]).map(x=>({time:+x[0],close:+x[4]}));
@@ -94,7 +108,7 @@ export async function scanMinuteMomentum(){
  state.checked=0;state.successful=0;state.failed=0;state.missing=0;state.attempted=0;state.errors=[];
  try{
   if(Date.now()-lastDiscovery>15*60000){
-   for(const e of ["BINANCE","COINBASE","OKX","KUCOIN","GATE.IO"]){
+   for(const e of ["BINANCE","BINANCE TR","COINBASE","OKX","KUCOIN","GATE.IO"]){
     try{markets[e]=await universe(e);}catch(err){errors.push(e+" semboller: "+err.message);}
    }
    lastDiscovery=Date.now();
@@ -102,7 +116,7 @@ export async function scanMinuteMomentum(){
   const eligible=new Set(Object.entries(markets).flatMap(([exchange,symbols])=>symbols.map(symbol=>exchange+":"+symbol)));
   for(const key of active.keys())if(!eligible.has(key))active.delete(key);
   state.universe=Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,v.length]));
-  for(const e of ["BINANCE","COINBASE","OKX","KUCOIN","GATE.IO"]){
+  for(const e of ["BINANCE","BINANCE TR","COINBASE","OKX","KUCOIN","GATE.IO"]){
    const symbols=markets[e]||[];
    let next=0;
    async function worker(){
@@ -113,7 +127,7 @@ export async function scanMinuteMomentum(){
       const result=detect(await candles(e,symbol));
       if(!result){missing++;continue;}
       successful++;
-      closest.push({exchange:e,symbol:symbol.replace(/[-_]/,"/"),...result});
+      closest.push({exchange:e,symbol:symbol.replace(/[-_]/,"/").replace(/TRY$/,"/TRY"),...result});
       const previous=active.get(key);
       if(previous){
        if(result.changePct<=-2)active.delete(key);
@@ -145,7 +159,7 @@ export async function scanMinuteMomentum(){
 }
 export function minuteMomentumStatus(){
  return {...state,rows:[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.changePct-a.changePct),
-  notice:"Son 5 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 120 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. Günlük işlem hacmi en az 1 milyon USDT olan aktif USDT spot pariteleri taranır; 3S/3L/5S/5L ve UP/DOWN kaldıraçlı tokenlar hariç tutulur. Eksik mum verisi olanlar ayrı sayılır; analiz edilemeyen coinler başarılı taranmış sayılmaz."};
+  notice:"Son 5 kapanmış 1 dakikalık mumun ortalama kapanışı önceki 120 mumun ortalamasından en az %2 yüksekse takip başlar; %-2 veya altına düşerse takipten çıkar. Global borsalarda günlük işlem hacmi en az 1 milyon USDT olan spot pariteler; Binance TR için günlük en az 3 milyon TL hacimli TRY spot pariteleri taranır. Binance TR erişimi engellenirse hata gösterilir; 3S/3L/5S/5L ve UP/DOWN kaldıraçlı tokenlar hariç tutulur. Eksik mum verisi olanlar ayrı sayılır; analiz edilemeyen coinler başarılı taranmış sayılmaz."};
 }
 export function startMinuteMomentum(){
  scanMinuteMomentum().catch(console.error);
