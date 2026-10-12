@@ -67,7 +67,7 @@ export function evaluateEarlyRise(candles,ticker,benchmark=null,timestamp=Date.n
  const atrPct=atr14/price*100;
  const decliningRange=c1>0&&c2<=c1*0.94&&c3<=c2*0.90;
  const tight=c3<=Math.max(0.65,Math.min(5,atrPct*4));
- const fallingVol=volEarly>0&&dryRatio<=0.90;
+ const fallingVol=volEarly>0&&volLast>=300&&dryRatio<=0.90;
  const decliningATR=atr14/atrBefore<=0.94;
  const pivot=high(closed.slice(-30));
  const distancePct=(pivot/price-1)*100;
