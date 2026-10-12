@@ -686,7 +686,7 @@ async function loadData() {
 
 
     statusEl.textContent =
-      "Bağlantı yok";
+      "Günlük teyit verisi alınamadı";
 
 
     updatedEl.textContent =
