@@ -2,6 +2,17 @@
 const state={running:false,updatedAt:0,sources:{},plans:[],history:[]};
 const plans=new Map(),history=[];
 const now=()=>Date.now(),round=x=>Number(x.toPrecision(9));
+const MAX_AGE=4*60000;
+function planState(p,t){
+ if(!t||!Number.isFinite(t.price)||t.price<=0||!Number.isFinite(t.ask)||t.ask<=0)return {status:"SİNYAL GEÇERSİZ",reason:"Güncel alış fiyatı alınamadı",terminal:true};
+ if(now()-p.lastCheckedAt>MAX_AGE)return {status:"SİNYAL GEÇERSİZ",reason:"Fiyat verisi güncel değil",terminal:true};
+ if(now()-p.createdAt>24*3600000)return {status:"SİNYAL GEÇERSİZ",reason:"Planın 24 saatlik süresi doldu",terminal:true};
+ if(t.price>=p.target)return {status:"HEDEF FİYAT GÖRÜLDÜ",reason:"Hedef fiyat görüldü; gerçekleşmiş satış anlamına gelmez",terminal:true};
+ if(t.price<=p.stop)return {status:"SİNYAL GEÇERSİZ",reason:"Zarar durdurma seviyesi görüldü",terminal:true};
+ if(t.ask>p.entry*1.012)return {status:"FİYAT KAÇTI",reason:"Güncel alış fiyatı referansın %1,2 üzerinde",terminal:true};
+ if(t.ask>=p.entry*0.997&&t.ask<=p.entry*1.003)return {status:"ALIŞ BÖLGESİNDE",reason:"Güncel satış kotasyonu referans alışa yakın; otomatik emir değildir",terminal:false};
+ return {status:"BEKLE",reason:t.ask<p.entry*0.997?"Fiyat referansın altında; yeni teyit gerekli":"Fiyat referans alış bölgesinin dışında",terminal:false};
+}
 async function get(url){
  const r=await fetch(url,{signal:AbortSignal.timeout(11000)});
  if(!r.ok)throw Error("HTTP "+r.status);
@@ -66,18 +77,15 @@ export async function scanTryPlans(){
       try{
        const existing=plans.get(key);
        if(existing){
-        existing.lastPrice=t.price;existing.lastCheckedAt=now();
-        if(t.price>=existing.target){existing.status="HEDEF FİYAT GÖRÜLDÜ";existing.closedAt=now();}
-        else if(t.price<=existing.stop){existing.status="STOP FİYATI GÖRÜLDÜ";existing.closedAt=now();}
-        else if(t.price>existing.entry*1.012){existing.status="ALIŞ SEVİYESİ KAÇTI";existing.closedAt=now();}
-        else if(now()-existing.createdAt>24*3600000){existing.status="SÜRESİ DOLDU";existing.closedAt=now();}
-        if(existing.closedAt){plans.delete(key);history.unshift(existing);}
+        existing.lastPrice=t.price;existing.currentAsk=t.ask;existing.lastCheckedAt=now();
+        const next=planState(existing,t);existing.status=next.status;existing.reason=next.reason;
+        if(next.terminal){existing.closedAt=now();plans.delete(key);history.unshift(existing);}
        }else if(!history.some(x=>x.key===key&&now()-x.createdAt<24*3600000)){
         const signal=evaluate(await candles(p,t.symbol));
         if(signal&&t.ask>0&&t.bid>0&&(t.ask-t.bid)/t.ask<0.008){
          const entry=round(t.ask),target=round(entry*1.03),stop=round(entry*0.985);
          plans.set(key,{key,symbol:t.symbol.replace(/[-]?TRY$/,"/TRY"),exchange:p.name,entry,target,stop,
-          lastPrice:t.price,createdAt:now(),lastCheckedAt:now(),status:"İZLEME ADAYI",...signal});
+          lastPrice:t.price,currentAsk:t.ask,createdAt:now(),lastCheckedAt:now(),status:"BEKLE",reason:"Yeni sinyal; alış fiyatı teyidi bekleniyor",...signal});
         }
        }
       }catch(e){stat.error=stat.error||e.message;}
@@ -89,7 +97,7 @@ export async function scanTryPlans(){
    }catch(e){stat.error=e.message;}
    state.sources={...sourceState};state.plans=[...plans.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,50);state.updatedAt=now();
   }
-  for(const [key,p] of plans)if(now()-p.createdAt>24*3600000){plans.delete(key);p.status="SÜRESİ DOLDU";p.closedAt=now();history.unshift(p);}
+  for(const [key,p] of plans)if(now()-p.lastCheckedAt>MAX_AGE||now()-p.createdAt>24*3600000){plans.delete(key);p.status="SİNYAL GEÇERSİZ";p.reason="Fiyat kontrolü güncel değil veya plan süresi doldu";p.closedAt=now();history.unshift(p);}
   history.length=Math.min(history.length,100);
   state.plans=[...plans.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,50);
   state.updatedAt=now();state.sources=sourceState;
