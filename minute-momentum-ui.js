@@ -24,6 +24,9 @@ async function refresh(){
    " | Alım teyidi: "+(micro.confirmed??0)+" | Erken uyarı: "+(micro.early??0)+
    " | Geç kalındı: "+(micro.late??0)+(micro.running?" | Kontrol sürüyor":"");
   cards.append(microStatus);
+  const methodology=document.createElement("p");methodology.className="description";
+  methodology.textContent="Potansiyel yüzdeleri 14 mumluk ATR oynaklığı, 20 dakikalık direnç, güncel alış kotasyonu ve hacim ile hesaplanan 5–15 dakikalık teknik senaryolardır. Kesin fiyat tahmini veya alım tavsiyesi değildir.";
+  cards.append(methodology);
   const sourceErrors=Object.entries(micro.sources||{}).filter(([,v])=>v.error);
   if(sourceErrors.length){
    const ep=document.createElement("p");ep.className="description";
@@ -37,10 +40,32 @@ async function refresh(){
   }
   for(const x of (micro.rows||[])){
    const card=document.createElement("article");card.className="coin-card";
-   const h=document.createElement("h3");h.textContent=x.symbol+" • "+x.exchange;card.append(h);
+   const estimate=x.potential;
+   const percent=n=>Number(n).toLocaleString("tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2});
+   const price=n=>Number(n).toLocaleString("tr-TR",{maximumSignificantDigits:9});
+   const h=document.createElement("h3");
+   h.textContent=x.symbol+" • "+x.exchange+
+    (x.status==="GEÇ KALINDI"?" | Potansiyel: Yeni alım için uygun değil":
+     estimate&&Number.isFinite(estimate.upperPct)?
+      " | Potansiyel: %"+percent(estimate.lowerPct)+"–%"+percent(estimate.upperPct):
+      " | Potansiyel: Hesaplanamadı");
+   card.append(h);
    const dec=document.createElement("p");
    dec.className="first-reaction-decision "+(x.status==="GEÇ KALINDI"?"decision-wait":"decision-watch-buy");
    dec.textContent=x.status;card.append(dec);
+   const upside=document.createElement("p");
+   if(x.status==="GEÇ KALINDI"){
+    upside.textContent="Tahmini kalan yükseliş: Gösterilmiyor. Ani yükselişin ardından alım kovalanmamalı.";
+   }else if(estimate&&Number.isFinite(estimate.upperPct)){
+    upside.textContent="Tahmini 5–15 dk yükseliş senaryosu: %"+percent(estimate.lowerPct)+
+     " – %"+percent(estimate.upperPct)+
+     (Number.isFinite(estimate.lowerTarget)&&Number.isFinite(estimate.upperTarget)?
+      " | Olası hedef aralığı: "+price(estimate.lowerTarget)+" – "+price(estimate.upperTarget)+" USDT":"")+
+     " | "+estimate.reason;
+   }else{
+    upside.textContent="Tahmini yükseliş senaryosu: Yeterli güncel mum ve direnç verisi bekleniyor.";
+   }
+   card.append(upside);
    const p=document.createElement("p");
    p.textContent="Anlık fiyat: "+x.price+" USDT | Alış kotasyonu: "+x.ask+
     " USDT | Kısa ivme: %"+x.speedPct+
