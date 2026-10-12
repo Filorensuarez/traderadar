@@ -4,7 +4,11 @@ async function refreshPlans(){
  if(section.hidden)return;
  try{
   const r=await fetch("/api/daily-plans",{cache:"no-store"});if(!r.ok)throw Error("HTTP "+r.status);
-  const d=await r.json();status.textContent="Son kontrol: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yok")+" | Kaynaklar: "+Object.entries(d.sources||{}).map(([k,v])=>k+" "+v.checked+"/"+v.eligible+(v.error?" (hata: "+v.error+")":"")).join(" | ")+" | Açık plan: "+d.plans.length+" | Kapanan: "+d.history.length;
+  const d=await r.json();
+  const blocked=Object.entries(d.sources||{}).filter(([name,v])=>v.error&&/HTTP 451/.test(v.error));
+  const available=Object.entries(d.sources||{}).filter(([name,v])=>v.checked>0&&!v.error);
+  const warning=blocked.length?" | ERİŞİM ENGELİ: "+blocked.map(([name])=>name).join(", ")+" (HTTP 451; bu borsa taranamıyor). Diğer borsalar bağımsız taranır.":"";
+  status.textContent="Çalışan kaynak: "+available.map(([name])=>name).join(", ")+(available.length?"":"Henüz doğrulanmadı")+warning+" | Son kontrol: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"Henüz yok")+" | Kaynaklar: "+Object.entries(d.sources||{}).map(([k,v])=>k+" "+v.checked+"/"+v.eligible+(v.error?" (hata: "+v.error+")":"")).join(" | ")+" | Açık plan: "+d.plans.length+" | Kapanan: "+d.history.length;
   cards.replaceChildren();
   if(!d.plans.length){const p=document.createElement("p");p.textContent="Şu anda uygun fiyat ve hacim sinyali bulunamadı. İşlem açmak zorunlu değildir.";cards.append(p);}
   for(const x of d.plans){
