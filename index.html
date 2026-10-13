@@ -431,13 +431,14 @@
 <section id="earlypump" hidden>
  <div class="section-head">
   <div>
-   <h2>Erken Yükseliş Radarı — VCP ve Nicel Teyit</h2>
-   <p class="description">Binance, OKX, KuCoin, Gate.io ve Bitget spot USDT paritelerinde yükseliş öncesi sıkışma ve kırılım koşulları aranır. Sıkışmanın üç adet 20 dakikalık aşaması, azalan hacim ve ATR, direnç yakınlığı, BTC'ye göre göreceli güç, anlık hacim patlaması, istatistiksel fiyat sapması ve risk/getiri birlikte değerlendirilir. Sadece uygun hacimli piyasalar rotasyonla taranır; tek taramada tüm borsaların bütün coinleri incelenmez.</p>
-   <p class="description">Minervini'nin kamuya açık VCP/SEPA prensiplerinden uyarlanmış kurallar ve Simons'ın veri odaklı yaklaşımından esinlenen açık istatistiksel kontroller kullanılır. Bu, kişilerin özgün veya gizli stratejilerinin aynısı değildir. Potansiyel artış teknik senaryodur; otomatik alım yoktur.</p>
+   <h2>Erken Yükseliş Radarı — EMA + MACD Çift Kesişim</h2>
+   <p class="description">Görseldeki 1 saatlik EMA 7'nin EMA 25'i yukarı kesmesi ve MACD (12,26,9) DIF çizgisinin DEA sinyal çizgisini yukarı kesmesi birlikte aranır. Yalnızca kapanmış 1 saatlik mumlar kullanılır; oluşmakta olan mumun geçici kesişimi sinyal değildir.</p>
+   <p class="description">İki kesişim en fazla 6 saat aralıklı olmalı; son kesişimin ardından en fazla 2 tamamlanmış saatlik mum geçmiş olmalıdır. EMA 99 yalnızca ekranda bilgi olarak gösterilir. Eski VCP/sıkışma/diğer erken sinyaller bu bölümde artık listelenmez.</p>
+   <p class="description">Binance, OKX, KuCoin, Gate.io ve Bitget'in uygun spot USDT pariteleri dönüşümlü taranır. Görseldeki TRY paritesi bu bölümün kapsamına dahil değildir. Kesişim sinyali kesin alım veya yükseliş garantisi değildir.</p>
   </div>
   <button id="earlyPumpScan" class="refresh-button" type="button">Şimdi Tara</button>
  </div>
- <p id="earlyPumpStatus" aria-live="polite">Tarama hazırlanıyor.</p>
+ <p id="earlyPumpStatus" aria-live="polite">1 saatlik EMA + MACD kesişim taraması hazırlanıyor.</p>
  <div id="earlyPumpCards" class="coin-grid"></div>
 </section>
 <section id="momentum" hidden>
@@ -473,7 +474,7 @@
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./minute-momentum-ui.js?v=30s-30m-v1"></script>
-  <script type="module" src="./early-pump-ui.js?v=vcp3"></script>
+  <script type="module" src="./early-pump-ui.js?v=ema-macd-1h-v1"></script>
   <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>
   <script type="module" src="./daily-trade-plans-ui.js?v=usdt5"></script>
   <script defer src="./tab-navigation-fix.js"></script>
