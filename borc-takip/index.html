@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#101e38">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>BütçePilot — Borç Takip Paneli</title>
+<link rel="stylesheet" href="./style.css">
+<script type="module" src="./app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">B</span><div><b>BütçePilot</b><small>Borç yönetim paneli</small></div></div>
+    <div class="nav-label">ÇALIŞMA ALANI</div>
+    <nav aria-label="Ana menü">
+      <button data-nav="dashboard" class="nav-btn active">▦ <span>Genel görünüm</span></button>
+      <button data-nav="debts" class="nav-btn">▤ <span>Borçlarım</span></button>
+      <button data-nav="schedule" class="nav-btn">▥ <span>Aylık ödeme planı</span></button>
+      <button data-nav="payments" class="nav-btn">✓ <span>Ödeme kayıtları</span></button>
+      <button data-nav="settings" class="nav-btn">⚙ <span>Gelir ve ayarlar</span></button>
+    </nav>
+    <div class="sidebar-footer"><div class="privacy-dot"></div><div><b>Cihazınızda saklanır</b><span>Verileriniz sunucuya gönderilmez. Başka cihazda açmak için yedek aktarmanız gerekir.</span></div></div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div class="page-heading"><div class="eyebrow">KİŞİSEL FİNANS YÖNETİMİ</div><h1 id="page-title">Genel görünüm</h1><p id="page-subtitle">Bütçeniz, aylık ödemeleriniz ve borçlarınız tek ekranda.</p></div><div class="top-actions"><button class="btn secondary" id="backup-btn">Yedeği indir</button><label for="import-input" class="btn primary import-label">Yedek yükle</label><input id="import-input" type="file" accept=".json,application/json" hidden></div></header>
+    <div class="content">
+    <div id="notice" role="status" aria-live="polite"></div>
+    <section data-page="dashboard" class="page active">
+      <div class="notice-box">Bu panel bir **tahmin aracıdır**. Banka ekstreleri ve güncel ödeme yükümlülükleri esas alınır. Ödenmeyen KMH faizinin modele eklenmesi gerçek banka işlemini birebir temsil etmeyebilir.</div>
+      <div class="kpi-grid">
+        <div class="kpi"><span>Toplam KMH anaparası</span><strong id="kpi-kmh">—</strong><small>Kaydedilen KMH hesapları</small></div>
+        <div class="kpi"><span>Aylık borç ödeme kapasitesi</span><strong id="kpi-capacity">—</strong><small>Gelir − kira − aile gideri − rezerv</small></div>
+        <div class="kpi"><span>İlk ay tahmini KMH faizi</span><strong id="kpi-interest">—</strong><small>Seçilen aylık oran ve vergi varsayımı</small></div>
+        <div class="kpi critical"><span>İlk ay ödeme açığı</span><strong id="kpi-gap">—</strong><small id="kpi-gap-caption">Kart ve krediler dâhil</small></div>
+      </div>
+      <div class="split">
+        <article class="panel grow"><div class="panel-head"><div><h2>KMH borcunun tahmini seyri</h2><p>Faizler sonrası ödeme kapasitesine göre</p></div><div class="mini-tag" id="payoff-badge">—</div></div><div id="debt-chart" class="chart-area"></div></article>
+        <article class="panel side-panel"><div class="panel-head"><div><h2>Yaklaşan aylar</h2><p>Öngörülen nakit akışı</p></div></div><div id="quick-months" class="quick-months"></div></article>
+      </div>
+      <article class="panel"><div class="panel-head"><div><h2>Ödeme önceliği</h2><p>İlk ay için operasyonel kontrol listesi</p></div></div><div id="priority-list" class="priority-list"></div></article>
+    </section>
+    <section data-page="debts" class="page">
+      <div class="section-grid"><article class="panel"><div class="panel-head"><div><h2>KMH hesapları</h2><p>Aylık faiz oranını bankanızın uyguladığı rakama göre değiştirin.</p></div><button id="add-bank" class="btn secondary">+ KMH ekle</button></div><div class="table-scroll"><table class="data-table"><thead><tr><th>Banka</th><th>Güncel KMH borcu (TL)</th><th>Aylık faiz (%)</th><th></th></tr></thead><tbody id="banks-body"></tbody></table></div></article>
+      <article class="panel"><div class="panel-head"><div><h2>İhtiyaç kredisi</h2><p>Kalan taksitlerinizi girin.</p></div></div><div class="form-grid"><label>Aylık kredi taksiti (TL)<input id="loan-installment" type="number" min="0" step="100"></label><label>Kalan taksit (bu ay dâhil)<input id="loan-left" type="number" min="0" max="120" step="1"></label><label>İlk ödeme ayı<input id="loan-first" type="month"></label></div><hr><h3>Diğer tek seferlik ödemeler</h3><div id="extra-list"></div><button id="add-extra" class="btn secondary">+ Tek seferlik ödeme ekle</button></article>
+      <article class="panel"><div class="panel-head"><div><h2>Kredi kartı</h2><p>Mevcut ekstre borcu ve gelecek aylara ait planlı ödemeler farklı alanlardır; otomatik toplanmaz.</p></div></div><div class="form-grid"><label>Mevcut ekstre (TL)<input id="card-balance" type="number" min="0" step="100"></label><label>Kart limiti 100.000 TL üzeri mi?<select id="card-limit"><option value="true">Evet</option><option value="false">Hayır</option></select></label></div><p class="helper">Kredi kartının gelecek dönem ödemelerini “Aylık ödeme planı” bölümünde düzenleyin. Kart faizinin gelecekteki borç bakiyesine etkisi bu simülasyonda modellenmez.</p></article></div>
+    </section>
+    <section data-page="schedule" class="page">
+      <article class="panel"><div class="panel-head"><div><h2>Aylık tahmini ödeme tablosu</h2><p>Kart ödeme sütununu değiştirebilirsiniz. Diğer tutarlar otomatik hesaplanır.</p></div><button class="btn secondary" id="export-csv">CSV olarak indir</button></div><div class="legend-row"><span class="dot-info">Bilgi: Sarı alanlar düzenlenebilir.</span><span class="dot-danger">Kırmızı: öngörülen ödeme açığı.</span></div><div class="table-scroll"><table class="data-table schedule-table"><thead><tr><th>Ay</th><th>Gelir</th><th>Gider + rezerv</th><th>Kredi + tek ödeme</th><th>Kart ödemesi (düzenle)</th><th>KMH faiz</th><th>KMH anapara ödeme</th><th>Ay sonu KMH</th><th>Ödeme açığı</th></tr></thead><tbody id="schedule-body"></tbody></table></div></article>
+      <p class="footnote">Not: KMH faizleri dönem başı borca göre yaklaşık hesaplanır. İlk aylardaki açık modellenirken karşılanamayan faiz KMH bakiyesine eklenmiş kabul edilir. Gerçek borçlarınızı banka uygulamasından güncelleyin. Kart taksitlerinin birbirleriyle çakışıp çakışmadığını kontrol edin.</p>
+    </section>
+    <section data-page="payments" class="page">
+      <article class="panel"><div class="panel-head"><div><h2>Gerçekleşen ödemeler</h2><p>Buraya yaptığınız ödemeleri not edin. Kayıtlar planı otomatik değiştirmez; ay sonunda güncel borç bakiyesini de düzeltin.</p></div></div><form id="payment-form" class="form-grid payment-form"><label>Ödeme tarihi<input id="payment-date" type="date" required></label><label>Banka / açıklama<input id="payment-target" maxlength="100" placeholder="Örn. Halkbank KMH" required></label><label>Tutar (TL)<input id="payment-amount" type="number" min="0.01" step="0.01" required></label><label>Not (isteğe bağlı)<input id="payment-note" maxlength="280" placeholder="Dekont açıklaması"></label><button type="submit" class="btn primary">Ödemeyi kaydet</button></form><div class="table-scroll"><table class="data-table"><thead><tr><th>Tarih</th><th>Banka / açıklama</th><th>Tutar</th><th>Not</th><th></th></tr></thead><tbody id="payments-body"></tbody></table></div></article>
+    </section>
+    <section data-page="settings" class="page"><article class="panel"><div class="panel-head"><div><h2>Gelir, gider ve simülasyon</h2><p>Yazdığınız değişiklikler bu tarayıcıda otomatik kaydedilir.</p></div></div><div class="form-grid settings-grid"><label>Aylık net gelir (TL)<input id="setting-income" type="number" min="0" step="100"></label><label>Aylık kira (TL)<input id="setting-rent" type="number" min="0" step="100"></label><label>Kira hariç aylık aile gideri (TL)<input id="setting-living" type="number" min="0" step="100"></label><label>Aylık emniyet rezervi (TL)<input id="setting-reserve" type="number" min="0" step="100"></label><label>Plan başlangıç ayı<input id="setting-start" type="month"></label><label>Kaç ay gösterilsin?<input id="setting-months" type="number" min="1" max="60" step="1"></label><label>Faiz üzerinden toplam vergi yükü (%)<input id="setting-tax" type="number" min="0" max="100" step="0.1"></label><label>Artan tutarla hangi KMH kapatılsın?<select id="setting-method"><option value="smallest">Önce en küçük KMH</option><option value="highest">Önce en yüksek faizli KMH</option></select></label></div><hr><div class="danger-zone"><div><h3>Veri güvenliği</h3><p>Bilgiler yalnızca bu tarayıcının yerel deposundadır. Gizli sekme, tarayıcı verisi temizleme veya cihaz değişikliğinde silinebilir. Bu yüzden düzenli JSON yedeği indirin. Paylaşılan cihazlarda kullanmayın.</p></div><button id="clear-all" class="btn danger">Bu cihazdaki verileri sil</button></div></article></section>
+    </div>
+  </main>
+</div>
+</body></html>
