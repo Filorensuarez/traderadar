@@ -1,5 +1,6 @@
 name: Android build
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'android/**'
@@ -8,6 +9,8 @@ on:
     paths:
       - 'android/**'
       - '.github/workflows/android-build.yml'
+permissions:
+  contents: read
 jobs:
   debug-build:
     runs-on: ubuntu-latest
@@ -21,10 +24,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build debug APK
+      - name: Build installable debug APK
         working-directory: android
-        run: gradle :app:assembleDebug --no-daemon
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
         with:
-          name: traderadar-pro-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: traderadar-android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

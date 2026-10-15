@@ -15,6 +15,17 @@
     href="./style.css"
   >
 <style>#hourlyPullback,#capital,#whale{display:none!important}</style>
+
+  <meta name="theme-color" content="#101b2e">
+  <meta name="application-name" content="TradeRadar">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="TradeRadar">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/icons/traderadar.svg">
+  <link rel="apple-touch-icon" href="/icons/traderadar-192.png">
+  <link rel="stylesheet" href="/mobile-app.css?v=1">
 </head>
 
 <body>
@@ -33,6 +44,7 @@
     >
       Bağlanıyor...
     </div>
+    <div class="install-controls"><button id="installTradeRadar" class="install-button" type="button">Uygulamayı Yükle</button><span id="installHelp" class="install-help" role="status" aria-live="polite" hidden></span></div>
   </header>
 <nav class="tabs">
 
@@ -478,6 +490,7 @@
   <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>
   <script type="module" src="./daily-trade-plans-ui.js?v=usdt5"></script>
   <script defer src="./tab-navigation-fix.js"></script>
+  <script defer src="/install-app.js?v=1"></script>
   <script type="module" src="./hourly-pullback-ui.js"></script>
 
 </body>

@@ -1,19 +1,15 @@
-# TradeRadar Pro — Android başlangıç projesi
+# TradeRadar — Android uygulaması
 
-Bu klasör Android Studio'da açılabilen ilk geliştirme iskeletidir; Google Play'e hazır ürün değildir.
+TradeRadar'ın Android'de ayrı simgeyle açılan, adres çubuğu olmayan uygulama sürümüdür.
 
-## Kurulum
-1. Android Studio'da `android/` klasörünü açın.
-2. Android SDK 35 ve JDK 17 kurulu olmalıdır.
-3. Gradle eşitlemesinden sonra test cihazında çalıştırın.
-4. İmzalı AAB için Android Studio > Build > Generate Signed Bundle/APK kullanın; özel anahtarları GitHub'a yüklemeyin.
+- Uygulama canlı sistemin HTTPS adresini Android WebView içinde çalıştırır.
+- Android 8.0 (API 26) veya üzeri gerektirir.
+- GitHub Actions, `.github/workflows/android-build.yml` ile otomatik **test/debug APK** derler.
+- GitHub > Actions > Android build > ilgili çalıştırma > Artifacts > `traderadar-android-debug-apk` üzerinden indirilebilir.
+- ZIP içinde `app-debug.apk` yer alır. Android'de yükleme iznini yalnızca güvenilir kaynaklar için verin.
+- İnternet gerekir. Kripto API'si kaynaklı tarama sorunları native uygulamada da devam edebilir.
+- Android WebView, normal Chrome'dan farklı olarak **Web Push bildirimlerini garanti etmez**. Bu sürüm arka planda bildirim garantisi vermez.
+- APK debug anahtarıyla imzalı **test sürümüdür**, Google Play için imzalı yayın sürümü değildir.
+- Google Play için üretim imzası, politika/gizlilik kontrolleri, kullanıcı testleri ve yayın yapılandırması ayrıca gerekir.
 
-## Yayın öncesi zorunlu işler
-- Native Android bildirimleri, Android 13+ izinleri ve arka plan davranışını uygulama/test etme.
-- Uygulama çevrimdışı ve bağlantı hatası ekranı, erişilebilirlik ve kullanıcı testleri.
-- Borsa API kullanım ve ticari veri lisanslarını doğrulama.
-- Veri güvenliği, gizlilik politikası, finansal özellikler beyanı ve uygulama içeriği kontrolleri.
-- Kullanıcıya gösterilen puanları olasılık gibi sunmama; performans ölçümlerini denetleme.
-- Google Play geliştirici hesabı, fiyatlandırma ve gerekli kapalı testleri tamamlama.
-
-Başlangıç modeli: Tek seferlik ücretli indirme (fiyat sonradan belirlenecek). Uygulama içi ödeme veya otomatik alım-satım bu iskelette yoktur.
+Alternatif: Android Chrome üzerinden https://traderadar-v3-production.up.railway.app/ adresini açıp **Uygulamayı Yükle** seçeneğini kullanarak PWA olarak yükleyebilirsiniz.
