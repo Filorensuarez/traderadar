@@ -115,8 +115,8 @@ class MainActivity : Activity() {
             settings.setSupportZoom(false)
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                    progress.progress = newProgress
-                    progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
+                    this@MainActivity.progress.progress = newProgress
+                    this@MainActivity.progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
                 }
             }
             webViewClient = object : WebViewClient() {
