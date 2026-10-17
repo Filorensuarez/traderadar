@@ -49,3 +49,37 @@ test("grafik ve radar aynı kapalı mumlara ait tek bir değerlendirme kullanır
  assert(r.markers.every(m=>m.index<r.candles.length));
  assert(r.markers.every(m=>["BUY","SELL"].includes(m.kind)));
 });
+
+test("teyitli SMA200 geri kazanımında BUY işareti yalnızca kapalı haftada oluşur",()=>{
+ const prices=[...Array(237).fill(100),...Array(8).fill(94),94,94,99,103,108];
+ const signal=analyzeWeeklyMA200(candles(prices),{now:end});
+ assert.equal(signal.status,"BUY");
+ assert.equal(signal.markers.at(-1).kind,"BUY");
+ assert(signal.markers.at(-1).confirmedAt<=end);
+ assert(signal.lastClosedPrice>signal.sma200);
+});
+test("SMA200 altı haftalık teyit bozulmasında SELL risk işareti oluşur",()=>{
+ const prices=[...Array(235).fill(100),...Array(10).fill(110),111,111,104,96,92];
+ const signal=analyzeWeeklyMA200(candles(prices),{now:end});
+ assert.equal(signal.status,"SELL");
+ assert.equal(signal.markers.at(-1).kind,"SELL");
+ assert(signal.markers.at(-1).confirmedAt<=end);
+ assert(signal.lastClosedPrice<signal.sma200);
+});
+test("güncel kapanmamış haftanın sert düşüşü mevcut BUY işaretini SELL yapamaz",()=>{
+ const prices=[...Array(237).fill(100),...Array(8).fill(94),94,94,99,103,108];
+ const original=candles(prices);
+ const fake={time:end,open:108,high:109,low:1,close:1,quoteVolume:99999999};
+ const without=analyzeWeeklyMA200(original,{now:end});
+ const withOpen=analyzeWeeklyMA200([...original,fake],{now:end});
+ assert.equal(without.status,"BUY");
+ assert.equal(withOpen.status,"BUY");
+ assert.deepEqual(withOpen.markers,without.markers);
+});
+test("500 haftalık OHLCV uzun seride SMA200 hesaplaması stabil",()=>{
+ const prices=Array.from({length:500},(_,i)=>100+30*Math.sin(i/16)+i*.55);
+ const report=analyzeWeeklyMA200(candles(prices),{now:end});
+ assert.equal(report.weeks,500);
+ assert.equal(report.ma200.length,500);
+ assert(Number.isFinite(report.sma200));
+});
