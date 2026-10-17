@@ -1,0 +1,33 @@
+name: Weekly MA200 Signal Tests
+on:
+  push:
+    paths:
+      - 'weekly-ma200-model.js'
+      - 'weekly-ma200-model.test.js'
+      - 'early-pump-watch.js'
+      - 'early-pump-ui.js'
+      - 'early-pump-chart.js'
+      - 'early-pump-chart.css'
+      - 'server.js'
+      - 'index.html'
+      - '.github/workflows/weekly-ma200-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax
+        run: |
+          node --check weekly-ma200-model.js
+          node --check early-pump-watch.js
+          node --check early-pump-ui.js
+          node --check early-pump-chart.js
+          node --check server.js
+      - name: Run weekly MA200 tests
+        run: node --test weekly-ma200-model.test.js
