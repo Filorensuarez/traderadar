@@ -42,3 +42,9 @@ Diğer momentum, V tipi dip ve USDT işlem planı bölümleri bağımsızdır. H
 - 1 dakikalık referans mumları önce, taze 1 saniyelik mumlar sonra alınır; 1 saniyelik seri beklerken eskimez.
 - Sadece kapanmış gerçek mumlarla **%2 fiyat teyidi** üretilir; hacim şartı ve teyitsiz aday listesi geri getirilmedi.
 - Tarama sayısı hedef değerdir; uygun coin azsa veya API 429 yanıtı gelirse o tur daha az parite değerlendirilebilir.
+
+## 1 Dakikalık Momentum — 216 borsa/parite tarama hedefi
+- Her taramada en fazla **Binance 200 + OKX 16 = 216** spot USDT **borsa/parite eşleşmesi** kontrol edilir. Aynı coin iki borsada bulunabilir.
+- Tarama periyodu 120 saniye; Binance istekleri arası asgari 180 ms, OKX asgari 1500 ms. Destekli mumlar yalnızca gerçek borsa verileridir; 1 saniyelik mumlar sentezlenmez.
+- API 429, borsa veri eksikliği veya piyasada uygun parite azlığı nedeniyle gerçek taranan sayı daha düşük olabilir.
+- Hacim teyidi aranmaz, fiyat +%2 koşulu korunur, yalnızca tam teyitliler listelenir. Daha geniş evrende seyrek kontrol edilen coinlerde kısa süreli hareketler taramalar arasında kaçabilir.

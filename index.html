@@ -487,7 +487,7 @@
 </section>
 <section id="momentum" hidden>
  <h2>1 Dakikalık Momentum — Sadece Tam Teyit</h2>
- <p class="description">Yeni yöntem: Son 30 tamamlanmış 1 saniyelik mumun ortalama kapanışı, bunlardan önceki 30 tamamlanmış 1 dakikalık mumun ortalamasının en az %2 üzerinde olmalı. Hacim çarpanı, minimum hacim veya hacim hızlanması şartı aranmaz. Gerçek 1 saniyelik mumlar Binance ve OKX USDT spot piyasalarından alınır; desteklenmeyen borsalar 1 saniyelik gibi gösterilmez. Tarama hedefi her turda Binance 70, OKX 16 olmak üzere 86 spot USDT paritesidir; borsanın sağladığı geçerli parite sayısı veya API sınırı daha az sonuç doğurabilir. Farklı coinler dönüşümlü kontrol edilir. Veriler yaklaşık 60 saniyede bir yeniden değerlendirilir; OKX istekleri API hız sınırına takılmamak için seyreltilir. Bu bölüm yalnızca bütün teknik koşulları sağlayan teyitli coinleri gösterir; eşik altı adaylar yayımlanmaz. Bu yöntem kesin alım veya getiri garantisi değildir.</p>
+ <p class="description">Yeni yöntem: Son 30 tamamlanmış 1 saniyelik mumun ortalama kapanışı, bunlardan önceki 30 tamamlanmış 1 dakikalık mumun ortalamasının en az %2 üzerinde olmalı. Hacim çarpanı, minimum hacim veya hacim hızlanması şartı aranmaz. Gerçek 1 saniyelik mumlar Binance ve OKX USDT spot piyasalarından alınır; desteklenmeyen borsalar 1 saniyelik gibi gösterilmez. Tarama hedefi her turda Binance 200, OKX 16 olmak üzere en fazla 216 borsa/parite eşleşmesidir; aynı coin iki borsada bulunabilir. Borsanın sağladığı parite sayısı veya API hızı nedeniyle daha azı tamamlanabilir. Farklı coinler dönüşümlü kontrol edilir. Tarama döngüsü yaklaşık 120 saniyedir; OKX sorguları API sınırına karşı seyreltilir. Bu bölüm yalnızca bütün teknik koşulları sağlayan teyitli coinleri gösterir; eşik altı adaylar yayımlanmaz. Bu yöntem kesin alım veya getiri garantisi değildir.</p>
  <button id="momentumScan" class="refresh-button" type="button">Şimdi Tara</button>
  <p id="momentumStatus" aria-live="polite">Veriler bekleniyor.</p>
  <div id="momentumCards" class="coin-grid"></div>
@@ -517,7 +517,7 @@
   <script defer src="./whale-monitor.js"></script>
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
-  <script type="module" src="./minute-momentum-ui.js?v=coverage-86-v4"></script>
+  <script type="module" src="./minute-momentum-ui.js?v=coverage-216-v5"></script>
   <script defer src="./early-pump-chart.js?v=weekly-ma-adaptive-v2"></script>
   <script type="module" src="./early-pump-ui.js?v=weekly-ma-adaptive-v2"></script>
   <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>

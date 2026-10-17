@@ -1,8 +1,8 @@
 // Responsible per-cycle market coverage while preserving real 1-second candle validation.
 // Higher numbers are targets; exchanges may return fewer eligible pairs or rate-limit.
-export const MOMENTUM_SCAN_INTERVAL_MS = 60_000;
-export const MOMENTUM_SCAN_TARGETS=Object.freeze({BINANCE:70,OKX:16});
-export const MOMENTUM_MIN_REQUEST_SPACING_MS=Object.freeze({BINANCE:140,OKX:1500});
+export const MOMENTUM_SCAN_INTERVAL_MS = 120_000;
+export const MOMENTUM_SCAN_TARGETS=Object.freeze({BINANCE:200,OKX:16});
+export const MOMENTUM_MIN_REQUEST_SPACING_MS=Object.freeze({BINANCE:180,OKX:1500});
 export function chooseMomentumMarkets(provider,rawMarkets,offset=0){
  const limit=MOMENTUM_SCAN_TARGETS[provider]||0;
  if(!Array.isArray(rawMarkets)||!limit)return {selected:[],nextOffset:0};

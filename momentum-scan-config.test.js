@@ -7,18 +7,18 @@ import {
 import {readFileSync} from "node:fs";
 const market=(i)=>({symbol:"COIN"+i+"USDT",volume:50000-i,dayChange:i%2?i/100:NaN});
 const fixture=Array.from({length:240},(_,i)=>market(i));
-test("Kapsam: Binance 70 ve OKX 16 olmak üzere 86 coin/tur",()=>{
- assert.equal(MOMENTUM_SCAN_TARGETS.BINANCE,70);
+test("Kapsam: Binance 200 ve OKX 16 olmak üzere 216 borsa/parite eşleşmesi",()=>{
+ assert.equal(MOMENTUM_SCAN_TARGETS.BINANCE,200);
  assert.equal(MOMENTUM_SCAN_TARGETS.OKX,16);
- assert.equal(MOMENTUM_SCAN_INTERVAL_MS,60000);
+ assert.equal(MOMENTUM_SCAN_INTERVAL_MS,120000);
  const binance=chooseMomentumMarkets("BINANCE",fixture);
  const okx=chooseMomentumMarkets("OKX",fixture);
- assert.equal(binance.selected.length,70);
+ assert.equal(binance.selected.length,200);
  assert.equal(okx.selected.length,16);
- assert.equal(new Set(binance.selected.map(x=>x.symbol)).size,70);
+ assert.equal(new Set(binance.selected.map(x=>x.symbol)).size,200);
  assert.equal(new Set(okx.selected.map(x=>x.symbol)).size,16);
 });
-test("Dönüşümlü tarama aynı ilk 70 coinle sınırlı kalmaz",()=>{
+test("Dönüşümlü tarama aynı ilk 200 coinle sınırlı kalmaz",()=>{
  const a=chooseMomentumMarkets("BINANCE",fixture);
  const b=chooseMomentumMarkets("BINANCE",fixture,a.nextOffset);
  assert(a.selected.some(x=>x.symbol==="COIN0USDT"));
@@ -38,6 +38,7 @@ test("Hedef, uygun coin sayısını aşmaz, tekrarlı coinleri elemez",()=>{
 });
 test("OKX istek aralığı korundu; fiyatın %2 teyidi değişmedi",()=>{
  assert(MOMENTUM_MIN_REQUEST_SPACING_MS.OKX>=1500);
+ assert(MOMENTUM_MIN_REQUEST_SPACING_MS.BINANCE>=180);
  const src=readFileSync(new URL("./minute-momentum-watch.js",import.meta.url),"utf8");
  assert.match(src,/chooseMomentumMarkets/);
  assert.match(src,/const minutes=await getMinutes/);

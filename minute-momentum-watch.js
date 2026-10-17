@@ -4,7 +4,7 @@ import {calculateMomentum30s,momentum30sThresholds} from "./momentum-30s-model.j
 import {confirmedMomentumRows} from "./momentum-visibility.js";
 import {MOMENTUM_SCAN_INTERVAL_MS,MOMENTUM_MIN_REQUEST_SPACING_MS,chooseMomentumMarkets} from "./momentum-scan-config.js";
 const SCAN_EVERY_MS=MOMENTUM_SCAN_INTERVAL_MS,UNIVERSE_TTL=75000;
-const MAX_ACTIVE_AGE=75000,WORKERS=3;
+const MAX_ACTIVE_AGE=150000,WORKERS=3;
 const PROVIDERS=[
  {name:"BINANCE",kind:"binance",api:"https://data-api.binance.vision",seconds:true},
  {name:"OKX",kind:"okx",api:"https://www.okx.com",seconds:true},
@@ -16,7 +16,7 @@ const state={
  running:false,updatedAt:0,startedAt:0,checked:0,successful:0,failed:0,missing:0,
  errors:[],rows:[],universe:{},sources:{},
  intervalSeconds:SCAN_EVERY_MS/1000,thresholds:momentum30sThresholds,
- notice:"Artırılmış coin taraması: Binance en fazla 70, OKX en fazla 16 spot USDT paritesi; 60 saniyede bir dönüşümlü tarama. Son 30 saniyenin ortalama kapanışı önceki 30 tamamlanmış dakikanın en az %2 üzerindeyse fiyat teyidi. Hacim şartı yoktur; yalnızca gerçek mumlar kullanılır. Kesin kazanç garantisi değildir."
+ notice:"Genişletilmiş tarama hedefi: Binance 200, OKX 16 olmak üzere en fazla 216 farklı borsa/parite eşleşmesi, 120 saniyelik döngüyle dönüşümlü kontrol edilir. Son 30 kapanmış gerçek 1 saniyelik mumun ortalama fiyatı önceki 30 kapanmış 1 dakikalık mumun ortalamasından en az %2 yukarıdaysa teyit verilir. Hacim şartı aranmaz. API hız sınırı ve yetersiz mum durumunda gerçekleşen tarama sayısı daha az olabilir. Kesin kazanç garantisi değildir."
 };
 const active=new Map(),minuteCache=new Map(),limitUntil=new Map(),marketCache=new Map(),rotation=new Map(),nextFetchAt=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
