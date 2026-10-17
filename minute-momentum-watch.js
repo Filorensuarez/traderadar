@@ -2,8 +2,9 @@
 // USDT spot only. Never downgrade a missing 1s source to 1m or synthetic 1s bars.
 import {calculateMomentum30s,momentum30sThresholds} from "./momentum-30s-model.js";
 import {confirmedMomentumRows} from "./momentum-visibility.js";
-const SCAN_EVERY_MS=30000,UNIVERSE_TTL=75000;
-const WINDOW_SIZE=28,MAX_ACTIVE_AGE=75000,WORKERS=3;
+import {MOMENTUM_SCAN_INTERVAL_MS,MOMENTUM_MIN_REQUEST_SPACING_MS,chooseMomentumMarkets} from "./momentum-scan-config.js";
+const SCAN_EVERY_MS=MOMENTUM_SCAN_INTERVAL_MS,UNIVERSE_TTL=75000;
+const MAX_ACTIVE_AGE=75000,WORKERS=3;
 const PROVIDERS=[
  {name:"BINANCE",kind:"binance",api:"https://data-api.binance.vision",seconds:true},
  {name:"OKX",kind:"okx",api:"https://www.okx.com",seconds:true},
@@ -15,7 +16,7 @@ const state={
  running:false,updatedAt:0,startedAt:0,checked:0,successful:0,failed:0,missing:0,
  errors:[],rows:[],universe:{},sources:{},
  intervalSeconds:SCAN_EVERY_MS/1000,thresholds:momentum30sThresholds,
- notice:"Yalnızca kapanmış gerçek mumlar ve fiyat karşılaştırması: son 30 saniyenin ortalama kapanışı, önceki 30 tamamlanmış dakikanın ortalama kapanışından en az %2 yüksek olursa teyit. Hacim şartı veya hacme dayalı ön filtre yoktur. Teknik sinyaldir, kazanç garantisi değildir."
+ notice:"Artırılmış coin taraması: Binance en fazla 70, OKX en fazla 16 spot USDT paritesi; 60 saniyede bir dönüşümlü tarama. Son 30 saniyenin ortalama kapanışı önceki 30 tamamlanmış dakikanın en az %2 üzerindeyse fiyat teyidi. Hacim şartı yoktur; yalnızca gerçek mumlar kullanılır. Kesin kazanç garantisi değildir."
 };
 const active=new Map(),minuteCache=new Map(),limitUntil=new Map(),marketCache=new Map(),rotation=new Map(),nextFetchAt=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -26,7 +27,7 @@ async function get(url,exchange){
  if(Date.now()<(limitUntil.get(exchange)||0))throw Error("Borsa hız sınırı nedeniyle beklemede");
  // Shared per-exchange spacing prevents parallel workers from exhausting OKX IP quotas.
  const next=Math.max(Date.now(),nextFetchAt.get(exchange)||0);
- nextFetchAt.set(exchange,next+(exchange==="OKX"?1050:130));
+ nextFetchAt.set(exchange,next+(MOMENTUM_MIN_REQUEST_SPACING_MS[exchange]||200));
  if(next>Date.now())await pause(next-Date.now());
  if(Date.now()<(limitUntil.get(exchange)||0))throw Error("Borsa hız sınırı nedeniyle beklemede");
  const response=await fetch(url,{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(9500)});
@@ -58,16 +59,9 @@ async function universe(p){
  return rows;
 }
 function selectMarkets(p,all){
- const selectedLimit=p.name==="OKX"?12:WINDOW_SIZE;
- const chosen=[],seen=new Set();
- const add=x=>{if(x&&!seen.has(x.symbol)&&chosen.length<selectedLimit){seen.add(x.symbol);chosen.push(x);}};
- for(const x of all.slice(0,p.name==="OKX"?4:11))add(x);
- for(const x of all.filter(x=>Number.isFinite(x.dayChange)).sort((a,b)=>b.dayChange-a.dayChange).slice(0,p.name==="OKX"?2:5))add(x);
- const remaining=all.filter(x=>!seen.has(x.symbol));
- const offset=rotation.get(p.name)||0;
- for(let i=0;i<remaining.length&&chosen.length<WINDOW_SIZE;i++)add(remaining[(offset+i)%remaining.length]);
- rotation.set(p.name,remaining.length?(offset+20)%remaining.length:0);
- return chosen;
+ const result=chooseMomentumMarkets(p.name,all,rotation.get(p.name)||0);
+ rotation.set(p.name,result.nextOffset);
+ return result.selected;
 }
 async function getSeconds(p,s){
  const url=p.kind==="binance"?
@@ -115,7 +109,10 @@ async function scanExchange(p){
     if(Date.now()<(limitUntil.get(p.name)||0)){stat.error="Borsa hız sınırı; yeni veri bekleniyor";break;}
     const ticker=selected[next++],key=p.name+":"+ticker.symbol;
     try{
-     const [seconds,minutes]=await Promise.all([getSeconds(p,ticker.symbol),getMinutes(p,ticker.symbol)]);
+     // Fetch the slower 1m reference first: the 1s candles must be checked immediately
+     // after retrieval or they'd age out while waiting in the shared rate-limit queue.
+     const minutes=await getMinutes(p,ticker.symbol);
+     const seconds=await getSeconds(p,ticker.symbol);
      const result=calculateMomentum30s(seconds,minutes,Date.now());
      if(!result.ok){stat.missing++;state.missing++;active.delete(key);}
      else{

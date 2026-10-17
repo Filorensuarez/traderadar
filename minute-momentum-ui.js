@@ -28,6 +28,7 @@ async function refresh(){
   status.textContent=(d.running?"Tarama sürüyor | ":"")+
    "Son kontrol: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"İlk tarama bekleniyor")+
    " | 30 sn / 30 dk teyit: "+confirmed.length+
+   " | Bu tur hedef: Binance 70 + OKX 16 = 86 coin"+
    " | Denenen: "+(d.checked||0)+" | Geçerli karşılaştırma: "+(d.successful||0)+
    " | Eksik mum: "+(d.missing||0)+" | API hata: "+(d.failed||0)+
    (sources?"\nBorsalar: "+sources:"")+

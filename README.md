@@ -33,3 +33,12 @@ Diğer momentum, V tipi dip ve USDT işlem planı bölümleri bağımsızdır. H
 - **Minimum hacim, hacim oranı ve hacim ivmesi teyidi kaldırılmıştır**; hacim yüzünden coin elenmez. Alış-satış farkı filtresi (%0,45) korunur.
 - Eşiğe yaklaşan fakat teyit almamış coinler arayüzde veya sonuç API'sinde paylaşılmaz.
 - Böyle bir sinyal daha az teyit koşulu taşıdığından yanlış sinyal ihtimali artabilir. İşlem veya getiri garantisi yoktur.
+
+## 1 Dakikalık Momentum — Genişletilmiş tarama
+
+- Her turda en fazla **Binance 70 + OKX 16 = 86** farklı spot USDT çiftini hedefler; önceki kapasite Binance 28 + OKX 12 idi.
+- 1 dakikalık tarama döngüsü ve dönüşümlü piyasa seçimi sayesinde zaman içinde daha fazla coin kontrol edilir.
+- OKX istekleri arasında en az 1,5 saniye, Binance istekleri arasında en az 140 milisaniye bırakılır. Diğer TradeRadar modülleriyle paylaşılan IP'de API hız sınırı yine oluşabilir.
+- 1 dakikalık referans mumları önce, taze 1 saniyelik mumlar sonra alınır; 1 saniyelik seri beklerken eskimez.
+- Sadece kapanmış gerçek mumlarla **%2 fiyat teyidi** üretilir; hacim şartı ve teyitsiz aday listesi geri getirilmedi.
+- Tarama sayısı hedef değerdir; uygun coin azsa veya API 429 yanıtı gelirse o tur daha az parite değerlendirilebilir.
