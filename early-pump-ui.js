@@ -41,6 +41,7 @@ function renderCards(){
    ["MA200",price(x.sma200)],
    ["MA200 farkı",((x.distancePct>=0)?"+":"")+fmt(x.distancePct)+"%"],
    ["RSI (14)",fmt(x.rsi14)],
+   ["MACD histogram",fmt(x.macdHist,7)],
    ["24s hacim",fmt(x.volume24h,0)+" USDT"]
   ]){
    const block=add(stats,"span","","ma-metric");
@@ -48,7 +49,7 @@ function renderCards(){
    add(block,"b",value);
   }
   add(button,"p",x.reason||"Haftalık görünümü açarak teyit koşullarına bakın.","ma-card-reason");
-  add(button,"div","Grafiği aç → • "+x.exchange+" • kapanan hafta "+date(x.lastClosedAt),"ma-card-action");
+  add(button,"div","Grafiği aç → • "+x.exchange+" • "+(x.signalAt?"Sinyal teyidi "+date(x.signalAt):"Son kapanan hafta "+date(x.lastClosedAt)),"ma-card-action");
   button.addEventListener("click",()=>openGraph(x.exchange,x.market||x.symbol));
   earlyCards.appendChild(card);
  }
