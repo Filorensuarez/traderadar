@@ -1,6 +1,7 @@
 // 30 genuine closed 1-second candles vs the 30 prior closed 1-minute candles.
 // USDT spot only. Never downgrade a missing 1s source to 1m or synthetic 1s bars.
 import {calculateMomentum30s,momentum30sThresholds} from "./momentum-30s-model.js";
+import {confirmedMomentumRows} from "./momentum-visibility.js";
 const SCAN_EVERY_MS=30000,UNIVERSE_TTL=75000,MIN_DAILY_USDT=1000000;
 const WINDOW_SIZE=28,MAX_ACTIVE_AGE=75000,WORKERS=3;
 const PROVIDERS=[
@@ -12,7 +13,7 @@ const PROVIDERS=[
 ];
 const state={
  running:false,updatedAt:0,startedAt:0,checked:0,successful:0,failed:0,missing:0,
- errors:[],rows:[],closest:[],maxChangePct:null,universe:{},sources:{},
+ errors:[],rows:[],universe:{},sources:{},
  intervalSeconds:SCAN_EVERY_MS/1000,thresholds:momentum30sThresholds,
  notice:"Son 30 tamamlanmış 1 saniyelik mumun fiyat ortalaması, onlardan önceki 30 adet tamamlanmış 1 dakikalık mum ortalamasının en az %2 üzerindeyse ve 30 saniyelik gerçek hacim geçmişin en az 2,5 katı olup üç ayrı 10 saniyede hızlanıyorsa teyit. Sadece gerçek 1s mum desteği doğrulanan spot USDT borsaları taranır."
 };
@@ -90,17 +91,17 @@ async function getMinutes(p,s){
  minuteCache.set(key,{rows:parsed,at:Date.now()});
  return parsed;
 }
-function publish(closest){
+function publish(){
  const time=Date.now();
  for(const [key,x] of active)if(time-x.lastCheckedAt>MAX_ACTIVE_AGE)active.delete(key);
- state.rows=[...active.values()].sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.priceChangePct-a.priceChangePct).slice(0,80);
- state.closest=[...closest].sort((a,b)=>b.priceChangePct-a.priceChangePct).slice(0,12);
- state.maxChangePct=state.closest[0]?.priceChangePct??null;
+ // Expose only fully confirmed results; no near-threshold candidates leave the backend.
+ state.rows=confirmedMomentumRows([...active.values()])
+  .sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.priceChangePct-a.priceChangePct).slice(0,80);
  state.updatedAt=time;
 }
-export function minuteMomentumStatus(){return {...state,rows:[...state.rows],closest:[...state.closest],
+export function minuteMomentumStatus(){return {...state,rows:confirmedMomentumRows(state.rows),
  sources:{...state.sources},errors:[...state.errors]};}
-async function scanExchange(p,nearest){
+async function scanExchange(p){
  const stat={supported:true,eligible:0,checked:0,successful:0,failed:0,missing:0,error:null,lastError:null};
  state.sources[p.name]=stat;
  try{
@@ -121,7 +122,6 @@ async function scanExchange(p,nearest){
       stat.successful++;state.successful++;
       const normalized={...result,exchange:p.name,symbol:ticker.symbol.replace(/[-]?USDT$/,"/USDT"),
        lastCheckedAt:Date.now(),spreadPct:+((ticker.ask-ticker.bid)/ticker.ask*100).toFixed(3)};
-      if(result.priceChangePct>=0.8)nearest.push(normalized);
       if(result.confirmed){
        const existing=active.get(key);
        active.set(key,{...normalized,firstSeenAt:existing?.firstSeenAt||Date.now(),
@@ -142,22 +142,21 @@ async function scanExchange(p,nearest){
  }catch(e){
   stat.error=String(e.message);
   if(state.errors.length<12)state.errors.push(p.name+": "+stat.error);
- }finally{publish(nearest);}
+ }finally{publish();}
 }
 export async function scanMinuteMomentum(){
  if(state.running)return minuteMomentumStatus();
  state.running=true;state.startedAt=Date.now();
  state.checked=0;state.attempted=0;state.successful=0;state.failed=0;state.missing=0;
  state.errors=[];state.sources={};state.universe={};
- const closest=[];
  for(const p of PROVIDERS)if(!p.seconds){
   state.sources[p.name]={supported:false,eligible:0,checked:0,successful:0,failed:0,missing:0,
    error:null,notice:"Doğrulanmış 1 saniyelik spot mum veri kaynağı yok; 1m verilerle taklit edilmiyor"};
   state.universe[p.name]=0;
  }
  try{
-  await Promise.all(PROVIDERS.filter(p=>p.seconds).map(p=>scanExchange(p,closest)));
-  publish(closest);
+  await Promise.all(PROVIDERS.filter(p=>p.seconds).map(p=>scanExchange(p)));
+  publish();
   console.log("30s/30m momentum: "+Object.entries(state.sources).map(([name,v])=>
    name+" "+(v.supported?v.checked+"/"+v.eligible+" geçerli="+v.successful+" eksik="+v.missing+" hata="+v.failed+(v.lastError?" ["+v.lastError+"]":"")+(v.error?" HATA "+v.error:""):"1s kullanılmıyor")).join(" | ")+
    " | Teyit "+state.rows.length+" | API sorunları "+state.errors.slice(0,2).join("; "));

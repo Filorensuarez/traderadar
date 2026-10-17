@@ -1,4 +1,5 @@
-// Real 30 x 1s / previous 30 x 1m momentum presentation.
+// Real 30 x 1s / previous 30 x 1m momentum presentation. Confirmed results only.
+import {confirmedMomentumRows} from "./momentum-visibility.js";
 const button=document.querySelector("#momentumButton");
 const section=document.querySelector("#momentum");
 const status=document.querySelector("#momentumStatus");
@@ -19,22 +20,23 @@ async function refresh(){
   const r=await fetch("/api/minute-momentum",{cache:"no-store",signal:AbortSignal.timeout(11000)});
   if(!r.ok)throw Error("HTTP "+r.status);
   const d=await r.json();
+  const confirmed=confirmedMomentumRows(d.rows);
   const sources=Object.entries(d.sources||{}).map(([name,s])=>
    !s.supported?name+": 1 sn verisi bu sürümde yok":
    name+": "+s.checked+"/"+s.eligible+" (tam veri "+s.successful+
    ", eksik "+s.missing+", hata "+s.failed+")"+(s.error?" ["+s.error+"]":"")).join(" | ");
   status.textContent=(d.running?"Tarama sürüyor | ":"")+
    "Son kontrol: "+(d.updatedAt?new Date(d.updatedAt).toLocaleTimeString("tr-TR"):"İlk tarama bekleniyor")+
-   " | 30 sn / 30 dk teyit: "+(d.rows?.length||0)+
+   " | 30 sn / 30 dk teyit: "+confirmed.length+
    " | Denenen: "+(d.checked||0)+" | Geçerli karşılaştırma: "+(d.successful||0)+
    " | Eksik mum: "+(d.missing||0)+" | API hata: "+(d.failed||0)+
    (sources?"\nBorsalar: "+sources:"")+
    ((d.errors||[]).length?"\nİlk sorun: "+d.errors[0]:"");
   cards.replaceChildren();
-  line(cards,"SİNYAL: Son 30 tamamlanmış 1 sn mumunun fiyat ortalaması, önceki 30 tamamlanmış 1 dk mum ortalamasından en az %2 yüksek olacak. 30 sn hacim, önceki 30 dk normaline göre en az 2,5 kat artacak. Son 3 adet 10 sn hacim dilimi kademeli hızlanacak.","description");
-  if(!d.rows?.length)line(cards,d.running?"Gerçek 1 sn mumları analiz ediliyor...":
-   "Şu anda fiyat +%2 ve hızlanan hacim koşullarını aynı anda sağlayan işlem çifti yok. Sinyal üretilmedi.");
-  for(const x of d.rows||[]){
+  if(!confirmed.length)line(cards,d.running?
+   "Tarama devam ediyor. Tam teyit alan coinler burada gösterilecek.":
+   "Şu anda tüm koşulları sağlayan teyitli coin bulunamadı.");
+  for(const x of confirmed){
    const card=document.createElement("article");card.className="coin-card";
    const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange;card.append(title);
    line(card,"30 SN HACİMLİ MOMENTUM TEYİDİ","first-reaction-decision decision-watch-buy");
@@ -51,15 +53,7 @@ async function refresh(){
     " | Son analiz: "+new Date(x.lastCheckedAt).toLocaleTimeString("tr-TR"),"description");
    cards.append(card);
   }
-  const candidates=(d.closest||[]).filter(x=>!x.confirmed&&x.priceChangePct>=0.8).slice(0,10);
-  if(candidates.length){
-   const header=document.createElement("h3");header.textContent="Eşiğe yaklaşanlar (TEYİT DEĞİL)";cards.append(header);
-   for(const x of candidates){
-    line(cards,x.symbol+" • "+x.exchange+" | Fiyat farkı: %"+fmt(x.priceChangePct,3)+
-     " | Hacim çarpanı: "+fmt(x.volumeRatio)+"× | Hacim hızlanıyor: "+
-     (x.volumeAccelerating?"Evet":"Hayır")+" | "+x.reason,"description");
-   }
-  }
+
  }catch(e){status.textContent="30 saniyelik momentum verileri alınamadı: "+e.message;}
  finally{refreshing=false;}
 }
