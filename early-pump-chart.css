@@ -51,3 +51,10 @@
  #earlypump .ma-signal{margin-left:0}
  #maChartDialog .ma-chart-buttons button{font-size:12px;padding:8px 9px}
 }
+
+#maChartDialog .ma-history{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;border-top:1px solid #abb9ca;padding-top:12px}
+#maChartDialog .ma-history strong{display:block;width:100%;font-size:13px;color:#27394b}
+#maChartDialog .ma-history p{font-size:12px;color:#52657d}
+#maChartDialog .ma-history button{border:1px solid #99adb8;border-radius:9px;padding:8px 10px;cursor:pointer;font-size:12px;font-weight:750}
+#maChartDialog .ma-history .ma-history-buy{background:#d9fbea;color:#096a47;border-color:#a0d9bb}
+#maChartDialog .ma-history .ma-history-sell{background:#fee3e6;color:#9c243f;border-color:#e5b0bc}

@@ -8,10 +8,10 @@ function candles(prices,volumes=prices.map(()=>1000000)) {
     return {time:end-(prices.length-i)*WEEK_MS,open:prev,high:Math.max(prev,p)*1.012,low:Math.min(prev,p)*.987,close:p,quoteVolume:volumes[i]};
   });
 }
-test("200 hafta dolmadan MA200 veya BUY/SELL işareti oluşturmaz",()=>{
+test("199 haftalık coin MA50 kullanır ve MA200 uydurmaz",()=>{
  const x=candles(Array.from({length:199},(_,i)=>50+i*.05));
  const v=analyzeWeeklyMA200(x,{now:end});
- assert.equal(v.insufficient,true);assert.equal(v.sma200,null);assert.equal(v.markers.length,0);
+ assert.equal(v.insufficient,false);assert.equal(v.referencePeriod,50);assert.equal(v.sma200,null);assert(v.referenceMA>0);assert.equal(v.markers.length,0);
 });
 test("SMA200 son 200 kapanışı kullanır",()=>{
  const raw=candles(Array.from({length:230},(_,i)=>i+1));
@@ -82,4 +82,35 @@ test("500 haftalık OHLCV uzun seride SMA200 hesaplaması stabil",()=>{
  assert.equal(report.weeks,500);
  assert.equal(report.ma200.length,500);
  assert(Number.isFinite(report.sma200));
+});
+
+test("80 haftalık yeni coin MA50 dönüşünü BUY olarak gösterebilir",()=>{
+ const prices=[...Array(67).fill(100),...Array(8).fill(80),80,80,88,102,105];
+ const v=analyzeWeeklyMA200(candles(prices),{now:end});
+ assert.equal(v.referencePeriod,50);
+ assert.equal(v.sma200,null);
+ assert.equal(v.status,"BUY");
+ assert.equal(v.markers.at(-1).kind,"BUY");
+ assert.equal(v.markers.at(-1).period,50);
+ assert.equal(v.ma.length,prices.length);
+});
+test("80 haftalık MA50 altına kırılma SELL olarak gösterilebilir",()=>{
+ const prices=[...Array(67).fill(100),...Array(8).fill(115),115,115,112,96,92];
+ const v=analyzeWeeklyMA200(candles(prices),{now:end});
+ assert.equal(v.referencePeriod,50);
+ assert.equal(v.status,"SELL");
+ assert.equal(v.markers.at(-1).kind,"SELL");
+ assert.equal(v.markers.at(-1).period,50);
+});
+test("24 haftadan az geçmişte sinyal yok, 49 haftada MA20 devrede",()=>{
+ const v=analyzeWeeklyMA200(candles(Array(24).fill(100)),{now:end});
+ assert.equal(v.referencePeriod,null);assert.equal(v.insufficient,true);assert.equal(v.markers.length,0);
+ const x=analyzeWeeklyMA200(candles(Array(49).fill(100)),{now:end});
+ assert.equal(x.referencePeriod,20);assert.equal(x.referenceMA,100);assert.equal(x.sma200,null);
+});
+test("henüz kapanmamış düşüş mumları MA50 BUY'ı tersine çeviremez",()=>{
+ const prices=[...Array(67).fill(100),...Array(8).fill(80),80,80,88,102,105];
+ const base=candles(prices),fake={time:end,open:105,high:106,low:1,close:1,quoteVolume:9999999};
+ const a=analyzeWeeklyMA200(base,{now:end}),b=analyzeWeeklyMA200([...base,fake],{now:end});
+ assert.equal(a.status,"BUY");assert.deepEqual(a.markers,b.markers);
 });

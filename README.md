@@ -2,16 +2,16 @@
 
 TradeRadar halka açık borsa verilerinden teknik sinyaller üretir; otomatik emir göndermez ve kâr garantisi vermez.
 
-## Erken Yükseliş Radarı (Haftalık SMA200)
+## Erken Yükseliş Radarı (Haftalık SMA200 / SMA50 / SMA20)
 
 - Kaynak: Binance, OKX, KuCoin spot USDT 1 haftalık mumları; Gate.io spot USDT 7 günlük periyotları (takvim hizalaması farklıdır). Bitget v3 spot API haftalık mum sağlamadığı için bu radara dahil değildir.
-- SMA200: son 200 kapanmış haftalık mumun kapanış ortalaması. 200 haftanın altındaki veriye BUY/SELL işareti konmaz.
-- BUY: iki tamamlanmış haftanın MA200 üstünde kapanması, daha önce ortalamanın altına iniş, ortalama bölgesine temas, olumlu RSI14/MACD histogram ve yeterli hacim teyidi.
-- SELL: MA200 altındaki iki tamamlanmış hafta, öncesinde MA200 üzerinde kalmış fiyat ve zayıflayan momentum. SELL bir teknik risk uyarısıdır.
-- İZLE: MA200 yakını ancak tam BUY/SELL teyidi henüz yok.
-- Coin kartına basılınca gerçek OHLC mumları, kırmızı MA200 çizgisi ve yalnızca ilgili tarihe kadar oluşmuş tarihsel BUY/SELL işaretleri açılır.
+- Uyarlanabilir ortalama: 206+ kapanmış hafta için MA200, 56–205 hafta için MA50, 26–55 hafta için MA20. Bu ortalamalar eşdeğer değildir. 26 hafta altında sinyal verilmez.
+- BUY: iki kapalı haftanın kullanılan MA çizgisi üzerinde kapanması, daha önce çizginin altında kalmış fiyat, RSI/MACD ve hacim teyidi.
+- SELL: iki kapalı haftanın kullanılan MA çizgisi altında kapanması, daha önce çizginin üzerinde kalmış fiyat ve zayıflayan momentum.
+- İZLE: seçilmiş ortalama yakını ancak tam BUY/SELL teyidi henüz yok.
+- Coin kartına basılınca gerçek OHLC mumları, kırmızı gerçek MA200/50/20 çizgisi, tarihsel BUY/SELL işaretleri ve geçmiş sinyallerin tarihli listesi açılır.
 - Grafik yakınlaştırılabilir, sürüklenebilir, log/doğrusal ölçekte incelenebilir.
-- Gerçek 200 haftalık geçmiş yoksa yapay çizgi üretilmez. Geçmiş BUY/SELL etiketleri kazanç garantisi değildir.
+- Gerçek yeterli geçmiş yoksa yapay çizgi üretilmez; MA50 asla MA200 gibi etiketlenmez. Geçmiş BUY/SELL etiketleri kazanç garantisi değildir.
 - GET /api/early-pump tarama sonuçları; GET /api/early-pump/chart?exchange=BINANCE&symbol=BTCUSDT mumları verir.
 - Otomatik tarama üç saatte bir yenilenir. POST /api/early-pump/scan elle tarama başlatır.
 

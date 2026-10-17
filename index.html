@@ -26,7 +26,7 @@
   <link rel="icon" type="image/svg+xml" href="/icons/traderadar.svg">
   <link rel="apple-touch-icon" href="/icons/traderadar-192.png">
   <link rel="stylesheet" href="/mobile-app.css?v=1">
-  <link rel="stylesheet" href="./early-pump-chart.css?v=weekly-ma200-v1">
+  <link rel="stylesheet" href="./early-pump-chart.css?v=weekly-ma-adaptive-v2">
 </head>
 
 <body>
@@ -444,9 +444,9 @@
 <section id="earlypump" hidden>
   <div class="section-head">
     <div>
-      <h2>Erken Yükseliş Radarı — Haftalık MA200 BUY / SELL</h2>
-      <p class="description">Görseldeki mantıkla gerçek mumlardan 200 haftalık basit ortalama (SMA200) hesaplanır. BUY için MA200 üstünde iki kapanmış hafta, yükselen RSI/MACD ve hacim teyidi; SELL için MA200 altında iki kapanmış hafta ve zayıflayan momentum aranır. İZLE teyitsiz yakınlık durumudur.</p>
-      <p class="description">Kapanmamış haftalar sinyal üretmez. 200 haftalık verisi olmayan coinlerde BUY/SELL verilmez. Binance, OKX, KuCoin ve Gate.io spot USDT çiftleri dönüşümlü taranır (Gate.io 7 günlük periyot kullanır). Bitget'in spot haftalık veri desteği olmadığı için bu taramaya dahil edilmez. Teknik sinyaller kesin kazanç veya dönüş garantisi değildir.</p>
+      <h2>Erken Yükseliş Radarı — Haftalık MA200 / MA50 / MA20 BUY / SELL</h2>
+      <p class="description">Gerçek haftalık mumlarla uzun geçmişi olan coinlerde MA200, yeni coinlerde MA50 veya MA20 hesaplanır. BUY için seçilen ortalama üzerinde iki kapanış, RSI/MACD ve hacim teyidi; SELL için ortalama altında iki kapanış ve zayıflayan momentum aranır. İZLE teyitsiz adaydır.</p>
+      <p class="description">Kapanmamış haftalar sinyal üretmez. MA200/MA50/MA20 farklı vadeleri gösterir. 26 kapanmış haftadan az geçmişi olan coinlere bu modelde BUY/SELL işareti konmaz. Binance, OKX, KuCoin ve Gate.io spot USDT çiftleri dönüşümlü taranır (Gate.io 7 günlük periyot kullanır). Sinyaller kâr veya teknik dönüş garantisi değildir.</p>
     </div>
     <button id="earlyPumpScan" class="refresh-button" type="button">Şimdi Tara</button>
   </div>
@@ -478,9 +478,10 @@
         <button id="maZoomAll" type="button">Tüm geçmiş</button>
         <button id="maScaleToggle" type="button">LOG ölçek</button>
       </div>
-      <div class="ma-chart-canvas"><canvas id="maChartCanvas" aria-label="Gerçek haftalık mum grafiği, MA200 ve BUY SELL etiketleri"></canvas></div>
+      <div class="ma-chart-canvas"><canvas id="maChartCanvas" aria-label="Gerçek haftalık mum grafiği, MA200 MA50 MA20 ve BUY SELL etiketleri"></canvas></div>
       <p id="maChartFeedback" role="status" aria-live="polite"></p>
       <p id="maChartNote"></p>
+      <div id="maChartSignalHistory" class="ma-history" aria-live="polite"></div>
     </div>
   </dialog>
 </section>
@@ -517,8 +518,8 @@
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./minute-momentum-ui.js?v=30s-30m-v1"></script>
-  <script defer src="./early-pump-chart.js?v=weekly-ma200-v1"></script>
-  <script type="module" src="./early-pump-ui.js?v=weekly-ma200-v1"></script>
+  <script defer src="./early-pump-chart.js?v=weekly-ma-adaptive-v2"></script>
+  <script type="module" src="./early-pump-ui.js?v=weekly-ma-adaptive-v2"></script>
   <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>
   <script type="module" src="./daily-trade-plans-ui.js?v=usdt5"></script>
   <script defer src="./tab-navigation-fix.js"></script>
