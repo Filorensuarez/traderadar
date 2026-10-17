@@ -9,6 +9,7 @@
  const zoomIn=document.querySelector("#maZoomIn"),zoomOut=document.querySelector("#maZoomOut");
  const fit=document.querySelector("#maZoomAll"),mode=document.querySelector("#maScaleToggle");
  const note=document.querySelector("#maChartNote");
+ const history=document.querySelector("#maChartSignalHistory");
  const ctx=canvas.getContext("2d");
  let data=null,windowSize=180,endAt=0,logScale=true,selected=-1,controller=null,lastRect=null;
  let down=null,pointerMoved=false;
@@ -42,7 +43,8 @@
   const start=Math.max(0,stop-windowSize);
   const subset=candles.slice(start,stop);
   if(!subset.length)return;
-  const ma=data.ma200||[];
+  const ma=data.ma||data.ma200||[];
+  const maLabel="MA"+(data.referencePeriod||"—");
   const lows=subset.map(x=>x.low),highs=subset.map(x=>x.high);
   for(let i=start;i<stop;i++)if(ma[i]!=null&&ma[i]>0){lows.push(ma[i]);highs.push(ma[i]);}
   let lo=Math.min(...lows),hi=Math.max(...highs);
@@ -80,7 +82,7 @@
    const body=Math.max(1.5,Math.abs(y(k.open)-y(k.close)));
    c.fillRect(px-Math.max(1,step*.32),Math.min(y(k.open),y(k.close)),Math.max(2,step*.64),body);
   }
-  // MA200 - draw only where the real 200 week history exists
+  // Draw actual reference MA; MA50 or MA20 must not be relabeled MA200.
   c.beginPath();let started=false;
   for(let i=start;i<stop;i++){
    if(ma[i]==null||ma[i]<=0){started=false;continue;}
@@ -88,7 +90,7 @@
   }
   c.strokeStyle="#dc2848";c.lineWidth=Math.max(2.1,Math.min(3.3,w/300));c.lineJoin="round";c.stroke();
   c.font="bold 12px system-ui";c.textAlign="left";c.fillStyle="#d32243";
-  c.fillText("MA200",Math.max(16,plot.left+12),plot.top+17);
+  c.fillText(maLabel,Math.max(16,plot.left+12),plot.top+17);
   // Signal markers, every label corresponds to completed weekly evidence
   for(const m of data.markers||[]){
    if(m.index<start||m.index>=stop)continue;
@@ -101,7 +103,7 @@
    c.beginPath();c.arc(px,red?y(candles[m.index].high):y(candles[m.index].low),2.8,0,Math.PI*2);c.fill();
   }
   c.fillStyle="#1a2434";c.textAlign="left";c.font="bold 13px system-ui";
-  c.fillText(data.symbol+"  •  "+data.exchange+"  •  "+(data.timeframe==="7D"?"7D":"1W")+"  •  MA200",plot.left+4,22);
+  c.fillText(data.symbol+"  •  "+data.exchange+"  •  "+(data.timeframe==="7D"?"7D":"1W")+"  •  "+maLabel,plot.left+4,22);
   // crosshair overlay on touch/mouse
   if(selected>=start&&selected<stop){
    const px=x(selected),k=candles[selected];
@@ -110,7 +112,7 @@
    c.fillText(t(k.time)+" | O "+format(k.open)+"  H "+format(k.high)+"  L "+format(k.low)+"  C "+format(k.close)+"  MA "+format(ma[selected]),plot.left+6,h-9);
   }else{
    c.fillStyle="#626f84";c.textAlign="left";c.font="11px system-ui";
-   c.fillText("BUY: teyitli yükseliş dönüşü   •   SELL: MA200 altı risk uyarısı   •   İşlem önerisi değil",plot.left+6,h-9);
+   c.fillText("BUY: kapalı hafta dönüşü   •   SELL: teknik risk uyarısı   •   İşlem önerisi değil",plot.left+6,h-9);
   }
  }
  function setWindow(count){
@@ -153,6 +155,7 @@
  const open=async(exchange,symbol)=>{
   controller?.abort();controller=new AbortController();
   data=null;selected=-1;show("Gerçek haftalık mumlar alınıyor...");
+  if(history)history.replaceChildren();
   details.textContent="";title.textContent="Grafik hazırlanıyor...";note.textContent="";
   if(!dialog.open)dialog.showModal();
   resize();
@@ -167,13 +170,44 @@
    data=body;windowSize=Math.min(body.candles.length,window.innerWidth<650?145:240);
    endAt=body.candles.length;
    title.textContent=body.symbol+" • "+body.exchange+" • "+(body.timeframe==="7D"?"7 günlük":"1 haftalık")+" mumlar";
-   details.textContent="Son kapalı mum: "+t(body.lastClosedAt)+"  |  Kapanış: "+format(body.candles.at(-1)?.close)+
-    " USDT  |  MA200: "+format(body.sma200)+"  |  Fark: "+(Number.isFinite(body.distancePct)?body.distancePct.toFixed(2)+"%":"—")+
-    "  |  "+(body.status||"SİNYAL YOK");
+   const maText=body.referencePeriod?"MA"+body.referencePeriod:"MA yok";
+   details.textContent="Son kapalı mum: "+t(body.lastClosedAt)+" | Kapanış: "+format(body.candles.at(-1)?.close)+
+     " USDT | "+maText+": "+format(body.referenceMA)+
+     " | MA farkı: "+(Number.isFinite(body.distancePct)?body.distancePct.toFixed(2)+"%":"—")+
+     " | "+(body.status||"YENİ TEYİTLİ SİNYAL YOK");
    note.textContent=body.insufficient?
-    "Bu coin 200+ kapanmış haftalık muma sahip değil. MA200 ve BUY/SELL işareti uydurulmaz.":
-    body.notice+" Geçmiş BUY/SELL işaretleri geçmişe dönük teyitlerdir; kesin dönüş veya kâr garantisi değildir.";
-   show("Kırmızı çizgi: 200 haftalık basit hareketli ortalama (SMA200). Grafiği yatay sürükleyin veya yakınlaştırın.");
+     "En az 26 kapanmış haftalık mum gerekli. Yetersiz geçmişte sahte BUY/SELL oluşturulmaz.":
+     body.notice+" MA50 ve MA20, MA200 ile aynı uzun vadeli gösterge değildir.";
+   const buys=(body.markers||[]).filter(m=>m.kind==="BUY");
+   const sells=(body.markers||[]).filter(m=>m.kind==="SELL");
+   show("Kırmızı çizgi: "+maText+" ("+(body.referencePeriod||"—")+
+     " haftalık). Tarihsel BUY: "+buys.length+" • SELL: "+sells.length+
+     ". Grafiği sürükleyip yakınlaştırabilirsiniz.");
+   if(history){
+     const heading=document.createElement("strong");
+     heading.textContent="Grafikteki geçmiş BUY / SELL işaretleri ("+(body.markers||[]).length+")";
+     history.appendChild(heading);
+     if(!(body.markers||[]).length){
+       const message=document.createElement("p");
+       message.textContent="Bu fiyat geçmişinde modelin teyit koşullarını karşılayan BUY/SELL oluşmamış. Bu nedenle grafik üzerinde sahte etiket gösterilmiyor.";
+       history.appendChild(message);
+     }else{
+       for(const marker of [...body.markers].reverse().slice(0,18)){
+         const button=document.createElement("button");
+         button.type="button";
+         button.className="ma-history-"+marker.kind.toLowerCase();
+         button.textContent=marker.kind+" · MA"+(marker.period||body.referencePeriod)+
+           " · "+t(marker.confirmedAt)+" · "+format(marker.price)+" USDT";
+         button.title=marker.reason||"Kapanmış haftalık sinyal";
+         button.addEventListener("click",()=>{
+           endAt=clamp(marker.index+Math.round(windowSize*.7),Math.min(windowSize,body.candles.length),body.candles.length);
+           selected=marker.index;
+           resize();
+         });
+         history.appendChild(button);
+       }
+     }
+   }
    requestAnimationFrame(resize);
   }catch(error){
    if(error.name==="AbortError")show("Grafik sorgusu zaman aşımına uğradı veya iptal edildi.");
