@@ -4,6 +4,7 @@ on:
     paths:
       - 'weekly-ma200-model.js'
       - 'weekly-ma200-model.test.js'
+      - 'early-pump-watch.test.js'
       - 'early-pump-watch.js'
       - 'early-pump-ui.js'
       - 'early-pump-chart.js'
@@ -30,4 +31,4 @@ jobs:
           node --check early-pump-chart.js
           node --check server.js
       - name: Run weekly MA200 tests
-        run: node --test weekly-ma200-model.test.js
+        run: node --test weekly-ma200-model.test.js early-pump-watch.test.js
