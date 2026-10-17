@@ -1,77 +1,115 @@
-// Display ONLY completed hourly EMA7/25 + MACD DIF/DEA bullish dual crosses.
+// Weekly MA200 dashboard for completed-candle BUY / SELL / IZLE signals.
+// No auto orders, no profit guarantees, and no fabricated price levels.
 const earlySection=document.querySelector("#earlypump");
 const earlyButton=document.querySelector("#earlyPumpButton");
 const earlyStatus=document.querySelector("#earlyPumpStatus");
 const earlyCards=document.querySelector("#earlyPumpCards");
 const earlyScan=document.querySelector("#earlyPumpScan");
-const fmt=(value,places=2)=>value!==null&&value!==undefined&&Number.isFinite(Number(value))
- ?Number(value).toLocaleString("tr-TR",{minimumFractionDigits:places,maximumFractionDigits:places}):"Veri yok";
-const asPrice=value=>value>0?Number(value).toLocaleString("tr-TR",{maximumSignificantDigits:10}):"Veri yok";
-const asTime=value=>value?new Date(value).toLocaleString("tr-TR",
- {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"Veri yok";
-function addText(target,text,cls="description"){
- const p=document.createElement("p");p.textContent=text;if(cls)p.className=cls;
- target.append(p);return p;
+const filterButtons=[...document.querySelectorAll("[data-ma-filter]")];
+let earlyFilter="ALL",earlyRows=[],isRefreshing=false;
+const fmt=(x,d=2)=>Number.isFinite(Number(x))&&x!==null?
+  Number(x).toLocaleString("tr-TR",{maximumFractionDigits:d,minimumFractionDigits:Math.min(2,d)}):"—";
+const price=x=>x>0?Number(x).toLocaleString("tr-TR",{maximumSignificantDigits:9}):"—";
+const date=x=>x?new Date(x).toLocaleString("tr-TR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+const add=(where,tag,text,cls)=>{
+ const el=document.createElement(tag);if(cls)el.className=cls;el.textContent=text;where.appendChild(el);return el;
+};
+function openGraph(exchange,symbol){
+ if(window.TradeRadarMA200Chart?.open)window.TradeRadarMA200Chart.open(exchange,symbol);
+ else earlyStatus.textContent="Grafik bileşeni henüz yüklenmedi. Sayfayı yenileyin.";
 }
-function displayCross(x){
- const box=document.createElement("article");box.className="coin-card";
- const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange;
- box.append(title);
- const status=document.createElement("div");status.className="confirmation confirmed";
- status.textContent="ÇİFT YUKARI KESİŞİM — 1 SAATLİK MUM TEYİDİ";
- box.append(status);
- addText(box,"EMA 7 ↑ EMA 25: "+asTime(x.emaCrossAt)+
-  " | MACD DIF ↑ DEA: "+asTime(x.macdCrossAt)+
-  " | İki koşulun tamamlandığı zaman: "+asTime(x.signalConfirmedAt));
- addText(box,"EMA 7: "+asPrice(x.ema7)+" | EMA 25: "+asPrice(x.ema25)+
-  " | EMA 99 (bilgi): "+asPrice(x.ema99)+
-  " | MACD DIF: "+fmt(x.macdDIF,7)+
-  " | DEA: "+fmt(x.macdDEA,7)+
-  " | Histogram: "+fmt(x.macdHistogram,7));
- addText(box,"Güncel fiyat: "+asPrice(x.price)+" USDT"+
-  " | Alış kotasyonu: "+asPrice(x.ask)+" USDT"+
-  " | Kesişim mumundan değişim: %"+fmt(x.riseFromCrossPct));
- addText(box,"ATR tabanlı örnek teknik yükseliş alanı: %"+fmt(x.potentialPct)+
-  " | Teknik hedef: "+asPrice(x.technicalTarget)+" USDT"+
-  " | Bu bir fiyat garantisi veya otomatik alım değildir.");
- addText(box,"Makas: %"+fmt(x.spreadPct,3)+" | Son 24s işlem hacmi: "+
-  fmt(x.volume24h,0)+" USDT | Son kontrol: "+asTime(x.lastCheckedAt));
- return box;
+function renderCards(){
+ earlyCards.replaceChildren();
+ const rows=earlyRows.filter(r=>earlyFilter==="ALL"||r.status===earlyFilter);
+ if(!rows.length){
+  add(earlyCards,"div",earlyFilter!=="ALL"?
+   "Bu kategoride teyit edilmiş coin bulunmuyor. İZLE adayları veya tüm sonuçları görüntüleyin.":
+   "Henüz MA200 dönüş koşullarını sağlayan coin bulunamadı. Haftalık kapanışlar beklenir; taranan pariteler dönüşümlü değişir. Yukarıdan manuel coin grafiği açabilirsiniz.","empty-card");
+  return;
+ }
+ for(const x of rows){
+  const card=document.createElement("article");card.className="ma-result-card ma-"+x.status.toLowerCase();
+  const button=add(card,"button","","ma-result-button");button.type="button";
+  button.setAttribute("aria-label",x.symbol+" "+x.exchange+" haftalık MA200 grafiğini aç");
+  const head=add(button,"div","","ma-card-head");
+  add(head,"strong",x.symbol,"ma-card-symbol");
+  add(head,"span",x.exchange,"ma-source");
+  add(head,"span",x.status==="BUY"?"BUY • ALIŞ TEYİDİ":x.status==="SELL"?"SELL • RİSK UYARISI":"İZLE • TEYİT BEKLENİYOR","ma-signal");
+  const stats=add(button,"div","","ma-row-metrics");
+  for(const [label,value] of [
+   ["Son kapanış",price(x.weekClose)+" USDT"],
+   ["MA200",price(x.sma200)],
+   ["MA200 farkı",((x.distancePct>=0)?"+":"")+fmt(x.distancePct)+"%"],
+   ["RSI (14)",fmt(x.rsi14)],
+   ["24s hacim",fmt(x.volume24h,0)+" USDT"]
+  ]){
+   const block=add(stats,"span","","ma-metric");
+   add(block,"small",label);
+   add(block,"b",value);
+  }
+  add(button,"p",x.reason||"Haftalık görünümü açarak teyit koşullarına bakın.","ma-card-reason");
+  add(button,"div","Grafiği aç → • "+x.exchange+" • kapanan hafta "+date(x.lastClosedAt),"ma-card-action");
+  button.addEventListener("click",()=>openGraph(x.exchange,x.market||x.symbol));
+  earlyCards.appendChild(card);
+ }
 }
-async function updateCrosses(){
- if(earlySection.hidden)return;
+function refreshFilterCounters(){
+ for(const btn of filterButtons){
+  const status=btn.dataset.maFilter;
+  const count=status==="ALL"?earlyRows.length:earlyRows.filter(x=>x.status===status).length;
+  btn.textContent=(status==="ALL"?"Tümü":status==="IZLE"?"İZLE":status)+" ("+count+")";
+  btn.setAttribute("aria-pressed",String(status===earlyFilter));
+ }
+}
+async function updateWeeklyRadar(){
+ if(!earlySection||earlySection.hidden||isRefreshing)return;
+ isRefreshing=true;
  try{
-  const response=await fetch("/api/early-pump",{cache:"no-store"});
+  const response=await fetch("/api/early-pump",{cache:"no-store",signal:AbortSignal.timeout(14000)});
   if(!response.ok)throw Error("HTTP "+response.status);
   const data=await response.json();
-  const coverage=Object.entries(data.sources||{}).map(([name,item])=>
-   name+": "+(item.checked||0)+"/"+(item.eligible||0)+(item.error?" (hata: "+item.error+")":"")).join(" | ");
-  earlyStatus.textContent=(data.running?"Tarama sürüyor | ":"")+
-   "Son tamamlanan: "+(data.updatedAt?asTime(data.updatedAt):"Henüz yok")+
-   " | Bu tur taranan: "+(data.checked||0)+" / Uygun piyasa: "+(data.eligible||0)+
-   " | Çift kesişim: "+(data.rows||[]).length+
-   " | Mum veri hatası: "+(data.failed||0)+
-   (coverage?"\nKaynaklar: "+coverage:"")+
-   ((data.errors||[]).length?"\nİlk hata: "+data.errors[0]:"");
-  earlyCards.replaceChildren();
-  if(!(data.rows||[]).length){
-   addText(earlyCards,data.running?
-    "Saatlik mumlar kontrol ediliyor. İki pozitif kesişim birlikte tamamlanırsa listelenecek.":
-    "Bu taramada son 2 kapanmış saatlik mum içinde EMA7/25 ve MACD DIF/DEA yukarı kesişimleri birlikte doğrulanmış coin bulunamadı. Tarama pariteleri dönüşümlü gezer.");
-  }else{
-   for(const row of data.rows)earlyCards.append(displayCross(row));
-  }
- }catch(err){earlyStatus.textContent="Çift kesişim verisi alınamadı: "+err.message;}
+  earlyRows=Array.isArray(data.rows)?data.rows:[];
+  const sources=Object.entries(data.sources||{}).map(([exchange,v])=>
+    exchange+": "+(v.checked||0)+" tarandı"+
+    (v.skippedHistory?" / "+v.skippedHistory+" geçmişi yetersiz":"")+
+    (v.error?" / HATA: "+v.error:"")).join(" | ");
+  const count=t=>earlyRows.filter(x=>x.status===t).length;
+  earlyStatus.textContent=(data.running?"Haftalık tarama sürüyor • ":"")+
+    "Son tarama: "+(data.updatedAt?new Date(data.updatedAt).toLocaleString("tr-TR"):"İlk tarama bekleniyor")+
+    " | BUY "+count("BUY")+" • SELL "+count("SELL")+" • İZLE "+count("IZLE")+
+    " | İncelenen "+(data.checked||0)+"/"+(data.eligible||0)+
+    " • Veri hatası "+(data.failed||0)+
+    (sources?"\n"+sources:"")+
+    ((data.errors||[]).length?"\nİlk hata: "+data.errors[0]:"")+
+    "\nYalnız kapanmış haftalık mumlar. Coinler sırayla taranır. Sinyal garantisi yok.";
+  refreshFilterCounters();renderCards();
+ }catch(err){earlyStatus.textContent="MA200 taraması görüntülenemedi: "+err.message;}
+ finally{isRefreshing=false;}
 }
-earlyButton?.addEventListener("click",()=>queueMicrotask(updateCrosses));
+filterButtons.forEach(button=>button.addEventListener("click",()=>{
+ earlyFilter=button.dataset.maFilter;refreshFilterCounters();renderCards();
+}));
+earlyButton?.addEventListener("click",()=>queueMicrotask(updateWeeklyRadar));
 earlyScan?.addEventListener("click",async()=>{
  if(earlyScan.disabled)return;
- earlyScan.disabled=true;earlyScan.textContent="Tarama başlatılıyor...";
+ earlyScan.disabled=true;earlyScan.textContent="Taranıyor...";
  try{
-  const r=await fetch("/api/early-pump/scan",{method:"POST"});
-  if(!r.ok)throw Error("HTTP "+r.status);
-  await updateCrosses();
+  const response=await fetch("/api/early-pump/scan",{method:"POST",cache:"no-store",signal:AbortSignal.timeout(14000)});
+  if(!response.ok)throw Error("HTTP "+response.status);
+  await updateWeeklyRadar();
  }catch(err){earlyStatus.textContent="Tarama başlatılamadı: "+err.message;}
  finally{earlyScan.disabled=false;earlyScan.textContent="Şimdi Tara";}
 });
-setInterval(updateCrosses,6000);
+const lookup=document.querySelector("#maLookup");
+lookup?.addEventListener("submit",event=>{
+ event.preventDefault();
+ const exchange=document.querySelector("#maChartExchange")?.value||"BINANCE";
+ const symbol=String(document.querySelector("#maChartSymbol")?.value||"").trim().toUpperCase();
+ if(!/^[A-Z0-9]{2,18}(?:[-_]?USDT)?$/.test(symbol)){
+  earlyStatus.textContent="Geçersiz coin sembolü. Örnek: BTC veya BTCUSDT.";
+  return;
+ }
+ openGraph(exchange,symbol);
+});
+setInterval(updateWeeklyRadar,20000);
+refreshFilterCounters();

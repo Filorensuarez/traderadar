@@ -26,6 +26,7 @@
   <link rel="icon" type="image/svg+xml" href="/icons/traderadar.svg">
   <link rel="apple-touch-icon" href="/icons/traderadar-192.png">
   <link rel="stylesheet" href="/mobile-app.css?v=1">
+  <link rel="stylesheet" href="./early-pump-chart.css?v=weekly-ma200-v1">
 </head>
 
 <body>
@@ -441,17 +442,47 @@
   <div id="vBottomCards" class="coin-grid"></div>
 </section>
 <section id="earlypump" hidden>
- <div class="section-head">
-  <div>
-   <h2>Erken Yükseliş Radarı — EMA + MACD Çift Kesişim</h2>
-   <p class="description">Görseldeki 1 saatlik EMA 7'nin EMA 25'i yukarı kesmesi ve MACD (12,26,9) DIF çizgisinin DEA sinyal çizgisini yukarı kesmesi birlikte aranır. Yalnızca kapanmış 1 saatlik mumlar kullanılır; oluşmakta olan mumun geçici kesişimi sinyal değildir.</p>
-   <p class="description">İki kesişim en fazla 6 saat aralıklı olmalı; son kesişimin ardından en fazla 2 tamamlanmış saatlik mum geçmiş olmalıdır. EMA 99 yalnızca ekranda bilgi olarak gösterilir. Eski VCP/sıkışma/diğer erken sinyaller bu bölümde artık listelenmez.</p>
-   <p class="description">Binance, OKX, KuCoin, Gate.io ve Bitget'in uygun spot USDT pariteleri dönüşümlü taranır. Görseldeki TRY paritesi bu bölümün kapsamına dahil değildir. Kesişim sinyali kesin alım veya yükseliş garantisi değildir.</p>
+  <div class="section-head">
+    <div>
+      <h2>Erken Yükseliş Radarı — Haftalık MA200 BUY / SELL</h2>
+      <p class="description">Görseldeki mantıkla gerçek mumlardan 200 haftalık basit ortalama (SMA200) hesaplanır. BUY için MA200 üstünde iki kapanmış hafta, yükselen RSI/MACD ve hacim teyidi; SELL için MA200 altında iki kapanmış hafta ve zayıflayan momentum aranır. İZLE teyitsiz yakınlık durumudur.</p>
+      <p class="description">Kapanmamış haftalar sinyal üretmez. 200 haftalık verisi olmayan coinlerde BUY/SELL verilmez. Binance, OKX, KuCoin ve Gate.io spot USDT çiftleri dönüşümlü taranır (Gate.io 7 günlük periyot kullanır). Bitget'in spot haftalık veri desteği olmadığı için bu taramaya dahil edilmez. Teknik sinyaller kesin kazanç veya dönüş garantisi değildir.</p>
+    </div>
+    <button id="earlyPumpScan" class="refresh-button" type="button">Şimdi Tara</button>
   </div>
-  <button id="earlyPumpScan" class="refresh-button" type="button">Şimdi Tara</button>
- </div>
- <p id="earlyPumpStatus" aria-live="polite">1 saatlik EMA + MACD kesişim taraması hazırlanıyor.</p>
- <div id="earlyPumpCards" class="coin-grid"></div>
+  <form id="maLookup" class="ma-lookup" autocomplete="off">
+    <select id="maChartExchange" aria-label="Grafik borsası">
+      <option>BINANCE</option><option>OKX</option><option>KUCOIN</option><option>GATE.IO</option>
+    </select>
+    <input id="maChartSymbol" aria-label="USDT coin kodu" maxlength="24" placeholder="Coin: BTC veya BTCUSDT" required>
+    <button type="submit">Coinin Grafiğini Aç</button>
+  </form>
+  <div class="ma-controls" role="group" aria-label="Sinyal filtreleri">
+    <button class="ma-filter" type="button" data-ma-filter="ALL" aria-pressed="true">Tümü</button>
+    <button class="ma-filter" type="button" data-ma-filter="BUY" aria-pressed="false">BUY</button>
+    <button class="ma-filter" type="button" data-ma-filter="SELL" aria-pressed="false">SELL</button>
+    <button class="ma-filter" type="button" data-ma-filter="IZLE" aria-pressed="false">İZLE</button>
+  </div>
+  <p id="earlyPumpStatus" aria-live="polite">Haftalık SMA200 dönüş taraması hazırlanıyor...</p>
+  <div id="earlyPumpCards" class="coin-grid"></div>
+  <dialog id="maChartDialog" aria-label="Haftalık mum ve MA200 grafik penceresi">
+    <div class="ma-chart-wrap">
+      <div class="ma-chart-top">
+        <h3 id="maChartTitle">Grafik yükleniyor...</h3>
+        <button id="maChartClose" type="button" aria-label="Grafiği kapat">×</button>
+      </div>
+      <div id="maChartDetails"></div>
+      <div class="ma-chart-buttons">
+        <button id="maZoomIn" type="button">+ Yakınlaştır</button>
+        <button id="maZoomOut" type="button">− Uzaklaştır</button>
+        <button id="maZoomAll" type="button">Tüm geçmiş</button>
+        <button id="maScaleToggle" type="button">LOG ölçek</button>
+      </div>
+      <div class="ma-chart-canvas"><canvas id="maChartCanvas" aria-label="Gerçek haftalık mum grafiği, MA200 ve BUY SELL etiketleri"></canvas></div>
+      <p id="maChartFeedback" role="status" aria-live="polite"></p>
+      <p id="maChartNote"></p>
+    </div>
+  </dialog>
 </section>
 <section id="momentum" hidden>
  <h2>1 Dakikalık Momentum</h2>
@@ -486,7 +517,8 @@
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./minute-momentum-ui.js?v=30s-30m-v1"></script>
-  <script type="module" src="./early-pump-ui.js?v=ema-macd-1h-v1"></script>
+  <script defer src="./early-pump-chart.js?v=weekly-ma200-v1"></script>
+  <script type="module" src="./early-pump-ui.js?v=weekly-ma200-v1"></script>
   <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>
   <script type="module" src="./daily-trade-plans-ui.js?v=usdt5"></script>
   <script defer src="./tab-navigation-fix.js"></script>
