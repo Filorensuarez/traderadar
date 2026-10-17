@@ -199,7 +199,9 @@ export function startEarlyPump(){
 export async function fetchEarlyPumpChart(exchange,symbol){
  const p=providers.find(x=>x.name===String(exchange||"").trim().toUpperCase());
  if(!p)throw Object.assign(Error("Borsa seçimi geçersiz. BINANCE, OKX, KUCOIN veya GATE.IO seçin."),{httpCode:400});
- const market=canonical(symbol);
+ const code=canonical(symbol);
+ const market=p.kind==="okx"||p.kind==="kucoin"?code.replace(/USDT$/,"-USDT"):
+  p.kind==="gate"?code.replace(/USDT$/,"_USDT"):code;
  const raw=await weeklyCandles(p,market);
  const analysis=analyzeWeeklyMA200(raw);
  if(!analysis.candles.length)throw Object.assign(Error("Bu coin için yeterli mum verisi bulunamadı."),{httpCode:404});
