@@ -2,7 +2,7 @@
 // USDT spot only. Never downgrade a missing 1s source to 1m or synthetic 1s bars.
 import {calculateMomentum30s,momentum30sThresholds} from "./momentum-30s-model.js";
 import {confirmedMomentumRows} from "./momentum-visibility.js";
-import {MOMENTUM_SCAN_INTERVAL_MS,MOMENTUM_MIN_REQUEST_SPACING_MS,chooseMomentumMarkets} from "./momentum-scan-config.js";
+import {MOMENTUM_SCAN_INTERVAL_MS,MOMENTUM_MIN_REQUEST_SPACING_MS,MOMENTUM_RATE_LIMIT_COOLDOWN_MS,chooseMomentumMarkets} from "./momentum-scan-config.js";
 const SCAN_EVERY_MS=MOMENTUM_SCAN_INTERVAL_MS,UNIVERSE_TTL=75000;
 const MAX_ACTIVE_AGE=150000,WORKERS=3;
 const PROVIDERS=[
@@ -16,7 +16,7 @@ const state={
  running:false,updatedAt:0,startedAt:0,checked:0,successful:0,failed:0,missing:0,
  errors:[],rows:[],universe:{},sources:{},
  intervalSeconds:SCAN_EVERY_MS/1000,thresholds:momentum30sThresholds,
- notice:"Genişletilmiş tarama hedefi: Binance 200, OKX 16 olmak üzere en fazla 216 farklı borsa/parite eşleşmesi, 120 saniyelik döngüyle dönüşümlü kontrol edilir. Son 30 kapanmış gerçek 1 saniyelik mumun ortalama fiyatı önceki 30 kapanmış 1 dakikalık mumun ortalamasından en az %2 yukarıdaysa teyit verilir. Hacim şartı aranmaz. API hız sınırı ve yetersiz mum durumunda gerçekleşen tarama sayısı daha az olabilir. Kesin kazanç garantisi değildir."
+ notice:"216 borsa/parite hedefi: Binance 200 + OKX 16, 120 saniyelik dönüşümlü tarama. OKX API istekleri paylaşılan IP sınırı nedeniyle seyreltilir; 429 durumunda geçici bekleme uygulanır ve eksik coin tarandı olarak sayılmaz. Fiyat +%2 teyidi korunur; hacim şartı yoktur. İşlem ve getiri garantisi değildir."
 };
 const active=new Map(),minuteCache=new Map(),limitUntil=new Map(),marketCache=new Map(),rotation=new Map(),nextFetchAt=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -32,7 +32,9 @@ async function get(url,exchange){
  if(Date.now()<(limitUntil.get(exchange)||0))throw Error("Borsa hız sınırı nedeniyle beklemede");
  const response=await fetch(url,{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(9500)});
  if(response.status===429||response.status===418){
-  limitUntil.set(exchange,Date.now()+90000);throw Error("API hız sınırı HTTP "+response.status);
+  const cooldown=MOMENTUM_RATE_LIMIT_COOLDOWN_MS[exchange]||90000;
+  limitUntil.set(exchange,Date.now()+cooldown);
+  throw Error("API hız sınırı HTTP "+response.status+"; "+Math.round(cooldown/60000)+" dk korumalı bekleme");
  }
  if(!response.ok)throw Error("API HTTP "+response.status);
  return response.json();

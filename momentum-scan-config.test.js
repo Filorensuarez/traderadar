@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
  MOMENTUM_SCAN_INTERVAL_MS,MOMENTUM_SCAN_TARGETS,
- MOMENTUM_MIN_REQUEST_SPACING_MS,chooseMomentumMarkets
+ MOMENTUM_MIN_REQUEST_SPACING_MS,MOMENTUM_RATE_LIMIT_COOLDOWN_MS,chooseMomentumMarkets
 } from "./momentum-scan-config.js";
 import {readFileSync} from "node:fs";
 const market=(i)=>({symbol:"COIN"+i+"USDT",volume:50000-i,dayChange:i%2?i/100:NaN});
@@ -37,7 +37,8 @@ test("Hedef, uygun coin sayısını aşmaz, tekrarlı coinleri elemez",()=>{
  assert.equal(chooseMomentumMarkets("OTHER",fixture).selected.length,0);
 });
 test("OKX istek aralığı korundu; fiyatın %2 teyidi değişmedi",()=>{
- assert(MOMENTUM_MIN_REQUEST_SPACING_MS.OKX>=1500);
+ assert(MOMENTUM_MIN_REQUEST_SPACING_MS.OKX>=2600);
+ assert(MOMENTUM_RATE_LIMIT_COOLDOWN_MS.OKX>=180000);
  assert(MOMENTUM_MIN_REQUEST_SPACING_MS.BINANCE>=180);
  const src=readFileSync(new URL("./minute-momentum-watch.js",import.meta.url),"utf8");
  assert.match(src,/chooseMomentumMarkets/);

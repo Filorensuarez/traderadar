@@ -48,3 +48,9 @@ Diğer momentum, V tipi dip ve USDT işlem planı bölümleri bağımsızdır. H
 - Tarama periyodu 120 saniye; Binance istekleri arası asgari 180 ms, OKX asgari 1500 ms. Destekli mumlar yalnızca gerçek borsa verileridir; 1 saniyelik mumlar sentezlenmez.
 - API 429, borsa veri eksikliği veya piyasada uygun parite azlığı nedeniyle gerçek taranan sayı daha düşük olabilir.
 - Hacim teyidi aranmaz, fiyat +%2 koşulu korunur, yalnızca tam teyitliler listelenir. Daha geniş evrende seyrek kontrol edilen coinlerde kısa süreli hareketler taramalar arasında kaçabilir.
+
+### API 429 kontrolü
+- Son canlı kayıtlar Binance **200/200** ve OKX **16/16** başarılı turlar olduğunu doğruladı.
+- OKX'te aralıklı HTTP 429 istek sınırı hataları saptandı. Farklı modüllerin ortak IP kotası etkili olabilir.
+- OKX istekleri arası minimum bekleme **2,6 saniyeye** çıkarıldı; 429 halinde **3 dakikalık** korumalı bekleme uygulanır.
+- Bu durumun tamamen ortadan kalkması garanti değildir. Sistem API engelini aşmaya çalışmaz, hatalı/gecikmiş mumları gerçek sinyal olarak yayımlamaz.
