@@ -35,18 +35,14 @@ async function refresh(){
   cards.replaceChildren();
   if(!confirmed.length)line(cards,d.running?
    "Tarama devam ediyor. Tam teyit alan coinler burada gösterilecek.":
-   "Şu anda tüm koşulları sağlayan teyitli coin bulunamadı.");
+   "Şu anda fiyat +%2 koşulunu karşılayan teyitli coin bulunamadı.");
   for(const x of confirmed){
    const card=document.createElement("article");card.className="coin-card";
    const title=document.createElement("h3");title.textContent=x.symbol+" • "+x.exchange;card.append(title);
-   line(card,"30 SN HACİMLİ MOMENTUM TEYİDİ","first-reaction-decision decision-watch-buy");
+   line(card,"30 SN FİYAT MOMENTUM TEYİDİ","first-reaction-decision decision-watch-buy");
    line(card,"30 sn fiyat ort.: "+fmt(x.currentAverage,9)+" USDT | Önceki 30 dk ort.: "+
     fmt(x.previousAverage,9)+" USDT | Fark: +%"+fmt(x.priceChangePct,3));
-   line(card,"30 sn işlem hacmi: "+fmt(x.volume30USDT,0)+" USDT | Normal 30 sn hacmi: "+
-    fmt(x.expected30USDT,0)+" USDT | Hacim çarpanı: "+fmt(x.volumeRatio)+"×","description");
-   line(card,"İlk 10 sn: "+fmt(x.first10USDT,0)+" | Orta 10 sn: "+fmt(x.middle10USDT,0)+
-    " | Son 10 sn: "+fmt(x.last10USDT,0)+" USDT | Son/orta ivme: "+
-    fmt(x.lastVsMiddle)+"× | Son/ilk ivme: "+fmt(x.lastVsFirst)+"×","description");
+   line(card,"Fiyat teyidi: +%2 eşiği aşıldı. Hacim koşulu aranmaz.","description");
    line(card,"Son 1 sn kapanışı: "+fmt(x.price,9)+" USDT | Makas: %"+fmt(x.spreadPct,3)+
     " | İlk tespit: "+new Date(x.firstSeenAt).toLocaleTimeString("tr-TR")+
     " | Son 1 sn mum kapanışı: "+new Date(x.candleTime+1000).toLocaleTimeString("tr-TR")+

@@ -2,7 +2,7 @@
 // USDT spot only. Never downgrade a missing 1s source to 1m or synthetic 1s bars.
 import {calculateMomentum30s,momentum30sThresholds} from "./momentum-30s-model.js";
 import {confirmedMomentumRows} from "./momentum-visibility.js";
-const SCAN_EVERY_MS=30000,UNIVERSE_TTL=75000,MIN_DAILY_USDT=1000000;
+const SCAN_EVERY_MS=30000,UNIVERSE_TTL=75000;
 const WINDOW_SIZE=28,MAX_ACTIVE_AGE=75000,WORKERS=3;
 const PROVIDERS=[
  {name:"BINANCE",kind:"binance",api:"https://data-api.binance.vision",seconds:true},
@@ -15,7 +15,7 @@ const state={
  running:false,updatedAt:0,startedAt:0,checked:0,successful:0,failed:0,missing:0,
  errors:[],rows:[],universe:{},sources:{},
  intervalSeconds:SCAN_EVERY_MS/1000,thresholds:momentum30sThresholds,
- notice:"Son 30 tamamlanmış 1 saniyelik mumun fiyat ortalaması, onlardan önceki 30 adet tamamlanmış 1 dakikalık mum ortalamasının en az %2 üzerindeyse ve 30 saniyelik gerçek hacim geçmişin en az 2,5 katı olup üç ayrı 10 saniyede hızlanıyorsa teyit. Sadece gerçek 1s mum desteği doğrulanan spot USDT borsaları taranır."
+ notice:"Yalnızca kapanmış gerçek mumlar ve fiyat karşılaştırması: son 30 saniyenin ortalama kapanışı, önceki 30 tamamlanmış dakikanın ortalama kapanışından en az %2 yüksek olursa teyit. Hacim şartı veya hacme dayalı ön filtre yoktur. Teknik sinyaldir, kazanç garantisi değildir."
 };
 const active=new Map(),minuteCache=new Map(),limitUntil=new Map(),marketCache=new Map(),rotation=new Map(),nextFetchAt=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -51,8 +51,8 @@ async function universe(p){
  if(cached&&Date.now()-cached.time<UNIVERSE_TTL)return cached.rows;
  const path=p.kind==="binance"?"/api/v3/ticker/24hr":"/api/v5/market/tickers?instType=SPOT";
  const raw=await get(p.api+path,p.name);
- const rows=standardize(raw,p.name).filter(x=>supports(x.symbol)&&Number.isFinite(x.volume)&&
-  x.volume>=MIN_DAILY_USDT&&x.price>0&&x.bid>0&&x.ask>=x.bid&&
+ const rows=standardize(raw,p.name).filter(x=>supports(x.symbol)&&
+  x.price>0&&x.bid>0&&x.ask>=x.bid&&
   (x.ask-x.bid)/x.ask*100<=0.45).sort((a,b)=>b.volume-a.volume);
  marketCache.set(p.name,{time:Date.now(),rows});
  return rows;
@@ -125,7 +125,7 @@ async function scanExchange(p){
       if(result.confirmed){
        const existing=active.get(key);
        active.set(key,{...normalized,firstSeenAt:existing?.firstSeenAt||Date.now(),
-        status:"30 SN HACİMLİ YÜKSELİŞ TEYİDİ"});
+        status:"30 SN FİYAT YÜKSELİŞ TEYİDİ"});
       }else active.delete(key);
      }
     }catch(e){

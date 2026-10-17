@@ -25,3 +25,11 @@ Web sürümü PWA olarak ana ekrana kurulabilir. Android APK geliştirme projesi
 node --test weekly-ma200-model.test.js early-pump-watch.test.js
 
 Diğer momentum, V tipi dip ve USDT işlem planı bölümleri bağımsızdır. Hiçbir sinyal yatırım tavsiyesi, kesin teknik dönüş veya otomatik işlem değildir.
+
+## 1 Dakikalık Momentum (yalnız fiyat teyidi)
+
+- Binance ve OKX spot piyasalarda 30 tamamlanmış, gerçek ve ardışık 1 saniyelik kapanışın ortalaması; bu pencereden önceki 30 kapalı, ardışık 1 dakikalık mumun kapanış ortalamasıyla karşılaştırılır.
+- Fiyat farkı en az **+%2** olunca, veri güncel ve eksiksizse `confirmed: true` üretilir.
+- **Minimum hacim, hacim oranı ve hacim ivmesi teyidi kaldırılmıştır**; hacim yüzünden coin elenmez. Alış-satış farkı filtresi (%0,45) korunur.
+- Eşiğe yaklaşan fakat teyit almamış coinler arayüzde veya sonuç API'sinde paylaşılmaz.
+- Böyle bir sinyal daha az teyit koşulu taşıdığından yanlış sinyal ihtimali artabilir. İşlem veya getiri garantisi yoktur.

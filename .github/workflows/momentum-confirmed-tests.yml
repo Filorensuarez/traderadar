@@ -2,6 +2,8 @@ name: Momentum confirmed-only regression
 on:
   push:
     paths:
+      - 'momentum-30s-model.js'
+      - 'momentum-price-only.test.js'
       - 'momentum-visibility.js'
       - 'momentum-visibility.test.js'
       - 'minute-momentum-watch.js'
@@ -21,8 +23,9 @@ jobs:
           node-version: '22'
       - name: Syntax check
         run: |
+          node --check momentum-30s-model.js
           node --check momentum-visibility.js
           node --check minute-momentum-watch.js
           node --check minute-momentum-ui.js
       - name: Test confirmed-only gating
-        run: node --test momentum-visibility.test.js
+        run: node --test momentum-visibility.test.js momentum-price-only.test.js
