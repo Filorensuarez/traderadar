@@ -1,4 +1,4 @@
-// Weekly MA200 dashboard for completed-candle BUY / SELL / IZLE signals.
+// Weekly adaptive MA200 / MA50 / MA20 dashboard for completed-candle signals.
 // No auto orders, no profit guarantees, and no fabricated price levels.
 const earlySection=document.querySelector("#earlypump");
 const earlyButton=document.querySelector("#earlyPumpButton");
@@ -24,13 +24,13 @@ function renderCards(){
  if(!rows.length){
   add(earlyCards,"div",earlyFilter!=="ALL"?
    "Bu kategoride teyit edilmiş coin bulunmuyor. İZLE adayları veya tüm sonuçları görüntüleyin.":
-   "Henüz MA200 dönüş koşullarını sağlayan coin bulunamadı. Haftalık kapanışlar beklenir; taranan pariteler dönüşümlü değişir. Yukarıdan manuel coin grafiği açabilirsiniz.","empty-card");
+   "Henüz haftalık dönüş koşullarını sağlayan coin bulunamadı. Haftalık kapanışlar beklenir; taranan pariteler dönüşümlü değişir. Yukarıdan manuel coin grafiği açabilirsiniz.","empty-card");
   return;
  }
  for(const x of rows){
   const card=document.createElement("article");card.className="ma-result-card ma-"+x.status.toLowerCase();
   const button=add(card,"button","","ma-result-button");button.type="button";
-  button.setAttribute("aria-label",x.symbol+" "+x.exchange+" haftalık MA200 grafiğini aç");
+  button.setAttribute("aria-label",x.symbol+" "+x.exchange+" haftalık ortalama grafiğini aç");
   const head=add(button,"div","","ma-card-head");
   add(head,"strong",x.symbol,"ma-card-symbol");
   add(head,"span",x.exchange,"ma-source");
@@ -38,8 +38,8 @@ function renderCards(){
   const stats=add(button,"div","","ma-row-metrics");
   for(const [label,value] of [
    ["Son kapanış",price(x.weekClose)+" USDT"],
-   ["MA200",price(x.sma200)],
-   ["MA200 farkı",((x.distancePct>=0)?"+":"")+fmt(x.distancePct)+"%"],
+   ["MA"+(x.referencePeriod||"—"),price(x.referenceMA)],
+   ["MA farkı",((x.distancePct>=0)?"+":"")+fmt(x.distancePct)+"%"],
    ["RSI (14)",fmt(x.rsi14)],
    ["MACD histogram",fmt(x.macdHist,7)],
    ["24s hacim",fmt(x.volume24h,0)+" USDT"]
@@ -78,13 +78,13 @@ async function updateWeeklyRadar(){
   earlyStatus.textContent=(data.running?"Haftalık tarama sürüyor • ":"")+
     "Son tarama: "+(data.updatedAt?new Date(data.updatedAt).toLocaleString("tr-TR"):"İlk tarama bekleniyor")+
     " | BUY "+count("BUY")+" • SELL "+count("SELL")+" • İZLE "+count("IZLE")+
-    " | İncelenen "+(data.checked||0)+"/"+(data.eligible||0)+
+    " | MA200/MA50/MA20 • İncelenen "+(data.checked||0)+"/"+(data.eligible||0)+
     " • Veri hatası "+(data.failed||0)+
     (sources?"\n"+sources:"")+
     ((data.errors||[]).length?"\nİlk hata: "+data.errors[0]:"")+
     "\nYalnız kapanmış haftalık mumlar. Coinler sırayla taranır. Sinyal garantisi yok.";
   refreshFilterCounters();renderCards();
- }catch(err){earlyStatus.textContent="MA200 taraması görüntülenemedi: "+err.message;}
+ }catch(err){earlyStatus.textContent="Haftalık MA taraması görüntülenemedi: "+err.message;}
  finally{isRefreshing=false;}
 }
 filterButtons.forEach(button=>button.addEventListener("click",()=>{

@@ -13,8 +13,8 @@ const providers=[
 const state={
  running:false,startedAt:0,updatedAt:0,eligible:0,checked:0,failed:0,skippedHistory:0,
  rows:[],sources:{},errors:[],intervalSeconds:INTERVAL_MS/1000,
- strategy:"WEEKLY_SMA200_CONFIRMED_REVERSAL",
- notice:"Haftalık MA200 çevresinde dönüş: BUY için iki kapanmış hafta MA200 üzerinde ve RSI/MACD/hacim teyidi, SELL için iki kapanmış hafta MA200 altında ve momentum zayıflaması aranır. İZLE teyitsiz adaydır. 200 haftalık geçmişi olmayan coinlere sinyal verilmez. Bu bir yatırım veya otomatik işlem önerisi değildir."
+ strategy:"WEEKLY_ADAPTIVE_SMA200_50_20",
+ notice:"Haftalık dönüş radarı: uzun geçmişte MA200, yeni coinlerde MA50/MA20 kullanılır. BUY/SELL iki kapanmış haftayla birlikte RSI/MACD ve hacim kontrollerinden geçer. Sinyaller işlem önerisi değildir."
 };
 const cursor=new Map(),blockedUntil=new Map(),candleCache=new Map();
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -140,7 +140,7 @@ async function scanProvider(p){
        reason:result.reason,
        price:ticker.price,
        weekClose:result.lastClosedPrice,
-       sma200:result.sma200,
+       sma200:result.sma200,referenceMA:result.referenceMA,referencePeriod:result.referencePeriod,
        distancePct:result.distancePct,
        rsi14:result.rsi14,
        macdHist:result.macdHist,
@@ -206,15 +206,16 @@ export async function fetchEarlyPumpChart(exchange,symbol){
  const analysis=analyzeWeeklyMA200(raw);
  if(!analysis.candles.length)throw Object.assign(Error("Bu coin için yeterli mum verisi bulunamadı."),{httpCode:404});
  return {
-  exchange:p.name,symbol:market.replace(/USDT$/,"/USDT"),market,
-  timeframe:p.kind==="gate"?"7D":"1W",MA_PERIOD:200,
+  exchange:p.name,symbol:market.replace(/[-_]?USDT$/,"/USDT"),market,
+  timeframe:p.kind==="gate"?"7D":"1W",MA_PERIOD:analysis.referencePeriod,
+  referencePeriod:analysis.referencePeriod,referenceMA:analysis.referenceMA,
   generatedAt:Date.now(),lastClosedAt:analysis.lastClosedAt,insufficient:analysis.insufficient,
   weeks:analysis.weeks,status:analysis.status,reason:analysis.reason,
   sma200:analysis.sma200,distancePct:analysis.distancePct,rsi14:analysis.rsi14,
-  candles:analysis.candles,ma200:analysis.ma200,
-  markers:analysis.markers.map(({kind,time,index,price,confirmedAt})=>({kind,time,index,price,confirmedAt})),
-  notice:p.kind==="gate"
-   ?"Gate.io mumları 7 günlük periyotlarla gelir; takvim haftasından farklı hizalanabilir. Kapanmamış periyot dahil edilmez."
-   :"Sinyaller yalnızca kapanmış haftalık mumlara dayanır. Güncel fiyat ve yeni açılan hafta sinyal için kullanılmaz."
+  candles:analysis.candles,ma200:analysis.ma200,ma:analysis.ma,
+  markers:analysis.markers.map(({kind,time,index,price,confirmedAt,period,reason})=>({kind,time,index,price,confirmedAt,period,reason})),
+  notice:(p.kind==="gate"?"Gate.io yedi günlük periyotları takvim haftasından farklı hizalanabilir. ":"")+
+   (analysis.referencePeriod?"Bu coin için gerçek MA"+analysis.referencePeriod+" kullanılıyor. ":"Yeterli mum geçmişi yok. ")+
+   "Yalnızca kapanmış haftalık mumlar kullanılır. Sinyal, kâr garantisi değildir."
  };
 }
