@@ -9,7 +9,7 @@ function analyze(rows,symbol,exchange,url){
  const sorted=[...rows].sort((a,b)=>Number(a[0])-Number(b[0]));
  if(sorted.length<33)return null;
  const now=Date.now();
- const closed=sorted.filter(r=>Number(r[0])<now-60000);
+ const closed=sorted.filter(r=>{const t=Number(r[0]);return Number.isFinite(t)&&(t<1e11?t*1000:t)+60000<=now;});
  if(closed.length<32)return null;
  const recent=closed.slice(-2);
  const base=closed.at(-32);
@@ -33,7 +33,7 @@ function render(items,stats){
  summary.textContent=stats.map(s=>s.name+": "+s.ok+"/"+s.total+" incelendi"+(s.error?" (HATA: "+s.error+")":"")).join(" • ");
  cards.append(summary);
  status.textContent="Tarama tamamlandı • "+stats.reduce((a,s)=>a+s.ok,0)+" parite • "+items.length+" takipte.";
- if(!items.length){const p=document.createElement("p");p.textContent="30 dakika öncesine göre son 2 mum sonunda %2 yükselen coin bulunamadı.";cards.append(p);}
+ if(!items.length){const p=document.createElement("p");p.textContent=stats.some(s=>s.error)?"Bazı borsalar taranamadı; sonuçlar eksik olabilir.":"30 dakika öncesine göre son 2 mum sonunda %2 yükselen coin bulunamadı.";cards.append(p);}
  for(const x of items.sort((a,b)=>b.gain-a.gain)){
   const el=document.createElement("article");el.className="coin-card";el.style.cssText="padding:16px;border:1px solid #41516a;border-radius:12px;margin:8px 0";
   const title=document.createElement("h3");title.textContent=x.exchange+" • "+x.symbol+" — TAKİPTE";
