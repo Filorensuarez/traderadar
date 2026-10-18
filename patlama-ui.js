@@ -32,8 +32,8 @@ function render(items,stats){
  const summary=document.createElement("div");summary.className="info-box";
  summary.textContent=stats.map(s=>s.name+": "+s.ok+"/"+s.total+" incelendi"+(s.error?" (HATA: "+s.error+")":"")).join(" • ");
  cards.append(summary);
- status.textContent="Tarama tamamlandı • "+stats.reduce((a,s)=>a+s.ok,0)+" parite • "+items.length+" takipte.";
- if(!items.length){const p=document.createElement("p");p.textContent=stats.some(s=>s.error)?"Bazı borsalar taranamadı; sonuçlar eksik olabilir.":"30 dakika öncesine göre son 2 mum sonunda %2 yükselen coin bulunamadı.";cards.append(p);}
+ status.textContent=(running?"Tarama sürüyor":"Tarama tamamlandı")+" • "+stats.reduce((a,s)=>a+s.ok,0)+" parite • "+items.length+" takipte.";
+ if(!items.length&&!running){const p=document.createElement("p");p.textContent=stats.some(s=>s.error)?"Bazı borsalar taranamadı; sonuçlar eksik olabilir.":"30 dakika öncesine göre son 2 mum sonunda %2 yükselen coin bulunamadı.";cards.append(p);}
  for(const x of items.sort((a,b)=>b.gain-a.gain)){
   const el=document.createElement("article");el.className="coin-card";el.style.cssText="padding:16px;border:1px solid #41516a;border-radius:12px;margin:8px 0";
   const title=document.createElement("h3");title.textContent=x.exchange+" • "+x.symbol+" — TAKİPTE";
@@ -42,7 +42,7 @@ function render(items,stats){
   el.append(title,desc,link);cards.append(el);
  }
 }
-async function scan(){if(running)return;running=true;button.disabled=true;cards.textContent="Beş borsanın verileri taranıyor...";const items=[],stats=[];try{for(const market of markets){const s={name:market.name,total:0,ok:0,error:""};stats.push(s);status.textContent=market.name+" taranıyor...";try{const symbols=await market.list();s.total=symbols.length;let failures=0;for(let i=0;i<symbols.length;i+=CONCURRENCY){await Promise.all(symbols.slice(i,i+CONCURRENCY).map(async x=>{try{const rows=await market.candles(x);if(!Array.isArray(rows)||rows.length<33)throw Error("Yetersiz mum");s.ok++;const hit=analyze(rows,x.symbol,market.name,x.url);if(hit)items.push(hit);}catch(e){failures++;s.error=e.message;}}));status.textContent=market.name+" "+Math.min(i+CONCURRENCY,s.total)+"/"+s.total+" işlendi • Başarılı: "+s.ok+" • Toplam aday: "+items.length;await new Promise(resolve=>setTimeout(resolve,BATCH_PAUSE_MS));}if(failures===0)s.error="";else s.error=failures+" parite okunamadı; son hata: "+s.error;}catch(e){s.error=e.message;}render(items,stats);}}finally{running=false;button.disabled=false;}}
+async function scan(){if(running)return;running=true;button.disabled=true;cards.textContent="Beş borsanın verileri taranıyor...";const items=[],stats=[],seen=new Set();try{for(const market of markets){const s={name:market.name,total:0,ok:0,error:""};stats.push(s);status.textContent=market.name+" taranıyor...";try{const symbols=await market.list();s.total=symbols.length;let failures=0;for(let i=0;i<symbols.length;i+=CONCURRENCY){await Promise.all(symbols.slice(i,i+CONCURRENCY).map(async x=>{try{const rows=await market.candles(x);if(!Array.isArray(rows)||rows.length<33)throw Error("Yetersiz mum");s.ok++;const hit=analyze(rows,x.symbol,market.name,x.url);if(hit){const key=market.name+":"+x.symbol;if(!seen.has(key)){seen.add(key);items.push(hit);render(items,stats);}}}catch(e){failures++;s.error=e.message;}}));status.textContent=market.name+" "+Math.min(i+CONCURRENCY,s.total)+"/"+s.total+" işlendi • Başarılı: "+s.ok+" • Toplam aday: "+items.length;await new Promise(resolve=>setTimeout(resolve,BATCH_PAUSE_MS));}if(failures===0)s.error="";else s.error=failures+" parite okunamadı; son hata: "+s.error;}catch(e){s.error=e.message;}render(items,stats);}}finally{running=false;button.disabled=false;render(items,stats);}}
 button?.addEventListener("click",scan);
 let timer=null;
 function startAuto(){if(timer)return;scan();timer=setInterval(()=>{if(!document.hidden)scan();},60000);}
