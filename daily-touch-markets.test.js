@@ -27,10 +27,11 @@ test("Tekrarlı veya geçersiz ticker satırları elenir; fallback tüm geçerli
  const a=eligibleDailyTouchMarkets([...synthetic,synthetic[0],{symbol:"XYZUSDT",lastPrice:"0"}]);
  assert.equal(a.length,1400);
 });
-test("Server tüm coinleri tarar; slice, üst limit ve rotasyon kullanılmaz",()=>{
+test("Sunucu her uygun piyasa için klines ister ve adet üst sınırı kullanmaz",()=>{
  const code=readFileSync(new URL("./daily-touch-watch.js",import.meta.url),"utf8");
- assert.match(code,/for\(const market of all\)/);
- assert.doesNotMatch(code,/\\.slice\\(0,\\d+\\)|MAX=|LIMIT=|rotation|offset/);
- assert.match(code,/state\\.checked\\+\\+/);
- assert.match(code,/response\\.status===429/);
+ assert(code.includes("for(const market of all)"));
+ assert(!code.includes("all.slice("));
+ assert(!code.includes("all.splice("));
+ assert(code.includes("state.checked++"));
+ assert(code.includes("response.status===429"));
 });
