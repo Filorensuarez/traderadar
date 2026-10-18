@@ -1,6 +1,7 @@
 // 30 genuine closed 1-second candles vs the 30 prior closed 1-minute candles.
 // USDT spot only. Never downgrade a missing 1s source to 1m or synthetic 1s bars.
 import {calculateMomentum30s,momentum30sThresholds} from "./momentum-30s-model.js";
+import {analyzeEmaSqueezeBreakout,EMA_BREAKOUT_RULES} from "./momentum-ema-breakout-model.js";
 import {confirmedMomentumRows} from "./momentum-visibility.js";
 import {MOMENTUM_SCAN_INTERVAL_MS,MOMENTUM_MIN_REQUEST_SPACING_MS,MOMENTUM_RATE_LIMIT_COOLDOWN_MS,chooseMomentumMarkets} from "./momentum-scan-config.js";
 const SCAN_EVERY_MS=MOMENTUM_SCAN_INTERVAL_MS,UNIVERSE_TTL=75000;
@@ -15,8 +16,8 @@ const PROVIDERS=[
 const state={
  running:false,updatedAt:0,startedAt:0,checked:0,successful:0,failed:0,missing:0,
  errors:[],rows:[],universe:{},sources:{},
- intervalSeconds:SCAN_EVERY_MS/1000,thresholds:momentum30sThresholds,
- notice:"216 borsa/parite hedefi: Binance 200 + OKX 16, 120 saniyelik dönüşümlü tarama. OKX API istekleri paylaşılan IP sınırı nedeniyle seyreltilir; 429 durumunda geçici bekleme uygulanır ve eksik coin tarandı olarak sayılmaz. Fiyat +%2 teyidi korunur; hacim şartı yoktur. İşlem ve getiri garantisi değildir."
+ intervalSeconds:SCAN_EVERY_MS/1000,thresholds:momentum30sThresholds,emaRules:EMA_BREAKOUT_RULES,
+ notice:"216 borsa/parite hedefi. İki bağımsız teyit türü: kapanmış mumlarla +%2 fiyat momentumu veya EMA7/25/99 sıkışması sonrası iki 1 dakikalık kapanışla yukarı kırılım. Hacim koşulu yoktur. Sadece tam teyitliler görüntülenir. Teknik sinyaller getiri garantisi değildir."
 };
 const active=new Map(),minuteCache=new Map(),limitUntil=new Map(),marketCache=new Map(),rotation=new Map(),nextFetchAt=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -78,12 +79,12 @@ async function getMinutes(p,s){
  const key=p.name+":"+s,cached=minuteCache.get(key);
  if(cached&&Date.now()-cached.at<43000)return cached.rows;
  const url=p.kind==="binance"?
-  p.api+"/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=42":
-  p.api+"/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=42";
+  p.api+"/api/v3/klines?symbol="+encodeURIComponent(s)+"&interval=1m&limit=160":
+  p.api+"/api/v5/market/candles?instId="+encodeURIComponent(s)+"&bar=1m&limit=160";
  const d=await get(url,p.name);
  const rows=p.kind==="binance"?d:d.code==="0"?d.data:null;
  if(!Array.isArray(rows))throw Error(p.name+" 1m referans mumları alınamadı");
- const parsed=rows.map(x=>({time:+x[0],close:+x[4],quoteVolume:+x[7]}));
+ const parsed=rows.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],quoteVolume:+x[7]}));
  minuteCache.set(key,{rows:parsed,at:Date.now()});
  return parsed;
 }
@@ -92,7 +93,7 @@ function publish(){
  for(const [key,x] of active)if(time-x.lastCheckedAt>MAX_ACTIVE_AGE)active.delete(key);
  // Expose only fully confirmed results; no near-threshold candidates leave the backend.
  state.rows=confirmedMomentumRows([...active.values()])
-  .sort((a,b)=>b.firstSeenAt-a.firstSeenAt||b.priceChangePct-a.priceChangePct).slice(0,80);
+  .sort((a,b)=>b.firstSeenAt-a.firstSeenAt||(Number(b.priceChangePct)||0)-(Number(a.priceChangePct)||0)).slice(0,80);
  state.updatedAt=time;
 }
 export function minuteMomentumStatus(){return {...state,rows:confirmedMomentumRows(state.rows),
@@ -114,23 +115,42 @@ async function scanExchange(p){
      // Fetch the slower 1m reference first: the 1s candles must be checked immediately
      // after retrieval or they'd age out while waiting in the shared rate-limit queue.
      const minutes=await getMinutes(p,ticker.symbol);
-     const seconds=await getSeconds(p,ticker.symbol);
-     const result=calculateMomentum30s(seconds,minutes,Date.now());
-     if(!result.ok){stat.missing++;state.missing++;active.delete(key);}
-     else{
-      stat.successful++;state.successful++;
-      const normalized={...result,exchange:p.name,symbol:ticker.symbol.replace(/[-]?USDT$/,"/USDT"),
-       lastCheckedAt:Date.now(),spreadPct:+((ticker.ask-ticker.bid)/ticker.ask*100).toFixed(3)};
-      if(result.confirmed){
-       const existing=active.get(key);
-       active.set(key,{...normalized,firstSeenAt:existing?.firstSeenAt||Date.now(),
-        status:"30 SN FİYAT YÜKSELİŞ TEYİDİ"});
-      }else active.delete(key);
+     const emaKey=key+":EMA",priceKey=key+":PRICE";
+     const now=Date.now(),ema=analyzeEmaSqueezeBreakout(minutes,now);
+     const normalizedSymbol=ticker.symbol.replace(/[-]?USDT$/,"/USDT");
+     const spreadPct=+((ticker.ask-ticker.bid)/ticker.ask*100).toFixed(3);
+     if(ema.confirmed){
+      const existing=active.get(emaKey);
+      active.set(emaKey,{...ema,exchange:p.name,symbol:normalizedSymbol,
+       lastCheckedAt:now,firstSeenAt:existing?.firstSeenAt||now,spreadPct,
+       status:"EMA SIKIŞMA KIRILIMI • BUY TEYİDİ"});
+     }else active.delete(emaKey);
+     // EMA is independent of fast 1-second data. If 1s fails, keep a confirmed EMA.
+     try{
+      const seconds=await getSeconds(p,ticker.symbol);
+      const result=calculateMomentum30s(seconds,minutes,Date.now());
+      if(!result.ok){
+       stat.missing++;state.missing++;active.delete(priceKey);
+      }else{
+       stat.successful++;state.successful++;
+       const normalized={...result,signalType:"PRICE_30S",exchange:p.name,symbol:normalizedSymbol,
+        lastCheckedAt:Date.now(),spreadPct};
+       if(result.confirmed){
+        const previous=active.get(priceKey);
+        active.set(priceKey,{...normalized,firstSeenAt:previous?.firstSeenAt||Date.now(),
+         status:"30 SN FİYAT YÜKSELİŞ TEYİDİ"});
+       }else active.delete(priceKey);
+      }
+     }catch(error){
+      stat.failed++;state.failed++;stat.lastError=String(error.message);
+      if(state.errors.length<12)state.errors.push(p.name+" "+ticker.symbol+": "+stat.lastError);
+      active.delete(priceKey);
      }
     }catch(e){
      stat.failed++;state.failed++;stat.lastError=String(e.message);
      if(state.errors.length<12)state.errors.push(p.name+" "+ticker.symbol+": "+stat.lastError);
-     active.delete(key);
+     active.delete(key+":PRICE");
+     active.delete(key+":EMA");
     }finally{
      stat.checked++;state.checked++;state.attempted=state.checked;
     }
