@@ -4,9 +4,21 @@ const button=document.getElementById("patlamaScan");
 let running=false;
 const LIMIT=50;
 async function json(url){const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);try{const r=await fetch(url,{cache:"no-store",signal:controller.signal});if(!r.ok)throw Error("HTTP "+r.status);return await r.json();}finally{clearTimeout(timeout);}}
-function ema(v,n){let e=v[0],k=2/(n+1);return v.map(x=>(e=x*k+e*(1-k)));}
-function rsi(v,n=7){let up=0,down=0;for(let i=v.length-n;i<v.length;i++){const d=v[i]-v[i-1];up+=Math.max(d,0);down+=Math.max(-d,0);}return down===0?(up===0?50:100):100-100/(1+up/down);}
-function analyze(rows,symbol,exchange,url){if(rows.length<110)return null;const closed=rows.slice(0,-1);const close=closed.map(x=>+x[4]),high=closed.map(x=>+x[2]),low=closed.map(x=>+x[3]);if([...close,...high,...low].some(x=>!Number.isFinite(x)||x<=0))return null;const p=close.at(-1),e9=ema(close,9),e21=ema(close,21),rs=rsi(close),prevRsi=rsi(close.slice(0,-2));const last10=close.slice(-10);const move=(Math.max(...last10)-Math.min(...last10))/Math.min(...last10)*100;const resist=Math.max(...high.slice(-11,-1));const distance=(resist-p)/resist*100;const range=high.map((h,i)=>(h-low[i])/close[i]*100);const recent=range.slice(-10).reduce((a,b)=>a+b,0)/10;const sorted=range.slice(-100).sort((a,b)=>a-b);const compressed=recent<=sorted[Math.floor(sorted.length*.30)];const near=distance>=-0.15&&distance<=0.55;const emaUp=e9.at(-1)>e9.at(-4)&&e9.at(-1)>=e21.at(-1)*.997;const rsiUp=rs>=50&&rs<=65&&rs>prevRsi;const notExtended=(p/close.at(-4)-1)*100<1.2;const score=(compressed?25:0)+(near?25:0)+(emaUp?20:0)+(rsiUp?20:0)+(notExtended?10:0);if(!(compressed&&near&&emaUp&&rsiUp&&notExtended))return null;return {symbol,exchange,url,p,rs,move,distance,score,stage:p>resist?"KIRILIM ADAYI":"PATLAMA ADAYI"};}
+function analyze(rows,symbol,exchange,url){
+ const sorted=[...rows].sort((a,b)=>Number(a[0])-Number(b[0]));
+ if(sorted.length<33)return null;
+ const now=Date.now();
+ const closed=sorted.filter(r=>Number(r[0])<now-60000);
+ if(closed.length<32)return null;
+ const recent=closed.slice(-2);
+ const base=closed.at(-32);
+ const basePrice=Number(base[4]);
+ const lastPrice=Number(recent.at(-1)[4]);
+ if(!Number.isFinite(basePrice)||basePrice<=0||!Number.isFinite(lastPrice))return null;
+ const gain=(lastPrice/basePrice-1)*100;
+ if(gain<2)return null;
+ return {symbol,exchange,url,p:lastPrice,gain,stage:"TAKİPTE"};
+}
 const markets=[
  {name:"BINANCE",async list(){const t=await json("https://api.binance.com/api/v3/ticker/24hr");return t.filter(x=>x.symbol.endsWith("USDT")&&+x.quoteVolume>0&&!/(UP|DOWN|BULL|BEAR)USDT$/.test(x.symbol)).sort((a,b)=>+b.quoteVolume-+a.quoteVolume).slice(0,LIMIT).map(x=>({symbol:x.symbol,id:x.symbol,url:"https://www.binance.com/en/trade/"+x.symbol.replace(/USDT$/,"_USDT")}));},async candles(x){return await json("https://api.binance.com/api/v3/klines?symbol="+encodeURIComponent(x.id)+"&interval=1m&limit=120");}},
  {name:"OKX",async list(){const j=await json("https://www.okx.com/api/v5/market/tickers?instType=SPOT");if(j.code!=="0")throw Error(j.msg||"API");return j.data.filter(x=>x.instId.endsWith("-USDT")&&+x.volCcy24h>0).sort((a,b)=>+b.volCcy24h-+a.volCcy24h).slice(0,LIMIT).map(x=>({symbol:x.instId.replace("-",""),id:x.instId,url:"https://www.okx.com/trade-spot/"+x.instId.toLowerCase()}));},async candles(x){const j=await json("https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(x.id)+"&bar=1m&limit=120");if(j.code!=="0")throw Error(j.msg||"API");return j.data.map(a=>[a[0],a[1],a[2],a[3],a[4]]).reverse();}},
@@ -14,6 +26,24 @@ const markets=[
  {name:"GATE.IO",async list(){const t=await json("https://api.gateio.ws/api/v4/spot/tickers");return t.filter(x=>x.currency_pair.endsWith("_USDT")&&+x.quote_volume>0).sort((a,b)=>+b.quote_volume-+a.quote_volume).slice(0,LIMIT).map(x=>({symbol:x.currency_pair.replace("_",""),id:x.currency_pair,url:"https://www.gate.com/trade/"+x.currency_pair}));},async candles(x){const j=await json("https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair="+encodeURIComponent(x.id)+"&interval=1m&limit=120");return j.map(a=>[a[0],a[5],a[3],a[4],a[2]]).sort((a,b)=>+a[0]-+b[0]);}},
  {name:"COINBASE",async list(){const t=await json("https://api.exchange.coinbase.com/products");return t.filter(x=>x.quote_currency==="USDT"&&x.status==="online"&&!x.trading_disabled).slice(0,LIMIT).map(x=>({symbol:x.id.replace("-",""),id:x.id,url:"https://www.coinbase.com/advanced-trade/spot/"+x.id}));},async candles(x){const j=await json("https://api.exchange.coinbase.com/products/"+encodeURIComponent(x.id)+"/candles?granularity=60");if(!Array.isArray(j))throw Error("Mum verisi yok");return j.slice(0,120).reverse().map(a=>[a[0],a[3],a[2],a[1],a[4]]);}}
 ];
-function render(items,stats){cards.replaceChildren();const summary=document.createElement("div");summary.className="info-box";summary.textContent=stats.map(s=>s.name+": "+s.ok+"/"+s.total+" incelendi"+(s.error?" (HATA: "+s.error+")":"")).join(" • ");cards.append(summary);status.textContent="Tarama tamamlandı • "+stats.reduce((a,s)=>a+s.ok,0)+" başarılı parite • "+items.length+" aday. 3 dakika önceden kesin tahmin değildir.";if(!items.length){const p=document.createElement("p");p.textContent="Şu anda bütün koşulları sağlayan aday bulunamadı.";cards.append(p);}for(const x of items.sort((a,b)=>b.score-a.score)){const el=document.createElement("article");el.className="coin-card";el.style.cssText="padding:16px;border:1px solid #41516a;border-radius:12px;margin:8px 0";const title=document.createElement("h3");title.textContent=x.exchange+" • "+x.symbol+" — "+x.stage;const desc=document.createElement("p");desc.textContent="Ön koşul puanı: "+x.score+"/100 • RSI(7): "+x.rs.toFixed(1)+" • Dirence uzaklık: "+x.distance.toFixed(2)+"% • Son 10 mum aralığı: "+x.move.toFixed(2)+"%";const link=document.createElement("a");link.href=x.url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Grafiği aç";el.append(title,desc,link);cards.append(el);}}
+function render(items,stats){
+ cards.replaceChildren();
+ const summary=document.createElement("div");summary.className="info-box";
+ summary.textContent=stats.map(s=>s.name+": "+s.ok+"/"+s.total+" incelendi"+(s.error?" (HATA: "+s.error+")":"")).join(" • ");
+ cards.append(summary);
+ status.textContent="Tarama tamamlandı • "+stats.reduce((a,s)=>a+s.ok,0)+" parite • "+items.length+" takipte.";
+ if(!items.length){const p=document.createElement("p");p.textContent="30 dakika öncesine göre son 2 mum sonunda %2 yükselen coin bulunamadı.";cards.append(p);}
+ for(const x of items.sort((a,b)=>b.gain-a.gain)){
+  const el=document.createElement("article");el.className="coin-card";el.style.cssText="padding:16px;border:1px solid #41516a;border-radius:12px;margin:8px 0";
+  const title=document.createElement("h3");title.textContent=x.exchange+" • "+x.symbol+" — TAKİPTE";
+  const desc=document.createElement("p");desc.textContent="30 dakika öncesine göre yükseliş: +"+x.gain.toFixed(2)+"% • Son kapanış: "+x.p;
+  const link=document.createElement("a");link.href=x.url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Grafiği aç";
+  el.append(title,desc,link);cards.append(el);
+ }
+}
 async function scan(){if(running)return;running=true;button.disabled=true;cards.textContent="Beş borsanın verileri taranıyor...";const items=[],stats=[];try{for(const market of markets){const s={name:market.name,total:0,ok:0,error:""};stats.push(s);status.textContent=market.name+" taranıyor...";try{const symbols=await market.list();s.total=symbols.length;let failures=0;for(let i=0;i<symbols.length;i+=4){await Promise.all(symbols.slice(i,i+4).map(async x=>{try{const rows=await market.candles(x);if(!Array.isArray(rows)||rows.length<110)throw Error("Yetersiz mum");s.ok++;const hit=analyze(rows,x.symbol,market.name,x.url);if(hit)items.push(hit);}catch(e){failures++;s.error=e.message;}}));status.textContent=market.name+" "+s.ok+"/"+s.total+" • Toplam aday: "+items.length;}if(failures===0)s.error="";else s.error=failures+" parite okunamadı; son hata: "+s.error;}catch(e){s.error=e.message;}render(items,stats);}}finally{running=false;button.disabled=false;}}
 button?.addEventListener("click",scan);
+let timer=null;
+function startAuto(){if(timer)return;scan();timer=setInterval(()=>{if(!document.hidden)scan();},60000);}
+document.getElementById("momentumButton")?.addEventListener("click",startAuto);
+if(!document.getElementById("momentum")?.hidden)startAuto();
