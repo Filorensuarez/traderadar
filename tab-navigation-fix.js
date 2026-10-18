@@ -16,7 +16,7 @@
  });
  // Restore a usable screen after page load even if another module hid every section.
  if(![...sections].some(s=>!s.hidden)){
-  const initial=document.querySelector("#dailyPlansButton")||document.querySelector("#dailyButton");
+  const initial=document.querySelector("#dailyButton");
   if(initial)activate(initial);
  }
 })();

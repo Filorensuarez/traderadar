@@ -26,7 +26,6 @@
   <link rel="icon" type="image/svg+xml" href="/icons/traderadar.svg">
   <link rel="apple-touch-icon" href="/icons/traderadar-192.png">
   <link rel="stylesheet" href="/mobile-app.css?v=1">
-  <link rel="stylesheet" href="./early-pump-chart.css?v=weekly-ma-adaptive-v2">
 </head>
 
 <body>
@@ -91,9 +90,6 @@
   <button id="flowButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
   <button id="momentumButton" class="tab" type="button" data-view="momentum">1 Dakikalık Momentum</button>
-  <button id="earlyPumpButton" class="tab" type="button" data-view="earlypump">Erken Yükseliş Radarı</button>
-  <button id="vBottomButton" class="tab" type="button" data-view="vbottom">V Tipi Dip • Tam Teyit</button>
-  <button id="dailyPlansButton" class="tab" type="button" data-view="dailyplans">USDT Coin İşlem Planları</button>
   <button id="pullbackButton" class="tab" type="button" data-view="hourlyPullback" style="display:none" aria-hidden="true">Büyük Geri Çekilmeler</button>
   <button id="capitalButton" class="tab" type="button" data-view="capital" style="display:none" aria-hidden="true">Sermaye Yönetimi</button>
   <button id="whaleButton" class="tab" data-view="whale" type="button" style="display:none" aria-hidden="true">Büyük Yatırımcı Takibi</button>
@@ -423,68 +419,6 @@
  <p id="pullbackStatus" aria-live="polite">Veriler bekleniyor.</p>
  <div id="pullbackCards" class="coin-grid"></div>
 </section>
-<section id="dailyPlans" hidden><div class="section-head"><div><h2>USDT Coin İşlem Planları</h2><p class="description">Binance, OKX, KuCoin, Gate.io ve Bitget borsalarının yalnızca USDT spot işlem çiftleri ayrı ayrı kontrol edilir. Bir borsada uygun USDT piyasası yoksa uydurma USD/USDT dönüşümü yapılmaz. EMA 7/25, RSI, hacim artışı ve alış-satış makası birlikte değerlendirilir. Sinyaller için USDT cinsinden örnek alış, %3 brüt hedef ve %1,5 stop seviyesi gösterilir. 72 saatlik başarı oranı sadece sanal sonuçlara dayanır. Fiyat hedefinin görülmesi gerçek işlem ya da kesin getiri değildir.</p></div></div><button id="dailyPlansScan" class="refresh-button" type="button">Şimdi Tara</button><p id="dailyPlansStatus" aria-live="polite">USDT taraması başlatılıyor.</p><div id="dailyPlansCards" class="coin-grid"></div></section>
-<section id="vbottom" hidden>
-  <div class="section-head">
-    <div>
-      <h2>V Tipi Dip — Çoklu Zaman Dilimi Teyidi</h2>
-      <p class="description">V biçimli sert düşüş ve dipten güçlü dönüşü 1, 5 ve 15 dakikalık kapanmış mumlarda birlikte ölçer. RSI 7, Stokastik RSI, MACD histogramı, EMA 7/25, 60 dakikalık VWAP, hacim, dip yapısı ve risk/getiri şartlarının hepsi zorunludur.</p>
-      <p class="description">Tam teknik teyit için 12/12 kontrol geçmelidir. Eksik veride, geç kalınmış fiyat hareketinde veya risk/getiri zayıfsa teyit verilmez. Tam teknik teyit kesin fiyat dönüşü, kazanç garantisi veya otomatik alım emri değildir.</p>
-      <p class="description">Binance, OKX, KuCoin, Gate.io, Bitget: likit USDT spot pariteleri dönüşümlü taranır. 24 saat hacmi en az 1 milyon USDT, alış-satış makası en çok %0,30 olmalıdır; tam teyitte makas sınırı %0,20'dir.</p>
-    </div>
-    <button id="vBottomScan" class="refresh-button" type="button">Şimdi Tara</button>
-  </div>
-  <label style="display:flex;gap:9px;align-items:center;margin:10px 0;font-size:14px">
-    <input id="vBottomCandidates" type="checkbox" style="height:18px;width:18px">
-    Adayları ve geç kalınmış hareketleri de göster (varsayılan: yalnızca tam teyit)
-  </label>
-  <p id="vBottomStatus" aria-live="polite">İlk tarama bekleniyor.</p>
-  <div id="vBottomCards" class="coin-grid"></div>
-</section>
-<section id="earlypump" hidden>
-  <div class="section-head">
-    <div>
-      <h2>Erken Yükseliş Radarı — Haftalık MA200 / MA50 / MA20 BUY / SELL</h2>
-      <p class="description">Gerçek haftalık mumlarla uzun geçmişi olan coinlerde MA200, yeni coinlerde MA50 veya MA20 hesaplanır. BUY için seçilen ortalama üzerinde iki kapanış, RSI/MACD ve hacim teyidi; SELL için ortalama altında iki kapanış ve zayıflayan momentum aranır. İZLE teyitsiz adaydır.</p>
-      <p class="description">Kapanmamış haftalar sinyal üretmez. MA200/MA50/MA20 farklı vadeleri gösterir. 26 kapanmış haftadan az geçmişi olan coinlere bu modelde BUY/SELL işareti konmaz. Binance, OKX, KuCoin ve Gate.io spot USDT çiftleri dönüşümlü taranır (Gate.io 7 günlük periyot kullanır). Sinyaller kâr veya teknik dönüş garantisi değildir.</p>
-    </div>
-    <button id="earlyPumpScan" class="refresh-button" type="button">Şimdi Tara</button>
-  </div>
-  <form id="maLookup" class="ma-lookup" autocomplete="off">
-    <select id="maChartExchange" aria-label="Grafik borsası">
-      <option>BINANCE</option><option>OKX</option><option>KUCOIN</option><option>GATE.IO</option>
-    </select>
-    <input id="maChartSymbol" aria-label="USDT coin kodu" maxlength="24" placeholder="Coin: BTC veya BTCUSDT" required>
-    <button type="submit">Coinin Grafiğini Aç</button>
-  </form>
-  <div class="ma-controls" role="group" aria-label="Sinyal filtreleri">
-    <button class="ma-filter" type="button" data-ma-filter="ALL" aria-pressed="true">Tümü</button>
-    <button class="ma-filter" type="button" data-ma-filter="BUY" aria-pressed="false">BUY</button>
-    <button class="ma-filter" type="button" data-ma-filter="SELL" aria-pressed="false">SELL</button>
-    <button class="ma-filter" type="button" data-ma-filter="IZLE" aria-pressed="false">İZLE</button>
-  </div>
-  <p id="earlyPumpStatus" aria-live="polite">Haftalık SMA200 dönüş taraması hazırlanıyor...</p>
-  <div id="earlyPumpCards" class="coin-grid"></div>
-  <dialog id="maChartDialog" aria-label="Haftalık mum ve MA200 grafik penceresi">
-    <div class="ma-chart-wrap">
-      <div class="ma-chart-top">
-        <h3 id="maChartTitle">Grafik yükleniyor...</h3>
-        <button id="maChartClose" type="button" aria-label="Grafiği kapat">×</button>
-      </div>
-      <div id="maChartDetails"></div>
-      <div class="ma-chart-buttons">
-        <button id="maZoomIn" type="button">+ Yakınlaştır</button>
-        <button id="maZoomOut" type="button">− Uzaklaştır</button>
-        <button id="maZoomAll" type="button">Tüm geçmiş</button>
-        <button id="maScaleToggle" type="button">LOG ölçek</button>
-      </div>
-      <div class="ma-chart-canvas"><canvas id="maChartCanvas" aria-label="Gerçek haftalık mum grafiği, MA200 MA50 MA20 ve BUY SELL etiketleri"></canvas></div>
-      <p id="maChartFeedback" role="status" aria-live="polite"></p>
-      <p id="maChartNote"></p>
-      <div id="maChartSignalHistory" class="ma-history" aria-live="polite"></div>
-    </div>
-  </dialog>
-</section>
 <section id="momentum" hidden>
  <h2>1 Dakikalık Momentum — EMA Sıkışması ve Fiyat Teyidi</h2>
  <p class="description">İki bağımsız BUY teyidi: (1) Son 30 kapalı gerçek 1 saniyelik mumun ortalaması, önceki 30 tamamlanmış dakikalık ortalamadan en az %2 yüksek olmalı. (2) EMA7, EMA25 ve EMA99 sıkışması sonrası yatay direncin üstünde iki tamamlanmış 1 dakikalık kapanış ve EMA yön teyidi aranır. EMA için en az 130 gerçek dakikalık mum gerekir. Hacim koşulu aranmaz. Gerçek 1 saniyelik mumlar Binance ve OKX USDT spot piyasalarından alınır; desteklenmeyen borsalar 1 saniyelik gibi gösterilmez. Tarama hedefi her turda Binance 200, OKX 16 olmak üzere en fazla 216 borsa/parite eşleşmesidir; aynı coin iki borsada bulunabilir. Borsanın sağladığı parite sayısı veya API hızı nedeniyle daha azı tamamlanabilir. Farklı coinler dönüşümlü kontrol edilir. Tarama döngüsü yaklaşık 120 saniyedir; OKX sorguları API sınırına karşı seyreltilir. Bu bölüm yalnızca bütün teknik koşulları sağlayan teyitli coinleri gösterir; eşik altı adaylar yayımlanmaz. Bu yöntem kesin alım veya getiri garantisi değildir.</p>
@@ -518,10 +452,7 @@
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./minute-momentum-ui.js?v=ema-squeeze-v6"></script>
-  <script defer src="./early-pump-chart.js?v=weekly-ma-adaptive-v2"></script>
-  <script type="module" src="./early-pump-ui.js?v=weekly-ma-adaptive-v2"></script>
-  <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>
-  <script type="module" src="./daily-trade-plans-ui.js?v=usdt5"></script>
+
   <script defer src="./tab-navigation-fix.js"></script>
   <script defer src="/install-app.js?v=1"></script>
   <script type="module" src="./hourly-pullback-ui.js"></script>

@@ -1,8 +1,5 @@
 import {paperStats} from "./paper-performance-72h.js";
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
-import {startEarlyPump,scanEarlyPump,earlyPumpStatus,fetchEarlyPumpChart} from "./early-pump-watch.js";
-import {startVBottom,scanVBottom,vBottomStatus} from "./v-bottom-watch.js";
-import {startTryPlans,scanTryPlans,tryPlanStatus} from "./try-market-plans.js";
 import {startHourlyPullbacks,scanHourlyPullbacks,hourlyPullbackStatus} from "./hourly-pullback-watch.js";
 
 import {recordFlowObservations,flowMeasurementStats} from "./flow-measurements.js";
@@ -24,22 +21,7 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 const app = express();
 app.get("/api/paper-performance-72h",(req,res)=>{res.set("Cache-Control","no-store");res.json(paperStats());});
-app.get("/api/daily-plans",(req,res)=>{res.set("Cache-Control","no-store");res.json(tryPlanStatus());});
-app.post("/api/daily-plans/scan",(req,res)=>{res.set("Cache-Control","no-store");scanTryPlans().catch(console.error);res.json({started:true,...tryPlanStatus()});});
-app.get("/api/early-pump",(req,res)=>{res.set("Cache-Control","no-store");res.json(earlyPumpStatus());});
-app.get("/api/early-pump/chart",async(req,res)=>{
- res.set("Cache-Control","no-store");
- try{
-  const data=await fetchEarlyPumpChart(req.query.exchange,req.query.symbol);
-  res.json(data);
- }catch(error){
-  const code=error.httpCode===400?400:error.httpCode===404?404:503;
-  res.status(code).json({error:"Haftalık grafik alınamadı: "+String(error.message).slice(0,140)});
- }
-});
-app.get("/api/v-bottom",(req,res)=>{res.set("Cache-Control","no-store");res.json(vBottomStatus());});
-app.post("/api/v-bottom/scan",(req,res)=>{res.set("Cache-Control","no-store");const wasRunning=vBottomStatus().running;scanVBottom().catch(err=>console.error("V tipi dip tarama hatası:",err));res.json({started:!wasRunning,running:true});});
-app.post("/api/early-pump/scan",(req,res)=>{res.set("Cache-Control","no-store");scanEarlyPump().catch(console.error);res.json({started:true,...earlyPumpStatus()});});
+// Retired three legacy radar endpoints; their scanners are no longer started.
 app.get("/api/minute-momentum",(req,res)=>{res.set("Cache-Control","no-store");res.json(minuteMomentumStatus());});
 app.post("/api/minute-momentum/scan",(req,res)=>{res.set("Cache-Control","no-store");scanMinuteMomentum().catch(console.error);res.json({started:true,...minuteMomentumStatus()});});
 app.get("/api/hourly-pullback",(req,res)=>{res.set("Cache-Control","no-store");res.json(hourlyPullbackStatus());});
@@ -7666,9 +7648,6 @@ startFlowRadar();
 startOkxFlow();
 startKucoinFlow();
 startMinuteMomentum();
-startEarlyPump();
-startVBottom();
-startTryPlans();
 startHourlyPullbacks();
 setInterval(()=>refreshMarketCaps().catch(e=>
  console.error("Piyasa değeri güncellemesi:",e.message)),60*60*1000);
