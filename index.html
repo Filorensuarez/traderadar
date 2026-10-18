@@ -420,8 +420,8 @@
  <div id="pullbackCards" class="coin-grid"></div>
 </section>
 <section id="momentum" hidden>
- <h2>Patlama — Erken Yükseliş Radarı</h2>
- <p class="description">1 dakikalık mumlarda sıkışma, RSI(7), EMA9/21 ve direnç yakınlığını tarar. Amaç yükselişten önce aday belirlemektir; 3 dakika önceden kesin tahmin değildir. Binance USDT spot pariteleri taranır. Spot piyasada açık pozisyon (Open Interest) verisi bulunmadığından bu ölçüt kullanılmaz; CVD ve emir defteri bu sürümde teyit edilmez.</p>
+ <h2>Patlama — %2 Yükseliş Takibi</h2>
+ <p class="description">Son iki kapanmış 1 dakikalık mumun son fiyatı, 30 dakika önceki kapanıştan en az %2 yüksekse coin TAKİPTE olarak gösterilir. Eski RSI, EMA, hacim ve sıkışma koşulları kaldırıldı. Bölüm açıkken tarama her 60 saniyede yenilenir.</p>
  <button id="patlamaScan" class="refresh-button" type="button">Patlama Tara</button>
  <p id="patlamaStatus" aria-live="polite">Tarama başlatılmadı.</p>
  <div id="patlamaCards" class="coin-grid"></div>
@@ -451,7 +451,7 @@
   <script defer src="./whale-monitor.js"></script>
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
-  <script type="module" src="./patlama-ui.js?v=1"></script>
+  <script type="module" src="./patlama-ui.js?v=2"></script>
 
   <script defer src="./tab-navigation-fix.js"></script>
   <script defer src="/install-app.js?v=1"></script>
