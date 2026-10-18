@@ -1,0 +1,28 @@
+name: Daily Touch all spot regression
+on:
+  push:
+    paths:
+      - 'daily-touch-*.js'
+      - 'server.js'
+      - 'index.html'
+      - '.github/workflows/daily-touch-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: |
+          node --check server.js
+          node --check daily-touch-watch.js
+          node --check daily-touch-model.js
+          node --check daily-touch-markets.js
+          node --check daily-touch-ui.js
+      - name: Test unlimited market selection
+        run: node --test daily-touch-markets.test.js

@@ -63,3 +63,11 @@ Diğer momentum, V tipi dip ve USDT işlem planı bölümleri bağımsızdır. H
 - Yeni EMA sinyali %2 fiyat şartı gerektirmez ve hacim şartı uygulanmaz. İki koşul birbirinden bağımsızdır ve yalnız tam teyitliler gösterilir.
 - EMA kırılımı adayının geçmişe ait direnç fiyatı ve geçmiş yatay bölge alt sınırı gösterilir; bunlar garanti edilmiş zarar durdurma noktaları değildir.
 - EMA eşikleri görsel örnekten türetilmiş deneysel değerlerdir. İleri dönük performans, maliyet ve kayma testleri yapılmadan kesin kazanç beklentisi kurulamaz.
+
+## Temas Araması — tüm uygun spot pariteler
+
+- Ayrı **Temas Araması** sekmesi ve `/api/daily-touch` canlı durum API'si.
+- Binance'te işlem gören bütün uygun USDT/TRY spot çiftleri taranır; **coin sayısı ve hacim alt sınırı yoktur**. Sınırsız ifadesi, borsanın sonlu ve güncel listesinde bütün uygun çiftlerin dahil edilmesi anlamına gelir.
+- Kapanmış 1 günlük mumlar üzerinde EMA7/EMA25 teması ve EMA99 altında yükseliş başlamamış durumu aranır; en az 110 günlük geçmiş gerekir.
+- API hız sınırlarında bekleyip **aynı coinden devam eder**. İlerleme, kalan, hata ve eşleşme sayıları görünür. 30 dakikada bir yeni tam tarama; önceki bitmemişse eşzamanlı tekrar başlatılmaz.
+- Binance dışındaki borsalar henüz bu modüle dahil değildir. Mum teması bir alım garantisi değildir.

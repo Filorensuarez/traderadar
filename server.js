@@ -1,4 +1,5 @@
 import {paperStats} from "./paper-performance-72h.js";
+import {startDailyTouch,scanDailyTouch,dailyTouchStatus,stopDailyTouch} from "./daily-touch-watch.js";
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
 import {startHourlyPullbacks,scanHourlyPullbacks,hourlyPullbackStatus} from "./hourly-pullback-watch.js";
 
@@ -20,6 +21,14 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 
 const app = express();
+app.get("/api/daily-touch",(req,res)=>{res.set("Cache-Control","no-store");res.json(dailyTouchStatus());});
+app.post("/api/daily-touch/scan",(req,res)=>{
+ res.set("Cache-Control","no-store");
+ const busy=dailyTouchStatus().running;
+ if(!busy)scanDailyTouch().catch(console.error);
+ res.json({started:!busy,...dailyTouchStatus()});
+});
+app.post("/api/daily-touch/stop",(req,res)=>{res.set("Cache-Control","no-store");res.json(stopDailyTouch());});
 app.get("/api/paper-performance-72h",(req,res)=>{res.set("Cache-Control","no-store");res.json(paperStats());});
 // Retired three legacy radar endpoints; their scanners are no longer started.
 app.get("/api/minute-momentum",(req,res)=>{res.set("Cache-Control","no-store");res.json(minuteMomentumStatus());});
@@ -7648,6 +7657,7 @@ startFlowRadar();
 startOkxFlow();
 startKucoinFlow();
 startMinuteMomentum();
+startDailyTouch();
 startHourlyPullbacks();
 setInterval(()=>refreshMarketCaps().catch(e=>
  console.error("Piyasa değeri güncellemesi:",e.message)),60*60*1000);
