@@ -54,3 +54,12 @@ Diğer momentum, V tipi dip ve USDT işlem planı bölümleri bağımsızdır. H
 - OKX'te aralıklı HTTP 429 istek sınırı hataları saptandı. Farklı modüllerin ortak IP kotası etkili olabilir.
 - OKX istekleri arası minimum bekleme **2,6 saniyeye** çıkarıldı; 429 halinde **3 dakikalık** korumalı bekleme uygulanır.
 - Bu durumun tamamen ortadan kalkması garanti değildir. Sistem API engelini aşmaya çalışmaz, hatalı/gecikmiş mumları gerçek sinyal olarak yayımlamaz.
+
+## 1 Dakikalık Momentum — EMA7/25/99 sıkışma kırılımı
+
+- +%2 fiyat momentumu ayrı bir sinyal olarak kalır.
+- İkinci sinyal: 18 tamamlanmış 1 dakikalık mumda fiyat ve EMA sıkışması, ardından önceki direnç üzerinde iki kapanmış 1 dakika, EMA7 > EMA25 ve fiyat EMA99 üzerinde.
+- En az 130 ardışık tamamlanmış 1 dakikalık mum gerekir. Binance ve OKX 160 adet gerçek 1 dakikalık OHLCV mum alınır; 1s mumlar ayrıca sorgulanır.
+- Yeni EMA sinyali %2 fiyat şartı gerektirmez ve hacim şartı uygulanmaz. İki koşul birbirinden bağımsızdır ve yalnız tam teyitliler gösterilir.
+- EMA kırılımı adayının geçmişe ait direnç fiyatı ve geçmiş yatay bölge alt sınırı gösterilir; bunlar garanti edilmiş zarar durdurma noktaları değildir.
+- EMA eşikleri görsel örnekten türetilmiş deneysel değerlerdir. İleri dönük performans, maliyet ve kayma testleri yapılmadan kesin kazanç beklentisi kurulamaz.

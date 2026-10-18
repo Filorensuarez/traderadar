@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'momentum-30s-model.js'
+      - 'momentum-ema-breakout-model.js'
+      - 'momentum-ema-breakout-model.test.js'
       - 'momentum-scan-config.js'
       - 'momentum-scan-config.test.js'
       - 'momentum-price-only.test.js'
@@ -26,9 +28,10 @@ jobs:
       - name: Syntax check
         run: |
           node --check momentum-30s-model.js
+          node --check momentum-ema-breakout-model.js
           node --check momentum-scan-config.js
           node --check momentum-visibility.js
           node --check minute-momentum-watch.js
           node --check minute-momentum-ui.js
       - name: Test confirmed-only gating
-        run: node --test momentum-visibility.test.js momentum-price-only.test.js momentum-scan-config.test.js
+        run: node --test momentum-visibility.test.js momentum-price-only.test.js momentum-scan-config.test.js momentum-ema-breakout-model.test.js

@@ -486,8 +486,8 @@
   </dialog>
 </section>
 <section id="momentum" hidden>
- <h2>1 Dakikalık Momentum — Sadece Tam Teyit</h2>
- <p class="description">Yeni yöntem: Son 30 tamamlanmış 1 saniyelik mumun ortalama kapanışı, bunlardan önceki 30 tamamlanmış 1 dakikalık mumun ortalamasının en az %2 üzerinde olmalı. Hacim çarpanı, minimum hacim veya hacim hızlanması şartı aranmaz. Gerçek 1 saniyelik mumlar Binance ve OKX USDT spot piyasalarından alınır; desteklenmeyen borsalar 1 saniyelik gibi gösterilmez. Tarama hedefi her turda Binance 200, OKX 16 olmak üzere en fazla 216 borsa/parite eşleşmesidir; aynı coin iki borsada bulunabilir. Borsanın sağladığı parite sayısı veya API hızı nedeniyle daha azı tamamlanabilir. Farklı coinler dönüşümlü kontrol edilir. Tarama döngüsü yaklaşık 120 saniyedir; OKX sorguları API sınırına karşı seyreltilir. Bu bölüm yalnızca bütün teknik koşulları sağlayan teyitli coinleri gösterir; eşik altı adaylar yayımlanmaz. Bu yöntem kesin alım veya getiri garantisi değildir.</p>
+ <h2>1 Dakikalık Momentum — EMA Sıkışması ve Fiyat Teyidi</h2>
+ <p class="description">İki bağımsız BUY teyidi: (1) Son 30 kapalı gerçek 1 saniyelik mumun ortalaması, önceki 30 tamamlanmış dakikalık ortalamadan en az %2 yüksek olmalı. (2) EMA7, EMA25 ve EMA99 sıkışması sonrası yatay direncin üstünde iki tamamlanmış 1 dakikalık kapanış ve EMA yön teyidi aranır. EMA için en az 130 gerçek dakikalık mum gerekir. Hacim koşulu aranmaz. Gerçek 1 saniyelik mumlar Binance ve OKX USDT spot piyasalarından alınır; desteklenmeyen borsalar 1 saniyelik gibi gösterilmez. Tarama hedefi her turda Binance 200, OKX 16 olmak üzere en fazla 216 borsa/parite eşleşmesidir; aynı coin iki borsada bulunabilir. Borsanın sağladığı parite sayısı veya API hızı nedeniyle daha azı tamamlanabilir. Farklı coinler dönüşümlü kontrol edilir. Tarama döngüsü yaklaşık 120 saniyedir; OKX sorguları API sınırına karşı seyreltilir. Bu bölüm yalnızca bütün teknik koşulları sağlayan teyitli coinleri gösterir; eşik altı adaylar yayımlanmaz. Bu yöntem kesin alım veya getiri garantisi değildir.</p>
  <button id="momentumScan" class="refresh-button" type="button">Şimdi Tara</button>
  <p id="momentumStatus" aria-live="polite">Veriler bekleniyor.</p>
  <div id="momentumCards" class="coin-grid"></div>
@@ -517,7 +517,7 @@
   <script defer src="./whale-monitor.js"></script>
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
-  <script type="module" src="./minute-momentum-ui.js?v=coverage-216-v5"></script>
+  <script type="module" src="./minute-momentum-ui.js?v=ema-squeeze-v6"></script>
   <script defer src="./early-pump-chart.js?v=weekly-ma-adaptive-v2"></script>
   <script type="module" src="./early-pump-ui.js?v=weekly-ma-adaptive-v2"></script>
   <script type="module" src="./v-bottom-ui.js?v=multiframe1"></script>
