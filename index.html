@@ -421,17 +421,14 @@
  <div id="pullbackCards" class="coin-grid"></div>
 </section>
 <section id="dailyTouch" hidden>
-  <div class="section-head">
-    <div><h2>Temas Araması — Erken Yükseliş</h2>
-      <p class="description">Binance spot USDT ve TRY çiftlerinde 5 dakikalık dar bant sonrası ilk fiyat kırılımı, EMA7 > EMA25 > EMA99 ve yeni oluşan mumun önceki kapanmış 5 dakikalık mumun zirvesini aşması aranır. Hacim zorunlu değildir. Sinyaller kesin kazanç garantisi değildir.</p>
-    </div>
-    <div style="display:flex;gap:9px;flex-wrap:wrap">
-      <button id="dailyTouchScan" class="refresh-button" type="button">Tümünü Tara</button>
-      <button id="dailyTouchNotify" class="refresh-button" type="button">Bildirimleri Aç</button>\n      <button id="dailyTouchStop" class="refresh-button" type="button" disabled>Durdur</button>
-    </div>
-  </div>
-  <p id="dailyTouchStatus" class="updated-line" aria-live="polite">Tarama hazırlanıyor...</p>
-  <div id="dailyTouchCards" class="coin-grid"></div>
+ <div class="section-head"><div><h2>Temas Araması — %2 Momentum</h2>
+ <p class="description">Son 10 tamamlanmış 1 dakikalık mumun ortalama kapanışı, bu mumlardan önceki 30 tamamlanmış 1 dakikalık mumun ortalama kapanışından en az %2 yüksek olduğunda sinyal oluşur. EMA, hacim ve alıcı sayısı filtresi uygulanmaz. Geçmiş hareket gelecekteki yükselişi garanti etmez.</p></div>
+ <div style="display:flex;gap:9px;flex-wrap:wrap">
+ <button id="dailyTouchScan" class="refresh-button" type="button">Tümünü Tara</button>
+ <button id="dailyTouchNotify" class="refresh-button" type="button">Bildirimleri Aç</button>
+ <button id="dailyTouchStop" class="refresh-button" type="button" disabled>Durdur</button></div></div>
+ <p id="dailyTouchStatus" class="updated-line" aria-live="polite">Tarama hazırlanıyor...</p>
+ <div id="dailyTouchCards" class="coin-grid"></div>
 </section>
 <section id="momentum" hidden>
  <h2>Patlama — %2 Yükseliş Takibi</h2>
