@@ -21,6 +21,39 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 
 const app = express();
+// Binance TR public market-data proxy for the GitHub Pages frontend.
+// Only fixed public endpoints are permitted; no keys or user-provided URLs.
+const trCache=new Map();
+app.get("/api/binance-tr/:kind",async(req,res)=>{
+ res.set("Access-Control-Allow-Origin","https://filorensuarez.github.io");
+ res.set("Cache-Control","no-store");
+ const kind=req.params.kind;
+ const symbol=String(req.query.symbol||"");
+ if(!["symbols","klines","aggTrades"].includes(kind))return res.status(404).json({error:"Unsupported endpoint"});
+ if(kind!=="symbols"&&!/^[A-Z0-9]{2,30}$/.test(symbol))return res.status(400).json({error:"Invalid symbol"});
+ const urls={
+  symbols:"https://www.binance.tr/open/v1/common/symbols",
+  klines:"https://api.binance.me/api/v1/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=120",
+  aggTrades:"https://api.binance.me/api/v3/aggTrades?symbol="+encodeURIComponent(symbol)+"&startTime="+encodeURIComponent(String(req.query.startTime||""))+"&endTime="+encodeURIComponent(String(req.query.endTime||""))+"&limit=1000"
+ };
+ if(kind==="aggTrades"&&(!/^\\d{13}$/.test(String(req.query.startTime||""))||!/^\\d{13}$/.test(String(req.query.endTime||""))))return res.status(400).json({error:"Invalid time"});
+ const key=kind+":"+symbol+":"+String(req.query.startTime||"");
+ const cached=trCache.get(key);
+ if(cached&&Date.now()-cached.at<(kind==="symbols"?300000:kind==="klines"?12000:45000))return res.json(cached.data);
+ try{
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+  let response;
+  try{response=await fetch(urls[kind],{signal:controller.signal,headers:{"Accept":"application/json"}});}
+  finally{clearTimeout(timer);}
+  if(!response.ok)throw Error("Binance TR HTTP "+response.status);
+  const data=await response.json();
+  if(data.code!==0||!data.data)throw Error(data.msg||"Invalid Binance TR response");
+  trCache.set(key,{at:Date.now(),data});
+  if(trCache.size>1000){for(const [k,v] of trCache)if(Date.now()-v.at>300000)trCache.delete(k);}
+  res.json(data);
+ }catch(e){res.status(502).json({error:"Binance TR upstream unavailable",detail:String(e.message||e)});}
+});
+
 app.get("/api/daily-touch",(req,res)=>{res.set("Cache-Control","no-store");res.json(dailyTouchStatus());});
 app.post("/api/daily-touch/scan",(req,res)=>{
  res.set("Cache-Control","no-store");
