@@ -5,7 +5,7 @@ const MIN_REQUEST_GAP=160;
 const state={
   running:false,status:"idle",startedAt:0,updatedAt:0,checked:0,eligible:0,
   failed:0,remaining:0,rows:[],error:null,waitUntil:0,
-  notice:"Binance spot USDT/TRY çiftlerinde 5 dakikalık yatay bant kırılımı, EMA7 > EMA25 > EMA99 ve en az 2 kat hacim ivmesi aranır."
+  notice:"Binance spot USDT/TRY çiftlerinde 5 dakikalık yatay bant kırılımı, EMA7 > EMA25 > EMA99 ve yeni mumun önceki kapalı mumun zirvesini aşması aranır. Hacim bilgilendirme amaçlıdır."
 };
 let stopRequested=false;
 const snooze=async(ms)=>{let remaining=ms;while(remaining>0&&!stopRequested){
