@@ -27,7 +27,7 @@ function analyze(rows,symbol,exchange,url){
 async function buyerTrades(market,x,minuteStart){
  const twoStart=minuteStart-60000,end=minuteStart+60000;
  let trades;
- if(market.name==="OKX TR"){const j=await json("https://traderadar-v3-production.up.railway.app/api/binance-tr/aggTrades?symbol="+encodeURIComponent(x.id)+"&startTime="+twoStart+"&endTime="+(end-1)+"&limit=1000");if(j.code!==0||!Array.isArray(j.data))throw Error(j.msg||"OKX TR işlem API hatası");trades=j.data.map(t=>({time:+t.T,buy:!t.m}));}
+ if(market.name==="OKX TR"){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/trades?instId="+encodeURIComponent(x.id)+"&startTime="+twoStart+"&endTime="+(end-1)+"&limit=1000");if(j.code!==0||!Array.isArray(j.data))throw Error(j.msg||"OKX TR işlem API hatası");trades=j.data.map(t=>({time:+t.T,buy:!t.m}));}
 
  else return null;
  trades=trades.filter(t=>Number.isFinite(t.time)).sort((a,b)=>a.time-b.time);
@@ -40,7 +40,7 @@ async function buyerTrades(market,x,minuteStart){
  return {prior,current,growth:(current/prior-1)*100};
 }
 const markets=[
- {name:"OKX TR",async list(){const j=await json("https://traderadar-v3-production.up.railway.app/api/binance-tr/symbols");if(j.code!==0||!Array.isArray(j.data?.list))throw Error(j.msg||"OKX TR pariteleri alınamadı");return j.data.list.filter(x=>x.type===1&&x.spotTradingEnable===1).map(x=>({symbol:x.symbol.replace("_","/"),id:x.symbol.replace("_",""),url:"https://www.binance.tr/tr/trade/"+x.symbol}));},async candles(x){const j=await json("https://traderadar-v3-production.up.railway.app/api/binance-tr/klines?symbol="+encodeURIComponent(x.id)+"&interval=1m&limit=120");if(j.code!==0||!Array.isArray(j.data))throw Error(j.msg||"OKX TR mum API hatası");return j.data;}}
+ {name:"OKX TR",async list(){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/instruments");if(j.code!==0||!Array.isArray(j.data?.list))throw Error(j.msg||"OKX TR pariteleri alınamadı");return j.data.list.filter(x=>x.type===1&&x.spotTradingEnable===1).map(x=>({symbol:x.symbol.replace("_","/"),id:x.symbol.replace("_",""),url:"https://www.binance.tr/tr/trade/"+x.symbol}));},async candles(x){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/candles?instId="+encodeURIComponent(x.id)+"&interval=1m&limit=120");if(j.code!==0||!Array.isArray(j.data))throw Error(j.msg||"OKX TR mum API hatası");return j.data;}}
 ];
 function render(items,stats){
  cards.replaceChildren();
