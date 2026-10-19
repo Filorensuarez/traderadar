@@ -9,12 +9,12 @@ function analyze(rows,symbol,exchange,url){
  const sorted=[...rows].sort((a,b)=>Number(a[0])-Number(b[0]));
  const now=Date.now();
  const closed=sorted.filter(r=>{const t=Number(r[0]);return Number.isFinite(t)&&(t<1e11?t*1000:t)+60000<=now&&String(r[8])==="1";});
- if(closed.length<32)return null;
- const last=closed.at(-1),previous=closed.slice(-31,-1);
+ if(closed.length<33)return null;
+ const last=closed.at(-1),recent=closed.slice(-3),previous=closed.slice(-33,-3);
  const avg=previous.reduce((s,r)=>s+Number(r[4]),0)/30;
  const p=Number(last[4]),gain=(p/avg-1)*100;
  const volumes=previous.map(r=>Number(r[5]));
- const vol=Number(last[5]),avgVol=volumes.reduce((a,b)=>a+b,0)/30;
+ const vol=recent.reduce((s,r)=>s+Number(r[5]),0)/3,avgVol=volumes.reduce((a,b)=>a+b,0)/30;
  const prev5=volumes.slice(-5).reduce((a,b)=>a+b,0)/5;
  const prev5Before=volumes.slice(-10,-5).reduce((a,b)=>a+b,0)/5;
  if(![p,avg,vol,avgVol,prev5,prev5Before].every(Number.isFinite)||avg<=0||avgVol<=0||prev5Before<=0)return null;
@@ -57,7 +57,7 @@ function render(items,stats){
   el.append(title,desc,link);cards.append(el);
  }
 }
-async function scan(){if(running)return;running=true;button.disabled=true;cards.textContent="OKX TR üzerindeki tüm uygun pariteler taranıyor...";const items=[],stats=[],seen=new Set();try{for(const market of markets){const s={name:market.name,total:0,ok:0,error:""};stats.push(s);status.textContent=market.name+" taranıyor...";try{const symbols=await market.list();s.total=symbols.length;let failures=0;for(let i=0;i<symbols.length;i+=CONCURRENCY){await Promise.all(symbols.slice(i,i+CONCURRENCY).map(async x=>{try{const rows=await market.candles(x);if(!Array.isArray(rows)||rows.length<33)throw Error("Yetersiz mum");s.ok++;const hit=analyze(rows,x.symbol,market.name,x.url);if(hit){const buyers=await buyerTrades(market,x,hit.minuteStart);if(!buyers)return;hit.buyers=buyers;hit.stage="PATLAMA TAKİBİ";const key=market.name+":"+x.symbol;if(!seen.has(key)){seen.add(key);items.push(hit);render(items,stats);}}}catch(e){failures++;s.error=e.message;}}));status.textContent=market.name+" "+Math.min(i+CONCURRENCY,s.total)+"/"+s.total+" işlendi • Başarılı: "+s.ok+" • Toplam aday: "+items.length;await new Promise(resolve=>setTimeout(resolve,BATCH_PAUSE_MS));}if(failures===0)s.error="";else s.error=failures+" parite okunamadı; son hata: "+s.error;}catch(e){s.error=e.message;}render(items,stats);}}finally{running=false;button.disabled=false;render(items,stats);}}
+async function scan(){if(running)return;running=true;button.disabled=true;cards.textContent="OKX TR üzerindeki tüm uygun pariteler taranıyor...";const items=[],stats=[],seen=new Set();try{for(const market of markets){const s={name:market.name,total:0,ok:0,error:""};stats.push(s);status.textContent=market.name+" taranıyor...";try{const symbols=await market.list();s.total=symbols.length;let failures=0;for(let i=0;i<symbols.length;i+=CONCURRENCY){await Promise.all(symbols.slice(i,i+CONCURRENCY).map(async x=>{try{const rows=await market.candles(x);if(!Array.isArray(rows)||rows.length<34)throw Error("Yetersiz mum");s.ok++;const hit=analyze(rows,x.symbol,market.name,x.url);if(hit){const buyers=await buyerTrades(market,x,hit.minuteStart);if(!buyers)return;hit.buyers=buyers;hit.stage="PATLAMA TAKİBİ";const key=market.name+":"+x.symbol;if(!seen.has(key)){seen.add(key);items.push(hit);render(items,stats);}}}catch(e){failures++;s.error=e.message;}}));status.textContent=market.name+" "+Math.min(i+CONCURRENCY,s.total)+"/"+s.total+" işlendi • Başarılı: "+s.ok+" • Toplam aday: "+items.length;await new Promise(resolve=>setTimeout(resolve,BATCH_PAUSE_MS));}if(failures===0)s.error="";else s.error=failures+" parite okunamadı; son hata: "+s.error;}catch(e){s.error=e.message;}render(items,stats);}}finally{running=false;button.disabled=false;render(items,stats);}}
 button?.addEventListener("click",scan);
 let timer=null;
 function startAuto(){if(timer)return;scan();timer=setInterval(()=>{if(!document.hidden)scan();},60000);}
