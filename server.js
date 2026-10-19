@@ -36,7 +36,7 @@ app.get("/api/binance-tr/:kind",async(req,res)=>{
   klines:"https://api.binance.me/api/v1/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=120",
   aggTrades:"https://api.binance.me/api/v3/aggTrades?symbol="+encodeURIComponent(symbol)+"&startTime="+encodeURIComponent(String(req.query.startTime||""))+"&endTime="+encodeURIComponent(String(req.query.endTime||""))+"&limit=1000"
  };
- if(kind==="aggTrades"&&(!/^\\d{13}$/.test(String(req.query.startTime||""))||!/^\\d{13}$/.test(String(req.query.endTime||""))))return res.status(400).json({error:"Invalid time"});
+ if(kind==="aggTrades"&&(!/^\d{13}$/.test(String(req.query.startTime||""))||!/^\d{13}$/.test(String(req.query.endTime||""))))return res.status(400).json({error:"Invalid time"});
  const key=kind+":"+symbol+":"+String(req.query.startTime||"");
  const cached=trCache.get(key);
  if(cached&&Date.now()-cached.at<(kind==="symbols"?300000:kind==="klines"?12000:45000))return res.json(cached.data);
