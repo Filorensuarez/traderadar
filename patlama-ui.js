@@ -13,16 +13,9 @@ function analyze(rows,symbol,exchange,url){
  const last=closed.at(-1),recent=closed.slice(-3),previous=closed.slice(-33,-3);
  const avg=previous.reduce((s,r)=>s+Number(r[4]),0)/30;
  const p=Number(last[4]),gain=(p/avg-1)*100;
- const volumes=previous.map(r=>Number(r[5]));
- const vol=recent.reduce((s,r)=>s+Number(r[5]),0)/3,avgVol=volumes.reduce((a,b)=>a+b,0)/30;
- const prev5=volumes.slice(-5).reduce((a,b)=>a+b,0)/5;
- const prev5Before=volumes.slice(-10,-5).reduce((a,b)=>a+b,0)/5;
- if(![p,avg,vol,avgVol,prev5,prev5Before].every(Number.isFinite)||avg<=0||avgVol<=0||prev5Before<=0)return null;
- const volumeRatio=vol/avgVol,volumeSpeed=vol/prev5;
- // Volume must exceed its 30-minute baseline AND recent volume momentum must accelerate.
- if(gain<2||volumeRatio<1.5||volumeSpeed<1.2||prev5<=prev5Before)return null;
+ if(!Number.isFinite(p)||!Number.isFinite(avg)||avg<=0||gain<2)return null;
  const timestamp=Number(last[0]);const minuteStart=timestamp<1e11?timestamp*1000:timestamp;
- return {symbol,exchange,url,p,gain,volumeRatio,volumeSpeed,minuteStart,stage:"PATLAMA TAKİBİ"};
+ return {symbol,exchange,url,p,gain,minuteStart,stage:"PATLAMA TAKİBİ"};
 }
 const markets=[
  {name:"OKX TR",async list(){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/instruments");if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"OKX TR pariteleri alınamadı");return j.data.filter(x=>x.instType==="SPOT"&&x.state==="live").map(x=>({symbol:x.instId.replace("-","/"),id:x.instId,url:"https://tr.okx.com/tr/trade-spot/"+x.instId.toLowerCase()}));},async candles(x){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/candles?instId="+encodeURIComponent(x.id)+"");if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"OKX TR mum API hatası");return j.data;}}
@@ -32,12 +25,12 @@ function render(items,stats){
  const summary=document.createElement("div");summary.className="info-box";
  summary.textContent=stats.map(s=>s.name+": "+s.ok+"/"+s.total+" incelendi"+(s.error?" (HATA: "+s.error+")":"")).join(" • ");
  cards.append(summary);
- status.textContent=(running?"Tarama sürüyor":"Tarama tamamlandı")+" • "+stats.reduce((a,s)=>a+s.ok,0)+" mum verisi incelendi • "+items.length+" fiyat ve hacim koşullarını sağlayan aday.";
- if(!items.length&&!running){const p=document.createElement("p");p.textContent="Fiyat ve hacim koşullarını birlikte sağlayan aday bulunamadı.";cards.append(p);}
+ status.textContent=(running?"Tarama sürüyor":"Tarama tamamlandı")+" • "+stats.reduce((a,s)=>a+s.ok,0)+" mum verisi incelendi • "+items.length+" %2 fiyat yükselişi koşulunu sağlayan aday.";
+ if(!items.length&&!running){const p=document.createElement("p");p.textContent="%2 fiyat yükselişi koşulunu sağlayan aday bulunamadı.";cards.append(p);}
  for(const x of items.sort((a,b)=>b.gain-a.gain)){
   const el=document.createElement("article");el.className="coin-card";el.style.cssText="padding:16px;border:1px solid #41516a;border-radius:12px;margin:8px 0";
   const title=document.createElement("h3");title.textContent=x.exchange+" • "+x.symbol+" — TAKİPTE";
-  const desc=document.createElement("p");desc.textContent="Son 3 mumun son kapanışı / önceki 30 dk ortalaması: +"+x.gain.toFixed(2)+"% • Son 3 mum ortalama hacmi / önceki 30 dk ortalaması: "+x.volumeRatio.toFixed(2)+"x • Hacim hızı: "+x.volumeSpeed.toFixed(2)+"x • Fiyat: "+x.p;
+  const desc=document.createElement("p");desc.textContent="Son 3 mumun son kapanışı / önceki 30 dk ortalaması: +"+x.gain.toFixed(2)+"% • Fiyat: "+x.p;
   const link=document.createElement("a");link.href=x.url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Grafiği aç";
   el.append(title,desc,link);cards.append(el);
  }
