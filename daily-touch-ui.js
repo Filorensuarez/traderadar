@@ -22,4 +22,4 @@ async function refresh(){
 scanButton?.addEventListener("click",async()=>{scanButton.disabled=true;try{await fetch("/api/daily-touch/scan",{method:"POST"});await refresh();}catch(e){status.textContent=e.message;}});
 stopButton?.addEventListener("click",async()=>{await fetch("/api/daily-touch/stop",{method:"POST"});await refresh();});
 document.getElementById("dailyTouchNotify")?.addEventListener("click",async()=>{if(typeof Notification==="undefined")return;const p=await Notification.requestPermission();document.getElementById("dailyTouchNotify").textContent=p==="granted"?"Bildirimler açık":"Bildirim izni verilmedi";});
-refresh();setInterval(refresh,15000);
+refresh();setInterval(refresh,2000);
