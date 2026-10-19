@@ -1,11 +1,11 @@
 import {dailyContact} from "./daily-touch-model.js";
 import {eligibleDailyTouchMarkets} from "./daily-touch-markets.js";
-const BASE="https://data-api.binance.vision",REPEAT_MS=2*60*1000;
+const BASE="https://data-api.binance.vision",REPEAT_MS=60*1000;
 const MIN_REQUEST_GAP=160;
 const state={
   running:false,status:"idle",startedAt:0,updatedAt:0,checked:0,eligible:0,
   failed:0,remaining:0,rows:[],error:null,waitUntil:0,
-  notice:"Binance spot USDT/TRY çiftlerinde 5 dakikalık yatay bant kırılımı, EMA7 > EMA25 > EMA99 ve yeni mumun önceki kapalı mumun zirvesini aşması aranır. Hacim bilgilendirme amaçlıdır."
+  notice:"Son 10 tamamlanmış 1 dakikalık mumun ortalama kapanışı, hemen öncesindeki 30 tamamlanmış 1 dakikalık mumun ortalamasından en az %2 yüksekse bildirilir. EMA ve hacim filtresi yoktur."
 };
 let stopRequested=false;
 const snooze=async(ms)=>{let remaining=ms;while(remaining>0&&!stopRequested){
@@ -46,7 +46,7 @@ async function json(url,{retries=2}={}){
  }
 }
 function publish(matches){
- state.rows=[...matches].sort((a,b)=>b.volumeRatio-a.volumeRatio||a.market.localeCompare(b.market));
+ state.rows=[...matches].sort((a,b)=>b.gainPct-a.gainPct||a.market.localeCompare(b.market));
 }
 export async function scanDailyTouch(){
  if(state.running)return dailyTouchStatus();
@@ -65,12 +65,12 @@ export async function scanDailyTouch(){
   for(const market of all){
    if(stopRequested)break;
    try{
-    const raw=await json(BASE+"/api/v3/klines?symbol="+encodeURIComponent(market.symbol)+"&interval=5m&limit=140");
-    if(!Array.isArray(raw))throw Error("5 dakikalık OHLC verisi geçersiz");
+    const raw=await json(BASE+"/api/v3/klines?symbol="+encodeURIComponent(market.symbol)+"&interval=1m&limit=45");
+    if(!Array.isArray(raw))throw Error("1 dakikalık OHLC verisi geçersiz");
     const candles=raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
     const result=dailyContact(candles);
     if(result.match){
-      const gapPct=Math.abs(result.ema7/result.ema25-1)*100;
+      const gapPct=result.gainPct;
       matches.push({...result,exchange:"BINANCE",market:market.symbol,
         symbol:market.symbol.replace(/(USDT|TRY)$/,"/$1"),gapPct});
       publish(matches); // show results immediately, no need to wait until last symbol
@@ -88,7 +88,7 @@ export async function scanDailyTouch(){
   state.updatedAt=Date.now();
   state.status=stopRequested?"stopped":"completed";
   console.log("Temas Araması: "+state.checked+"/"+state.eligible+" incelendi; "+
-    matches.length+" temas, "+state.failed+" veri hatası"+(stopRequested?" (durduruldu)":""));
+    matches.length+" momentum sinyali, "+state.failed+" veri hatası"+(stopRequested?" (durduruldu)":""));
  }catch(e){
   state.error=String(e.message).slice(0,140);
   state.status=e.cancelled||stopRequested?"stopped":"error";
