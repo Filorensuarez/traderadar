@@ -1,11 +1,11 @@
 import {dailyContact} from "./daily-touch-model.js";
 import {eligibleDailyTouchMarkets} from "./daily-touch-markets.js";
-const BASE="https://data-api.binance.vision",REPEAT_MS=30*60*1000;
-const MIN_REQUEST_GAP=420;
+const BASE="https://data-api.binance.vision",REPEAT_MS=2*60*1000;
+const MIN_REQUEST_GAP=160;
 const state={
   running:false,status:"idle",startedAt:0,updatedAt:0,checked:0,eligible:0,
   failed:0,remaining:0,rows:[],error:null,waitUntil:0,
-  notice:"Binance üzerinde işlem gören bütün uygun USDT ve TRY spot pariteleri taranır. Coin sayısı ve işlem hacmi sınırı yoktur. API 429/418 sınırında tarama aynı coinden devam etmek üzere bekler. Yalnızca kapanmış günlük EMA7/25 teması ve yükseliş başlamamış koşulları aranır."
+  notice:"Binance spot USDT/TRY çiftlerinde 5 dakikalık yatay bant kırılımı, EMA7 > EMA25 > EMA99 ve en az 2 kat hacim ivmesi aranır."
 };
 let stopRequested=false;
 const snooze=async(ms)=>{let remaining=ms;while(remaining>0&&!stopRequested){
@@ -46,7 +46,7 @@ async function json(url,{retries=2}={}){
  }
 }
 function publish(matches){
- state.rows=[...matches].sort((a,b)=>a.gapPct-b.gapPct||a.market.localeCompare(b.market));
+ state.rows=[...matches].sort((a,b)=>b.volumeRatio-a.volumeRatio||a.market.localeCompare(b.market));
 }
 export async function scanDailyTouch(){
  if(state.running)return dailyTouchStatus();
@@ -65,9 +65,9 @@ export async function scanDailyTouch(){
   for(const market of all){
    if(stopRequested)break;
    try{
-    const raw=await json(BASE+"/api/v3/klines?symbol="+encodeURIComponent(market.symbol)+"&interval=1d&limit=140");
-    if(!Array.isArray(raw))throw Error("Günlük OHLC verisi geçersiz");
-    const candles=raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4]}));
+    const raw=await json(BASE+"/api/v3/klines?symbol="+encodeURIComponent(market.symbol)+"&interval=5m&limit=140");
+    if(!Array.isArray(raw))throw Error("5 dakikalık OHLC verisi geçersiz");
+    const candles=raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
     const result=dailyContact(candles);
     if(result.match){
       const gapPct=Math.abs(result.ema7/result.ema25-1)*100;
