@@ -4,7 +4,7 @@ const button=document.getElementById("patlamaScan");
 let running=false;
 const CONCURRENCY=8;
 const BATCH_PAUSE_MS=150;
-async function json(url){const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);try{const r=await fetch(url,{cache:"no-store",signal:controller.signal});if(!r.ok)throw Error("HTTP "+r.status);return await r.json();}finally{clearTimeout(timeout);}}
+async function json(url){const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);try{const r=await fetch(url,{cache:"no-store",signal:controller.signal});if(!r.ok){let detail="";try{const e=await r.json();detail=e.detail||e.error||"";}catch{}throw Error("HTTP "+r.status+(detail?": "+detail:""));}return await r.json();}finally{clearTimeout(timeout);}}
 function analyze(rows,symbol,exchange,url){
  const sorted=[...rows].sort((a,b)=>Number(a[0])-Number(b[0]));
  const now=Date.now();
@@ -27,7 +27,7 @@ function analyze(rows,symbol,exchange,url){
 async function buyerTrades(market,x,minuteStart){
  const twoStart=minuteStart-60000,end=minuteStart+60000;
  let trades;
- if(market.name==="BINANCE TR"){const j=await json("https://api.binance.me/api/v3/aggTrades?symbol="+encodeURIComponent(x.id)+"&startTime="+twoStart+"&endTime="+(end-1)+"&limit=1000");if(j.code!==0||!Array.isArray(j.data))throw Error(j.msg||"Binance TR işlem API hatası");trades=j.data.map(t=>({time:+t.T,buy:!t.m}));}
+ if(market.name==="BINANCE TR"){const j=await json("https://traderadar-v3-production.up.railway.app/api/binance-tr/aggTrades?symbol="+encodeURIComponent(x.id)+"&startTime="+twoStart+"&endTime="+(end-1)+"&limit=1000");if(j.code!==0||!Array.isArray(j.data))throw Error(j.msg||"Binance TR işlem API hatası");trades=j.data.map(t=>({time:+t.T,buy:!t.m}));}
 
  else return null;
  trades=trades.filter(t=>Number.isFinite(t.time)).sort((a,b)=>a.time-b.time);
@@ -40,7 +40,7 @@ async function buyerTrades(market,x,minuteStart){
  return {prior,current,growth:(current/prior-1)*100};
 }
 const markets=[
- {name:"BINANCE TR",async list(){const j=await json("https://www.binance.tr/open/v1/common/symbols");if(j.code!==0||!Array.isArray(j.data?.list))throw Error(j.msg||"Binance TR pariteleri alınamadı");return j.data.list.filter(x=>x.type===1&&x.spotTradingEnable===1).map(x=>({symbol:x.symbol.replace("_","/"),id:x.symbol.replace("_",""),url:"https://www.binance.tr/tr/trade/"+x.symbol}));},async candles(x){const j=await json("https://api.binance.me/api/v1/klines?symbol="+encodeURIComponent(x.id)+"&interval=1m&limit=120");if(j.code!==0||!Array.isArray(j.data))throw Error(j.msg||"Binance TR mum API hatası");return j.data;}}
+ {name:"BINANCE TR",async list(){const j=await json("https://traderadar-v3-production.up.railway.app/api/binance-tr/symbols");if(j.code!==0||!Array.isArray(j.data?.list))throw Error(j.msg||"Binance TR pariteleri alınamadı");return j.data.list.filter(x=>x.type===1&&x.spotTradingEnable===1).map(x=>({symbol:x.symbol.replace("_","/"),id:x.symbol.replace("_",""),url:"https://www.binance.tr/tr/trade/"+x.symbol}));},async candles(x){const j=await json("https://traderadar-v3-production.up.railway.app/api/binance-tr/klines?symbol="+encodeURIComponent(x.id)+"&interval=1m&limit=120");if(j.code!==0||!Array.isArray(j.data))throw Error(j.msg||"Binance TR mum API hatası");return j.data;}}
 ];
 function render(items,stats){
  cards.replaceChildren();
