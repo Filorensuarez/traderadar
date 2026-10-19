@@ -2,13 +2,13 @@ const status=document.getElementById("patlamaStatus");
 const cards=document.getElementById("patlamaCards");
 const button=document.getElementById("patlamaScan");
 let running=false;
-const CONCURRENCY=8;
-const BATCH_PAUSE_MS=150;
+const CONCURRENCY=4;
+const BATCH_PAUSE_MS=350;
 async function json(url){const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);try{const r=await fetch(url,{cache:"no-store",signal:controller.signal});if(!r.ok){let detail="";try{const e=await r.json();detail=e.detail||e.error||"";}catch{}throw Error("HTTP "+r.status+(detail?": "+detail:""));}return await r.json();}finally{clearTimeout(timeout);}}
 function analyze(rows,symbol,exchange,url){
  const sorted=[...rows].sort((a,b)=>Number(a[0])-Number(b[0]));
  const now=Date.now();
- const closed=sorted.filter(r=>{const t=Number(r[0]);return Number.isFinite(t)&&(t<1e11?t*1000:t)+60000<=now;});
+ const closed=sorted.filter(r=>{const t=Number(r[0]);return Number.isFinite(t)&&(t<1e11?t*1000:t)+60000<=now&&String(r[8])==="1";});
  if(closed.length<32)return null;
  const last=closed.at(-1),previous=closed.slice(-31,-1);
  const avg=previous.reduce((s,r)=>s+Number(r[4]),0)/30;
@@ -27,7 +27,7 @@ function analyze(rows,symbol,exchange,url){
 async function buyerTrades(market,x,minuteStart){
  const twoStart=minuteStart-60000,end=minuteStart+60000;
  let trades;
- if(market.name==="OKX TR"){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/trades?instId="+encodeURIComponent(x.id)+"&startTime="+twoStart+"&endTime="+(end-1)+"&limit=1000");if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"OKX TR işlem API hatası");trades=j.data.map(t=>({time:+t.T,buy:!t.m}));}
+ if(market.name==="OKX TR"){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/trades?instId="+encodeURIComponent(x.id)+"");if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"OKX TR işlem API hatası");trades=j.data.map(t=>({time:Number(t.ts),buy:t.side==="buy"}));}
 
  else return null;
  trades=trades.filter(t=>Number.isFinite(t.time)).sort((a,b)=>a.time-b.time);
