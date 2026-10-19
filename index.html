@@ -435,7 +435,7 @@
 </section>
 <section id="momentum" hidden>
  <h2>Patlama — %2 Yükseliş Takibi</h2>
- <p class="description">Son iki kapanmış 1 dakikalık mumun son fiyatı, 30 dakika önceki kapanıştan en az %2 yüksekse coin TAKİPTE olarak gösterilir. Eski RSI, EMA, hacim ve sıkışma koşulları kaldırıldı. Bölüm açıkken tarama her 60 saniyede yenilenir.</p>
+ <p class="description">Yalnızca Binance TR aktif spot pariteleri taranır. Son kapanmış 1 dakikalık mumun fiyatı önceki 30 mum ortalamasından en az %2 yüksek, hacmi hızlanmış ve alıcı yönlü işlem sayısı artmışsa takip listesine alınır. Bölüm açıkken tarama 60 saniyede bir yenilenir.</p>
  <button id="patlamaScan" class="refresh-button" type="button">Patlama Tara</button>
  <p id="patlamaStatus" aria-live="polite">Tarama başlatılmadı.</p>
  <div id="patlamaCards" class="coin-grid"></div>
@@ -466,7 +466,7 @@
   <script defer src="./whale-monitor.js"></script>
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
-  <script type="module" src="./patlama-ui.js?v=2"></script>
+  <script type="module" src="./patlama-ui.js?v=binancetr-proxy-3"></script>
 
   <script defer src="./tab-navigation-fix.js"></script>
   <script defer src="/install-app.js?v=1"></script>
