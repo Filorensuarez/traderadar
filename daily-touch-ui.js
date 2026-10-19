@@ -3,7 +3,7 @@ const status=document.getElementById("dailyTouchStatus");
 const cards=document.getElementById("dailyTouchCards");
 const scanButton=document.getElementById("dailyTouchScan");
 const stopButton=document.getElementById("dailyTouchStop");
-const seen=new Set();
+const seen=new Set();let initialLoad=true;
 const notify=x=>{if(seen.has(x.market+":"+x.day))return;seen.add(x.market+":"+x.day);if(typeof Notification!=="undefined"&&Notification.permission==="granted")new Notification("TradeRadar: Erken yükseliş",{body:x.symbol+" | 5 dk kırılım | Hacim "+Number(x.volumeRatio).toFixed(1)+" kat"});};
 const fmt=(value,d=4)=>Number.isFinite(value)?value.toLocaleString("tr-TR",{maximumFractionDigits:d}):"—";
 async function refresh(){
@@ -30,7 +30,7 @@ async function refresh(){
       "Şu anda erken yükseliş koşullarını sağlayan coin bulunamadı.";
     cards.appendChild(p);
   }
-  for(const x of data.rows){notify(x);
+  for(const x of data.rows){if(initialLoad)seen.add(x.market+":"+x.day);else notify(x);
     const card=document.createElement("article");card.className="coin-card";
     const h=document.createElement("h3");h.textContent=x.symbol+" • ERKEN YÜKSELİŞ";card.appendChild(h);
     for(const line of [
@@ -43,6 +43,7 @@ async function refresh(){
     a.href="https://www.binance.com/tr/trade/"+encodeURIComponent(x.market.replace(/(USDT|TRY)$/,"_$1"));
     a.target="_blank";a.rel="noopener noreferrer";card.appendChild(a);cards.appendChild(card);
   }
+  initialLoad=false;
   if(data.error){const p=document.createElement("p");p.textContent="Son hata: "+data.error;cards.appendChild(p);}
  }catch(e){status.textContent="Temas Araması yüklenemedi: "+e.message;}
 }
