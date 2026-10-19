@@ -54,6 +54,29 @@ app.get("/api/binance-tr/:kind",async(req,res)=>{
  }catch(e){res.status(502).json({error:"Binance TR upstream unavailable",detail:String(e.message||e)});}
 });
 
+// OKX TR public spot-market endpoints; no account credentials required.
+const okxTrCache=new Map();
+app.get("/api/okx-tr/:kind",async(req,res)=>{
+ res.set("Access-Control-Allow-Origin","*");
+ res.set("Cache-Control","no-store");
+ const kind=req.params.kind,instId=String(req.query.instId||"");
+ if(!["instruments","candles","trades"].includes(kind))return res.status(404).json({error:"Unsupported endpoint"});
+ if(kind!=="instruments"&&!/^[A-Z0-9]+-[A-Z0-9]+$/.test(instId))return res.status(400).json({error:"Invalid instrument"});
+ const path=kind==="instruments"?"/api/v5/public/instruments?instType=SPOT":kind==="candles"?"/api/v5/market/candles?instId="+encodeURIComponent(instId)+"&bar=1m&limit=100":"/api/v5/market/trades?instId="+encodeURIComponent(instId)+"&limit=500";
+ const key=kind+":"+instId,ttl=kind==="instruments"?300000:kind==="candles"?12000:3000;
+ const old=okxTrCache.get(key);if(old&&Date.now()-old.at<ttl)return res.json(old.data);
+ try{
+  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),10000);
+  let response;try{response=await fetch("https://tr.okx.com"+path,{signal:ctrl.signal,headers:{"Accept":"application/json"}});}finally{clearTimeout(timer);}
+  if(!response.ok)throw Error("OKX TR HTTP "+response.status);
+  const data=await response.json();
+  if(String(data.code)!=="0"||!Array.isArray(data.data))throw Error(data.msg||"Invalid OKX TR response");
+  okxTrCache.set(key,{at:Date.now(),data});
+  if(okxTrCache.size>1500)for(const [k,v] of okxTrCache)if(Date.now()-v.at>300000)okxTrCache.delete(k);
+  res.json(data);
+ }catch(e){res.status(502).json({error:"OKX TR veri kaynağına erişilemiyor",detail:String(e.message||e)});}
+});
+
 app.get("/api/daily-touch",(req,res)=>{res.set("Cache-Control","no-store");res.json(dailyTouchStatus());});
 app.post("/api/daily-touch/scan",(req,res)=>{
  res.set("Cache-Control","no-store");
