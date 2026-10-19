@@ -422,12 +422,12 @@
 </section>
 <section id="dailyTouch" hidden>
   <div class="section-head">
-    <div><h2>Temas Araması — Günlük EMA Teması</h2>
-      <p class="description">Binance'te listelenen uygun bütün USDT ve TRY spot coinleri, herhangi bir adet veya işlem hacmi sınırı olmadan incelenir. Son tamamlanmış günlük mum EMA7 veya EMA25 ile temas etmiş, EMA7/25 yakınlaşmış, fiyat EMA99 altında ve yükseliş kırılımı henüz başlamamış olmalıdır. Temas, kesin dönüş veya alım sinyali değildir.</p>
+    <div><h2>Temas Araması — Erken Yükseliş</h2>
+      <p class="description">Binance spot USDT ve TRY çiftlerinde 5 dakikalık dar bant sonrası ilk fiyat kırılımı, EMA7 > EMA25 > EMA99 ve hacim ivmesi aranır. Oluşmakta olan mum değerlendirilir. Sinyaller kesin kazanç garantisi değildir.</p>
     </div>
     <div style="display:flex;gap:9px;flex-wrap:wrap">
       <button id="dailyTouchScan" class="refresh-button" type="button">Tümünü Tara</button>
-      <button id="dailyTouchStop" class="refresh-button" type="button" disabled>Durdur</button>
+      <button id="dailyTouchNotify" class="refresh-button" type="button">Bildirimleri Aç</button>\n      <button id="dailyTouchStop" class="refresh-button" type="button" disabled>Durdur</button>
     </div>
   </div>
   <p id="dailyTouchStatus" class="updated-line" aria-live="polite">Tarama hazırlanıyor...</p>
