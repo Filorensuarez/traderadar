@@ -3,6 +3,8 @@ const status=document.getElementById("dailyTouchStatus");
 const cards=document.getElementById("dailyTouchCards");
 const scanButton=document.getElementById("dailyTouchScan");
 const stopButton=document.getElementById("dailyTouchStop");
+const seen=new Set();
+const notify=x=>{if(seen.has(x.market+":"+x.day))return;seen.add(x.market+":"+x.day);if(typeof Notification!=="undefined"&&Notification.permission==="granted")new Notification("TradeRadar: Erken yükseliş",{body:x.symbol+" | 5 dk kırılım | Hacim "+Number(x.volumeRatio).toFixed(1)+" kat"});};
 const fmt=(value,d=4)=>Number.isFinite(value)?value.toLocaleString("tr-TR",{maximumFractionDigits:d}):"—";
 async function refresh(){
  try{
@@ -15,7 +17,7 @@ async function refresh(){
     data.status==="stopping"?"Durduruluyor":data.status==="stopped"?"Durduruldu":
     data.status==="error"?"Veri hatası":"Başlatılıyor")+
     " | Taranan: "+checked+" / "+total+
-    " | Kalan: "+remaining+" | Temas: "+data.rows.length+
+    " | Kalan: "+remaining+" | Erken yükseliş: "+data.rows.length+
     " | Veri hatası: "+data.failed+
     (data.waitUntil?" | Bekleme: "+Math.max(0,Math.ceil((data.waitUntil-Date.now())/1000))+" sn":"")+
     (data.updatedAt?" | Son tamamlanan: "+new Date(data.updatedAt).toLocaleTimeString("tr-TR"):"");
@@ -24,17 +26,17 @@ async function refresh(){
   cards.replaceChildren();
   if(!data.rows.length){
     const p=document.createElement("p");
-    p.textContent=data.running?"Tüm uygun spot coinler inceleniyor; henüz teyitli temas bulunmadı.":
-      "Şu anda günlük temas koşullarını karşılayan, yükselişi başlamamış coin bulunamadı.";
+    p.textContent=data.running?"Tüm uygun spot coinler inceleniyor; henüz erken kırılım bulunmadı.":
+      "Şu anda erken yükseliş koşullarını sağlayan coin bulunamadı.";
     cards.appendChild(p);
   }
-  for(const x of data.rows){
+  for(const x of data.rows){notify(x);
     const card=document.createElement("article");card.className="coin-card";
-    const h=document.createElement("h3");h.textContent=x.symbol+" • TEMAS / KIRILIM YOK";card.appendChild(h);
+    const h=document.createElement("h3");h.textContent=x.symbol+" • ERKEN YÜKSELİŞ";card.appendChild(h);
     for(const line of [
-      "Son kapalı mum: "+new Date(x.day).toLocaleDateString("tr-TR"),
+      "5 dakikalık mum başlangıcı: "+new Date(x.day).toLocaleDateString("tr-TR"),
       "Kapanış "+fmt(x.close,7)+" | EMA7 "+fmt(x.ema7,7)+" | EMA25 "+fmt(x.ema25,7)+" | EMA99 "+fmt(x.ema99,7),
-      "EMA7/25 farkı: %"+fmt(x.gapPct,2)+" | Son 3 günlük değişim: %"+fmt(x.gain3,2)
+      "Kırılım: "+fmt(x.breakout,7)+" | Hacim ivmesi: "+fmt(x.volumeRatio,2)+" kat
     ]){const p=document.createElement("p");p.textContent=line;card.appendChild(p);}
     const a=document.createElement("a");
     a.textContent="Binance grafiğini aç ↗";
@@ -56,3 +58,5 @@ stopButton?.addEventListener("click",async()=>{
  catch(e){status.textContent="Durdurma isteği başarısız: "+e.message;}
 });
 refresh();setInterval(refresh,15000);
+
+const enable=document.getElementById("dailyTouchNotify");enable?.addEventListener("click",async()=>{if(typeof Notification==="undefined"){enable.textContent="Bildirim desteklenmiyor";return;}const p=await Notification.requestPermission();enable.textContent=p==="granted"?"Bildirimler açık":"Bildirim izni verilmedi";});
