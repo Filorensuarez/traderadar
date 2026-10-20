@@ -5938,11 +5938,21 @@ async function scanMarket() {
     }
   }
   const providers = [
-    {key:"okx",name:"OKX",symbols:getSymbols,candles:getCandles,normalize:s=>String(s).replace("-USDT","")+"/USDT"},
-    {key:"kucoin",name:"KUCOIN",symbols:async()=> (await getKucoinSymbols()).map(x=>x.symbol),candles:getKucoinCandles,normalize:s=>String(s).replace("-USDT","")+"/USDT"},
-    {key:"gate",name:"GATE.IO",symbols:async()=> (await getGateSymbols()).map(x=>x.symbol),candles:getGateCandles,normalize:s=>String(s).replace("_USDT","")+"/USDT"},
-    {key:"binance",name:"BINANCE",symbols:getBinanceDailySymbols,candles:getBinanceDailyCandles,normalize:s=>String(s).replace(/USDT$/,"")+"/USDT"},
-    {key:"coinbase",name:"COINBASE",symbols:getCoinbaseDailySymbols,candles:getCoinbaseDailyCandles,normalize:s=>String(s).replace("-","/")}
+    {key:"binancetr",name:"BINANCE TR",
+      symbols:trSymbols,
+      candles:async item=>{
+        const kind=Number(item.type);
+        const base=kind===1?BINANCE_TR_MAIN:BINANCE_TR_NEXT;
+        const symbol=kind===1?item.symbol.replaceAll("_",""):item.symbol;
+        const raw=await trFetch(base+"/api/v1/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=260");
+        if(!Array.isArray(raw))throw Error("Binance TR günlük mum verisi geçersiz");
+        const now=Date.now();
+        return raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}))
+          .filter(x=>[x.time,x.open,x.high,x.low,x.close,x.volume].every(Number.isFinite)&&x.close>0&&x.time+86400000<=now)
+          .sort((a,b)=>a.time-b.time);
+      },
+      normalize:item=>item.symbol.replace("_","/")
+    }
   ];
   const results = {};
   const counts = {};
@@ -5950,7 +5960,7 @@ async function scanMarket() {
     results[p.key] = [];
     counts[p.key] = {symbols:[],error:null};
   }
-  console.log("Günlük yükseliş teyidi: beş borsa taraması başladı.");
+  console.log("Günlük yükseliş teyidi: Binance TR TRY günlük taraması başladı.");
   try {
     for (const p of providers) {
       try {
@@ -5961,10 +5971,12 @@ async function scanMarket() {
           const batch = symbols.slice(i,i+batchSize);
           const responses = await Promise.allSettled(batch.map(async symbol=>{
             const candles = await p.candles(symbol);
-            collectMedium(symbol,p.name,candles);
+            collectMedium(p.normalize(symbol),p.name,candles);
             const result = analyze(p.normalize(symbol),candles);
             if (!result) return null;
             result.source = p.name;
+            result.currency = "TRY";
+            result.detectedAt = Date.now();
             return result;
           }));
           for (const response of responses) {
@@ -5984,7 +5996,7 @@ async function scanMarket() {
     }
     mediumWatchCache = {updatedAt:Date.now(),scanned:mediumScanned,rows:mediumCandidates.sort((a,b)=>b.score-a.score).slice(0,100)};
     recordSignals("daily",providers.flatMap(p=>results[p.key]).filter(row=>row.confirmed));
-    const out = {ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanned:providers.reduce((n,p)=>n+counts[p.key].symbols.length,0),rows:results.okx.slice(0,30),error:counts.okx.error};
+    const out = {ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanned:providers.reduce((n,p)=>n+counts[p.key].symbols.length,0),rows:results.binancetr.slice(0,30),error:counts.binancetr.error};
     for (const p of providers) {
       out[p.key] = {ok:!counts[p.key].error,error:counts[p.key].error,scanned:counts[p.key].symbols.length,confirmed:counts[p.key].confirmed||0,candidates:counts[p.key].candidates||0,rows:results[p.key].slice(0,30)};
       console.log(p.name+": "+counts[p.key].symbols.length+" coin / "+(counts[p.key].confirmed||0)+" teyit / "+(counts[p.key].candidates||0)+" aday / "+(counts[p.key].error||"OK"));
