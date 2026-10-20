@@ -5995,9 +5995,38 @@ async function scanMarket() {
       if(!Array.isArray(j.t))throw Error("BtcTurk günlük mum verisi alınamadı");
       return closedDaily(j.t.map((t,i)=>[t*1000,j.o[i],j.h[i],j.l[i],j.c[i],j.v[i]]));
     },normalize:s=>s.replace(/TRY$/,"/TRY")},
+    ,{key:"okxglobal",name:"OKX GLOBAL",currency:"USDT",symbols:async()=>{
+      const j=await getExternalJSON("https://www.okx.com/api/v5/public/instruments?instType=SPOT","OKX GLOBAL");
+      if(j.code!=="0"||!Array.isArray(j.data))throw Error("OKX GLOBAL sembol yanıtı geçersiz");
+      return j.data.filter(x=>x.quoteCcy==="USDT"&&x.state==="live").map(x=>x.instId);
+    },candles:async symbol=>{
+      const rows=[];let after="";
+      for(let page=0;page<4;page++){
+        const j=await getExternalJSON("https://www.okx.com/api/v5/market/history-candles?instId="+encodeURIComponent(symbol)+"&bar=1Dutc&limit=100"+(after?"&after="+after:""),"OKX GLOBAL");
+        if(j.code!=="0"||!Array.isArray(j.data))throw Error("OKX GLOBAL günlük mum verisi alınamadı");
+        if(!j.data.length)break;
+        rows.push(...j.data);after=String(j.data.at(-1)[0]);
+        if(j.data.length<100)break;
+      }
+      return closedDaily(rows.map(x=>[x[0],x[1],x[2],x[3],x[4],x[5]]));
+    },normalize:s=>s.replace("-","/")},
+    {key:"binanceglobal",name:"BINANCE GLOBAL",currency:"USDT",symbols:async()=>{
+      const j=await getExternalJSON("https://api.binance.com/api/v3/exchangeInfo","BINANCE GLOBAL");
+      if(!Array.isArray(j.symbols))throw Error("Binance Global sembol verisi alınamadı");
+      return j.symbols.filter(x=>x.quoteAsset==="USDT"&&x.status==="TRADING"&&x.isSpotTradingAllowed!==false).map(x=>x.symbol);
+    },candles:async symbol=>{
+      const j=await getExternalJSON("https://api.binance.com/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=260","BINANCE GLOBAL");
+      if(!Array.isArray(j))throw Error("Binance Global günlük mum verisi alınamadı");
+      return closedDaily(j);
+    },normalize:s=>s.replace(/USDT$/,"/USDT")}
   ];
   const results = {};
   const counts = {};
+  const publish = () => {
+    const out={ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanning:true,scanned:providers.reduce((n,p)=>n+(counts[p.key].processed||0),0),rows:results.okxtr.slice(0,30),error:counts.okxtr.error};
+    for(const p of providers)out[p.key]={ok:!counts[p.key].error,error:counts[p.key].error,scanned:counts[p.key].processed||0,total:counts[p.key].symbols.length,confirmed:results[p.key].filter(x=>x.confirmed).length,candidates:results[p.key].filter(x=>x.candidate).length,rows:results[p.key].slice(0,30)};
+    cache=out;
+  };
   for (const p of providers) {
     results[p.key] = [];
     counts[p.key] = {symbols:[],error:null};
@@ -6010,9 +6039,11 @@ async function scanMarket() {
         let failedCandles=0;
         let firstCandleError="";
         const symbols = await p.symbols();
-        if (!Array.isArray(symbols)||symbols.length===0) throw Error("Aktif TRY işlem çifti bulunamadı");
+        if (!Array.isArray(symbols)||symbols.length===0) throw Error("Aktif işlem çifti bulunamadı");
         counts[p.key].symbols = symbols;
-        const batchSize = ["btcturk","okxtr"].includes(p.key) ? 1 : 5;
+        counts[p.key].processed = 0;
+        publish();
+        const batchSize = p.key==="btcturk"?1:p.key==="okxtr"?2:6;
         for (let i=0;i<symbols.length;i+=batchSize) {
           const batch = symbols.slice(i,i+batchSize);
           const responses = await Promise.allSettled(batch.map(async symbol=>{
@@ -6023,7 +6054,7 @@ async function scanMarket() {
             const result = analyze(p.normalize(symbol),candles);
             if (!result) return null;
             result.source = p.name;
-            result.currency = "TRY";
+            result.currency = p.currency || "TRY";
             result.detectedAt = Date.now();
             return result;
           }));
@@ -6032,7 +6063,10 @@ async function scanMarket() {
             const result = response.value;
             if (result && (result.confirmed || result.candidate)) results[p.key].push(result);
           }
-          await new Promise(resolve=>setTimeout(resolve,p.key==="btcturk"?1500:900));
+          counts[p.key].processed += batch.length;
+          results[p.key].sort((a,b)=>Number(b.confirmed)-Number(a.confirmed)||b.score-a.score);
+          publish();
+          await new Promise(resolve=>setTimeout(resolve,p.key==="btcturk"?1500:p.key==="okxtr"?500:120));
         }
         if(successfulCandles===0) throw Error("Günlük analiz için 205 tamamlanmış mum alınamadı; başarısız parite: "+failedCandles+"; ilk hata: "+firstCandleError);
       } catch (error) {
@@ -6050,7 +6084,7 @@ async function scanMarket() {
       out[p.key] = {ok:!counts[p.key].error,error:counts[p.key].error,scanned:counts[p.key].symbols.length,confirmed:counts[p.key].confirmed||0,candidates:counts[p.key].candidates||0,rows:results[p.key].slice(0,30)};
       console.log(p.name+": "+counts[p.key].symbols.length+" coin / "+(counts[p.key].confirmed||0)+" teyit / "+(counts[p.key].candidates||0)+" aday / "+(counts[p.key].error||"OK"));
     }
-    cache = out;
+    cache = {...out,scanning:false};
   } catch (error) {
     console.error("Genel günlük tarama hatası:",error.message);
     cache = {...cache,ok:false,error:error.message};
