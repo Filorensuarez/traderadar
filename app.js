@@ -68,7 +68,7 @@ let radarLoading =
 let radarLoaded =
   false;
 let selectedExchange =
-  "okx";
+  "binancetr";
 
 let lastData =
   null;
@@ -209,13 +209,13 @@ scenarioButton.addEventListener(
 
 function selectExchange(exchange) {
   selectedExchange = exchange;
-  for (const key of ["okx","kucoin","gate","binance","coinbase"]) {
+  for (const key of ["binancetr"]) {
     const button = document.querySelector("#"+key+"Button");
     if (button) button.classList.toggle("active",exchange===key);
   }
   if (lastData) renderExchange(lastData);
 }
-for (const key of ["okx","kucoin","gate","binance","coinbase"]) {
+for (const key of ["binancetr"]) {
   const button = document.querySelector("#"+key+"Button");
   if (button) button.addEventListener("click",()=>selectExchange(key));
 }
@@ -408,6 +408,7 @@ function coinCard(row) {
   const plan = row.confirmed ? dailyTradePlan(row) : null;
   const resistancePrice = Number(row.longTrendResistance);
   const possibleTop = Number.isFinite(resistancePrice) && resistancePrice > Number(row.price) ? resistancePrice : null;
+  const tryPrice = value => Number.isFinite(Number(value)) ? price(value)+" TL" : "Hesaplanamadı";
   const reasonText =
     reasons.length
       ? reasons
@@ -449,11 +450,11 @@ function coinCard(row) {
 
         <div class="metric">
           Fiyat
-          <strong>${price(row.price)}</strong>
+          <strong>${tryPrice(row.price)}</strong>
         </div>
         <div class="metric">
           Günlük trendin olası üst direnci
-          <strong>${possibleTop ? price(possibleTop) : "Hesaplanamadı"}</strong>
+          <strong>${possibleTop ? tryPrice(possibleTop) : "Hesaplanamadı"}</strong>
           <small>Son 180 günlük geçmiş direnç. Düşüş trendine geçiş ancak sonraki fiyat hareketleriyle teyit edilebilir.</small>
         </div>
 
@@ -599,7 +600,7 @@ function renderExchange(data) {
       : [];
 
 
-  const exchangeName = ({okx:"OKX",kucoin:"KUCOIN",gate:"GATE.IO",binance:"BINANCE",coinbase:"COINBASE"})[selectedExchange] || selectedExchange.toUpperCase();
+  const exchangeName = ({binancetr:"BINANCE TR"})[selectedExchange] || selectedExchange.toUpperCase();
 
   if (exchangeData.ok) {
 
