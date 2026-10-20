@@ -209,13 +209,13 @@ scenarioButton.addEventListener(
 
 function selectExchange(exchange) {
   selectedExchange = exchange;
-  for (const key of ["okxtr","btcturk","paribu","bitexen","kucointr","bitci","mexctr"]) {
+  for (const key of ["okxtr","btcturk"]) {
     const button = document.querySelector("#"+key+"Button");
     if (button) button.classList.toggle("active",exchange===key);
   }
   if (lastData) renderExchange(lastData);
 }
-for (const key of ["okxtr","btcturk","paribu","bitexen","kucointr","bitci","mexctr"]) {
+for (const key of ["okxtr","btcturk"]) {
   const button = document.querySelector("#"+key+"Button");
   if (button) button.addEventListener("click",()=>selectExchange(key));
 }
