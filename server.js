@@ -5996,13 +5996,13 @@ async function scanMarket() {
       return closedDaily(j.t.map((t,i)=>[t*1000,j.o[i],j.h[i],j.l[i],j.c[i],j.v[i]]));
     },normalize:s=>s.replace(/TRY$/,"/TRY")},
     {key:"okxglobal",name:"OKX GLOBAL",currency:"USDT",symbols:async()=>{
-      const j=await getExternalJSON("https://www.okx.com/api/v5/public/instruments?instType=SPOT","OKX GLOBAL");
+      const j=await getExternalJSON("https://eea.okx.com/api/v5/public/instruments?instType=SPOT","OKX GLOBAL");
       if(j.code!=="0"||!Array.isArray(j.data))throw Error("OKX GLOBAL sembol yanıtı geçersiz");
       return j.data.filter(x=>x.quoteCcy==="USDT"&&x.state==="live").map(x=>x.instId);
     },candles:async symbol=>{
       const rows=[];let after="";
       for(let page=0;page<4;page++){
-        const j=await getExternalJSON("https://www.okx.com/api/v5/market/history-candles?instId="+encodeURIComponent(symbol)+"&bar=1Dutc&limit=100"+(after?"&after="+after:""),"OKX GLOBAL");
+        const j=await getExternalJSON("https://eea.okx.com/api/v5/market/history-candles?instId="+encodeURIComponent(symbol)+"&bar=1Dutc&limit=100"+(after?"&after="+after:""),"OKX GLOBAL");
         if(j.code!=="0"||!Array.isArray(j.data))throw Error("OKX GLOBAL günlük mum verisi alınamadı");
         if(!j.data.length)break;
         rows.push(...j.data);after=String(j.data.at(-1)[0]);
