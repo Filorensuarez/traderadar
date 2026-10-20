@@ -5871,6 +5871,13 @@ if (extended) {
     support,
 
     resistance,
+    // Long-horizon daily resistance: previous 180 completed daily candles.
+    longTrendResistance: (() => {
+      const history=candles.slice(-181,-1).map(x=>Number(x.high)).filter(x=>Number.isFinite(x)&&x>0);
+      if(history.length<120)return null;
+      const level=Math.max(...history);
+      return level>price?level:null;
+    })(),
 
     resistanceDistance,
 
