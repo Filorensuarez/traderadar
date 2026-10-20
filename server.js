@@ -5979,7 +5979,7 @@ async function scanMarket() {
     {key:"kucointr",name:"KUCOIN TR",symbols:async()=>{
       const j=await getExternalJSON("https://api.kucoin.tr/api/v2/symbols","KuCoin TR");
       if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR sembol yanıtı geçersiz");
-      return j.data.filter(x=>String(x.quoteCurrency||x.quoteAsset||"").toUpperCase()==="TRY"&&x.enableTrading!==false&&x.isMarginEnabled!==null).map(x=>x.symbol).filter(Boolean);
+      return j.data.filter(x=>String(x.quoteCurrency||x.quoteAsset||"").toUpperCase()==="TRY"&&x.enableTrading!==false).map(x=>x.symbol).filter(Boolean);
     },candles:async symbol=>{
       const j=await getExternalJSON("https://api.kucoin.tr/api/v1/market/candles?type=1day&symbol="+encodeURIComponent(symbol),"KuCoin TR");
       if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR mum yanıtı geçersiz");
