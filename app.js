@@ -406,14 +406,6 @@ function coinCard(row) {
 
 
   const plan = row.confirmed ? dailyTradePlan(row) : null;
-  const upside = dailyUpsidePotential(row);
-  const upsideText = upside
-    ? "%" + number(upside.percent, 2)
-    : "Hesaplanamadı";
-  const upsideDetail = upside
-    ? `Teknik hedef: ${price(upside.target)} · ${escapeHTML(upside.scenario)} · ${upside.horizon}`
-    : "Günlük verilerden güvenilir teknik hedef çıkarılamadı.";
-
   const reasonText =
     reasons.length
       ? reasons
@@ -432,9 +424,7 @@ function coinCard(row) {
 
         <div class="coin-symbol">
           ${escapeHTML(row.symbol)}
-          <div class="description" style="font-size:0.78em;font-weight:500;margin-top:4px">
-            1–3 günlük potansiyel: ${upsideText}
-          </div>
+          <div class="description" style="font-size:0.78em;font-weight:500;margin-top:4px">Tespit: ${escapeHTML(row.detectedAt ? new Date(row.detectedAt).toLocaleString("tr-TR") : (row.scanTime ? new Date(row.scanTime).toLocaleString("tr-TR") : "Son tarama: " + timeText(lastData?.updatedAt)))}</div>
         </div>
 
         <div class="score">
@@ -454,12 +444,6 @@ function coinCard(row) {
 
 
       <div class="metrics">
-
-        <div class="metric">
-          Tahmini yükseliş potansiyeli (1–3 gün)
-          <strong>${upsideText}</strong>
-          <small>${upsideDetail}</small>
-        </div>
 
         <div class="metric">
           Fiyat
@@ -551,7 +535,6 @@ function coinCard(row) {
 
 
       <div class="daily-trade-plan">
-        <small>Potansiyel artış, güncel olmayan son günlük fiyat üzerinden, 14 günlük ATR ve 20 günlük dirençle oluşturulmuş 1–3 günlük teknik senaryodur. Kesin getiri, olasılık veya alım önerisi değildir.</small>
         <h4>Alım / Satım Fiyat Planı</h4>
         ${plan ? `
           <div class="trade-levels">
