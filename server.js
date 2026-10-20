@@ -6011,11 +6011,12 @@ async function scanMarket() {
       return closedDaily(rows.map(x=>[x[0],x[1],x[2],x[3],x[4],x[5]]));
     },normalize:s=>s.replace("-","/")},
     {key:"binanceglobal",name:"BINANCE GLOBAL",currency:"USDT",symbols:async()=>{
-      const j=await getExternalJSON("https://api.binance.com/api/v3/exchangeInfo","BINANCE GLOBAL");
+      // Binance'in herkese açık piyasa-verisi alan adı; hesap/trading API'si değil.
+      const j=await getExternalJSON("https://data-api.binance.vision/api/v3/exchangeInfo","BINANCE GLOBAL");
       if(!Array.isArray(j.symbols))throw Error("Binance Global sembol verisi alınamadı");
       return j.symbols.filter(x=>x.quoteAsset==="USDT"&&x.status==="TRADING"&&x.isSpotTradingAllowed!==false).map(x=>x.symbol);
     },candles:async symbol=>{
-      const j=await getExternalJSON("https://api.binance.com/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=260","BINANCE GLOBAL");
+      const j=await getExternalJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=260","BINANCE GLOBAL");
       if(!Array.isArray(j))throw Error("Binance Global günlük mum verisi alınamadı");
       return closedDaily(j);
     },normalize:s=>s.replace(/USDT$/,"/USDT")}
