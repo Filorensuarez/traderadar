@@ -5937,22 +5937,31 @@ async function scanMarket() {
       mediumCandidates.push({symbol:String(symbol).replace(/[-_]USDT$/,"/USDT"),source,...setup});
     }
   }
+  const closedDaily=raw=>raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]})).filter(x=>[x.time,x.open,x.high,x.low,x.close,x.volume].every(Number.isFinite)&&x.close>0&&x.time+86400000<=Date.now()).sort((a,b)=>a.time-b.time);
   const providers = [
-    {key:"binancetr",name:"BINANCE TR",
-      symbols:trSymbols,
-      candles:async item=>{
-        const kind=Number(item.type);
-        const base=kind===1?BINANCE_TR_MAIN:BINANCE_TR_NEXT;
-        const symbol=kind===1?item.symbol.replaceAll("_",""):item.symbol;
-        const raw=await trFetch(base+"/api/v1/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=260");
-        if(!Array.isArray(raw))throw Error("Binance TR günlük mum verisi geçersiz");
-        const now=Date.now();
-        return raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}))
-          .filter(x=>[x.time,x.open,x.high,x.low,x.close,x.volume].every(Number.isFinite)&&x.close>0&&x.time+86400000<=now)
-          .sort((a,b)=>a.time-b.time);
-      },
-      normalize:item=>item.symbol.replace("_","/")
-    }
+    {key:"okxtr",name:"OKX TR",symbols:async()=>{
+      const j=await getExternalJSON("https://tr.okx.com/api/v5/public/instruments?instType=SPOT","OKX TR");
+      if(j.code!=="0"||!Array.isArray(j.data))throw Error("OKX TR sembol verisi alınamadı");
+      return j.data.filter(x=>x.quoteCcy==="TRY"&&x.state==="live").map(x=>x.instId);
+    },candles:async symbol=>{
+      const j=await getExternalJSON("https://tr.okx.com/api/v5/market/history-candles?instId="+encodeURIComponent(symbol)+"&bar=1Dutc&limit=300","OKX TR");
+      if(j.code!=="0"||!Array.isArray(j.data))throw Error("OKX TR mum verisi alınamadı");
+      return closedDaily(j.data.map(x=>[x[0],x[1],x[2],x[3],x[4],x[5]]));
+    },normalize:s=>s.replace("-","/")},
+    {key:"btcturk",name:"BTCTURK",symbols:async()=>{
+      const j=await getExternalJSON("https://api.btcturk.com/api/v2/server/exchangeinfo","BtcTurk");
+      return (j.data?.symbols||[]).filter(x=>x.denominator==="TRY"&&x.status==="TRADING").map(x=>x.name);
+    },candles:async symbol=>{
+      const to=Math.floor(Date.now()/1000),from=to-265*86400;
+      const j=await getExternalJSON("https://graph-api.btcturk.com/v1/klines/history?symbol="+encodeURIComponent(symbol)+"&resolution=1D&from="+from+"&to="+to,"BtcTurk");
+      if(!Array.isArray(j.t))throw Error("BtcTurk günlük mum verisi alınamadı");
+      return closedDaily(j.t.map((t,i)=>[t*1000,j.o[i],j.h[i],j.l[i],j.c[i],j.v[i]]));
+    },normalize:s=>s.replace(/TRY$/,"/TRY")},
+    ...["paribu","bitexen","kucointr","bitci","mexctr"].map((key,i)=>({
+      key,name:["PARIBU","BITEXEN","KUCOIN TR","BITCI","MEXC TR"][i],
+      symbols:async()=>{throw Error("Doğrulanmış TRY günlük mum API bağlantısı henüz yok");},
+      candles:async()=>[],normalize:s=>s
+    }))
   ];
   const results = {};
   const counts = {};
@@ -5960,7 +5969,7 @@ async function scanMarket() {
     results[p.key] = [];
     counts[p.key] = {symbols:[],error:null};
   }
-  console.log("Günlük yükseliş teyidi: Binance TR TRY günlük taraması başladı.");
+  console.log("Günlük yükseliş teyidi: seçilen Türkiye borsaları taranıyor.");
   try {
     for (const p of providers) {
       try {
@@ -5996,7 +6005,7 @@ async function scanMarket() {
     }
     mediumWatchCache = {updatedAt:Date.now(),scanned:mediumScanned,rows:mediumCandidates.sort((a,b)=>b.score-a.score).slice(0,100)};
     recordSignals("daily",providers.flatMap(p=>results[p.key]).filter(row=>row.confirmed));
-    const out = {ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanned:providers.reduce((n,p)=>n+counts[p.key].symbols.length,0),rows:results.binancetr.slice(0,30),error:counts.binancetr.error};
+    const out = {ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanned:providers.reduce((n,p)=>n+counts[p.key].symbols.length,0),rows:results.okxtr.slice(0,30),error:counts.okxtr.error};
     for (const p of providers) {
       out[p.key] = {ok:!counts[p.key].error,error:counts[p.key].error,scanned:counts[p.key].symbols.length,confirmed:counts[p.key].confirmed||0,candidates:counts[p.key].candidates||0,rows:results[p.key].slice(0,30)};
       console.log(p.name+": "+counts[p.key].symbols.length+" coin / "+(counts[p.key].confirmed||0)+" teyit / "+(counts[p.key].candidates||0)+" aday / "+(counts[p.key].error||"OK"));
