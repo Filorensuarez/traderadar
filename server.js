@@ -5975,9 +5975,18 @@ async function scanMarket() {
       if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR mum yanıtı geçersiz");
       return closedDaily(j.data.map(x=>[Number(x[0])*1000,x[1],x[3],x[4],x[2],x[5]]));
     },normalize:s=>s.replace("-","/")},
-    ...["paribu","bitexen","bitci","mexctr"].map((key,i)=>({
-      key,name:["PARIBU","BITEXEN","BITCI","MEXC TR"][i],
-      symbols:async()=>{throw Error("Doğrulanmış TRY günlük mum API bağlantısı henüz yok");},
+    {key:"bitexen",name:"BITEXEN",symbols:async()=>{
+      const j=await getExternalJSON("https://www.bitexen.com/api/v1/market_info/","Bitexen");
+      if(j.status!=="success"||!Array.isArray(j.data?.markets))throw Error("Bitexen TRY piyasaları alınamadı");
+      return j.data.markets.filter(x=>x.counter_currency==="TRY"&&/^[A-Z0-9]+TRY$/.test(x.market_code)).map(x=>x.market_code);
+    },candles:async symbol=>{
+      const j=await getExternalJSON("https://dv-api.bitexen.com/api/v1/market/bars/"+encodeURIComponent(symbol)+"?timeframe=1d&limit=300","Bitexen");
+      if(!Array.isArray(j.bars))throw Error("Bitexen günlük bar verisi alınamadı");
+      return closedDaily(j.bars.map(x=>[Date.parse(x.time),x.open,x.high,x.low,x.close,x.volume]));
+    },normalize:s=>s.replace(/TRY$/,"/TRY")},
+    ...["paribu","bitci","mexctr"].map((key,i)=>({
+      key,name:["PARIBU","BITCI","MEXC TR"][i],
+      symbols:async()=>{throw Error("Bu platform için doğrulanmış, 205+ günlük TRY mum API'si bulunamadı");},
       candles:async()=>[],normalize:s=>s
     }))
   ];
