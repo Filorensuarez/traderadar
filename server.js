@@ -5995,29 +5995,6 @@ async function scanMarket() {
       if(!Array.isArray(j.t))throw Error("BtcTurk günlük mum verisi alınamadı");
       return closedDaily(j.t.map((t,i)=>[t*1000,j.o[i],j.h[i],j.l[i],j.c[i],j.v[i]]));
     },normalize:s=>s.replace(/TRY$/,"/TRY")},
-    {key:"kucointr",name:"KUCOIN TR",symbols:async()=>{
-      const j=await getExternalJSON("https://api.kucoin.tr/api/v2/symbols","KuCoin TR");
-      if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR sembol yanıtı geçersiz");
-      return j.data.filter(x=>String(x.quoteCurrency||x.quoteAsset||"").toUpperCase()==="TRY"&&x.enableTrading!==false).map(x=>x.symbol).filter(Boolean);
-    },candles:async symbol=>{
-      const j=await getExternalJSON("https://api.kucoin.tr/api/v1/market/candles?type=1day&symbol="+encodeURIComponent(symbol),"KuCoin TR");
-      if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR mum yanıtı geçersiz");
-      return closedDaily(j.data.map(x=>[Number(x[0])*1000,x[1],x[3],x[4],x[2],x[5]]));
-    },normalize:s=>s.replace("-","/")},
-    {key:"bitexen",name:"BITEXEN",symbols:async()=>{
-      const j=await getExternalJSON("https://www.bitexen.com/api/v1/market_info/","Bitexen");
-      if(j.status!=="success"||!Array.isArray(j.data?.markets))throw Error("Bitexen TRY piyasaları alınamadı");
-      return j.data.markets.filter(x=>String(x.counter_currency||x.quote_currency||x.quoteCurrency||"").toUpperCase()==="TRY"||/^[A-Z0-9]+(?:_|-)TRY$/.test(String(x.market_code||""))||/^[A-Z0-9]+TRY$/.test(String(x.market_code||""))).map(x=>x.market_code).filter(Boolean);
-    },candles:async symbol=>{
-      const j=await getExternalJSON("https://dv-api.bitexen.com/api/v1/market/bars/"+encodeURIComponent(symbol)+"?timeframe=1d&limit=300","Bitexen");
-      if(!Array.isArray(j.bars))throw Error("Bitexen günlük bar verisi alınamadı");
-      return closedDaily(j.bars.map(x=>[Date.parse(x.time),x.open,x.high,x.low,x.close,x.volume]));
-    },normalize:s=>s.replace(/TRY$/,"/TRY")},
-    ...["paribu","bitci","mexctr"].map((key,i)=>({
-      key,name:["PARIBU","BITCI","MEXC TR"][i],
-      symbols:async()=>{throw Error("Bu platform için doğrulanmış, 205+ günlük TRY mum API'si bulunamadı");},
-      candles:async()=>[],normalize:s=>s
-    }))
   ];
   const results = {};
   const counts = {};
@@ -6035,7 +6012,7 @@ async function scanMarket() {
         const symbols = await p.symbols();
         if (!Array.isArray(symbols)||symbols.length===0) throw Error("Aktif TRY işlem çifti bulunamadı");
         counts[p.key].symbols = symbols;
-        const batchSize = ["btcturk","okxtr","kucointr","bitexen","paribu","bitci","mexctr"].includes(p.key) ? 1 : 5;
+        const batchSize = ["btcturk","okxtr"].includes(p.key) ? 1 : 5;
         for (let i=0;i<symbols.length;i+=batchSize) {
           const batch = symbols.slice(i,i+batchSize);
           const responses = await Promise.allSettled(batch.map(async symbol=>{
