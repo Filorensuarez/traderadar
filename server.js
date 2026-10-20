@@ -2076,16 +2076,35 @@ let cache = {
    HTTP
 ========================= */
 
+const externalRateLimits = new Map();
+const externalWait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function getExternalJSON(url, label = "Dış borsa") {
-  const response = await fetch(url, {
-    headers: {
-      "Accept": "application/json",
-      "User-Agent": "TradeRadar/1.0"
-    },
-    signal: AbortSignal.timeout(15000)
-  });
-  if (!response.ok) throw new Error(label + " HTTP " + response.status);
-  return response.json();
+  const host = new URL(url).hostname;
+  const minimumGap = host.includes("btcturk") ? 1200 : 200;
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const wait = Math.max(0, (externalRateLimits.get(host) || 0) - Date.now());
+    if (wait) await externalWait(wait);
+    externalRateLimits.set(host, Date.now() + minimumGap);
+    try {
+      const response = await fetch(url, {
+        headers: {"Accept":"application/json","User-Agent":"TradeRadar/1.0"},
+        signal: AbortSignal.timeout(15000)
+      });
+      if (response.ok) return response.json();
+      if (response.status !== 429 && response.status < 500) throw Error(label + " HTTP " + response.status);
+      lastError = Error(label + " HTTP " + response.status);
+      const retryHeader = Number(response.headers.get("retry-after"));
+      const backoff = Number.isFinite(retryHeader) && retryHeader > 0 ? Math.min(retryHeader * 1000, 60000) : Math.min(60000, 4000 * 2 ** attempt);
+      externalRateLimits.set(host, Date.now() + backoff);
+      await externalWait(backoff);
+    } catch (error) {
+      lastError = error;
+      if (/HTTP 4(?!29)/.test(String(error.message))) throw error;
+      await externalWait(1000 * (attempt + 1));
+    }
+  }
+  throw lastError || Error(label + " bağlantısı kurulamadı");
 }
 async function getJSON(url) {
 
@@ -6016,7 +6035,7 @@ async function scanMarket() {
         const symbols = await p.symbols();
         if (!Array.isArray(symbols)||symbols.length===0) throw Error("Aktif TRY işlem çifti bulunamadı");
         counts[p.key].symbols = symbols;
-        const batchSize = 5;
+        const batchSize = p.key === "btcturk" ? 1 : 5;
         for (let i=0;i<symbols.length;i+=batchSize) {
           const batch = symbols.slice(i,i+batchSize);
           const responses = await Promise.allSettled(batch.map(async symbol=>{
@@ -6036,7 +6055,7 @@ async function scanMarket() {
             const result = response.value;
             if (result && (result.confirmed || result.candidate)) results[p.key].push(result);
           }
-          await new Promise(resolve=>setTimeout(resolve,350));
+          await new Promise(resolve=>setTimeout(resolve,p.key==="btcturk"?1200:350));
         }
         if(successfulCandles===0) throw Error("Günlük analiz için 205 tamamlanmış mum alınamadı; başarısız parite: "+failedCandles+"; ilk hata: "+firstCandleError);
       } catch (error) {
