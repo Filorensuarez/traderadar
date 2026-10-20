@@ -5979,7 +5979,7 @@ async function scanMarket() {
     {key:"kucointr",name:"KUCOIN TR",symbols:async()=>{
       const j=await getExternalJSON("https://api.kucoin.tr/api/v2/symbols","KuCoin TR");
       if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR sembol yanıtı geçersiz");
-      return j.data.filter(x=>x.quoteCurrency==="TRY"&&x.enableTrading!==false).map(x=>x.symbol);
+      return j.data.filter(x=>String(x.quoteCurrency||x.quoteAsset||"").toUpperCase()==="TRY"&&x.enableTrading!==false&&x.isMarginEnabled!==null).map(x=>x.symbol).filter(Boolean);
     },candles:async symbol=>{
       const j=await getExternalJSON("https://api.kucoin.tr/api/v1/market/candles?type=1day&symbol="+encodeURIComponent(symbol),"KuCoin TR");
       if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR mum yanıtı geçersiz");
@@ -5988,7 +5988,7 @@ async function scanMarket() {
     {key:"bitexen",name:"BITEXEN",symbols:async()=>{
       const j=await getExternalJSON("https://www.bitexen.com/api/v1/market_info/","Bitexen");
       if(j.status!=="success"||!Array.isArray(j.data?.markets))throw Error("Bitexen TRY piyasaları alınamadı");
-      return j.data.markets.filter(x=>x.counter_currency==="TRY"&&/^[A-Z0-9]+TRY$/.test(x.market_code)).map(x=>x.market_code);
+      return j.data.markets.filter(x=>String(x.counter_currency||x.quote_currency||x.quoteCurrency||"").toUpperCase()==="TRY"||/^[A-Z0-9]+(?:_|-)TRY$/.test(String(x.market_code||""))||/^[A-Z0-9]+TRY$/.test(String(x.market_code||""))).map(x=>x.market_code).filter(Boolean);
     },candles:async symbol=>{
       const j=await getExternalJSON("https://dv-api.bitexen.com/api/v1/market/bars/"+encodeURIComponent(symbol)+"?timeframe=1d&limit=300","Bitexen");
       if(!Array.isArray(j.bars))throw Error("Bitexen günlük bar verisi alınamadı");
@@ -6012,6 +6012,7 @@ async function scanMarket() {
       try {
         let successfulCandles=0;
         let failedCandles=0;
+        let firstCandleError="";
         const symbols = await p.symbols();
         if (!Array.isArray(symbols)||symbols.length===0) throw Error("Aktif TRY işlem çifti bulunamadı");
         counts[p.key].symbols = symbols;
@@ -6020,7 +6021,7 @@ async function scanMarket() {
           const batch = symbols.slice(i,i+batchSize);
           const responses = await Promise.allSettled(batch.map(async symbol=>{
             const candles = await p.candles(symbol);
-            if(candles.length<205){failedCandles++;return null;}
+            if(candles.length<205){failedCandles++;if(!firstCandleError)firstCandleError=String(symbol)+": yalnızca "+candles.length+" günlük mum";return null;}
             successfulCandles++;
             collectMedium(p.normalize(symbol),p.name,candles);
             const result = analyze(p.normalize(symbol),candles);
@@ -6031,13 +6032,13 @@ async function scanMarket() {
             return result;
           }));
           for (const response of responses) {
-            if (response.status !== "fulfilled") {failedCandles++;continue;}
+            if (response.status !== "fulfilled") {failedCandles++;if(!firstCandleError)firstCandleError=String(response.reason?.message||response.reason||"Bilinmeyen API hatası");continue;}
             const result = response.value;
             if (result && (result.confirmed || result.candidate)) results[p.key].push(result);
           }
           await new Promise(resolve=>setTimeout(resolve,350));
         }
-        if(successfulCandles===0) throw Error("Günlük analiz için 205 tamamlanmış mum alınamadı; başarısız parite: "+failedCandles);
+        if(successfulCandles===0) throw Error("Günlük analiz için 205 tamamlanmış mum alınamadı; başarısız parite: "+failedCandles+"; ilk hata: "+firstCandleError);
       } catch (error) {
         counts[p.key].error = error.message;
         console.error(p.name+" günlük tarama hatası:",error.message);
