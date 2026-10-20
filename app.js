@@ -406,6 +406,9 @@ function coinCard(row) {
 
 
   const plan = row.confirmed ? dailyTradePlan(row) : null;
+  const upside = dailyUpsidePotential(row);
+  const resistancePrice = Number(row.resistance);
+  const possibleTop = upside?.target ?? (Number.isFinite(resistancePrice) && resistancePrice > Number(row.price) ? resistancePrice : null);
   const reasonText =
     reasons.length
       ? reasons
@@ -447,9 +450,12 @@ function coinCard(row) {
 
         <div class="metric">
           Fiyat
-          <strong>
-            ${price(row.price)}
-          </strong>
+          <strong>${price(row.price)}</strong>
+        </div>
+        <div class="metric">
+          Olası yükseliş sınırı (direnç)
+          <strong>${possibleTop ? price(possibleTop) : "Hesaplanamadı"}</strong>
+          <small>Bu fiyat düşüş trendinin başlayacağını kesin olarak göstermez.</small>
         </div>
 
 
