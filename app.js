@@ -406,9 +406,8 @@ function coinCard(row) {
 
 
   const plan = row.confirmed ? dailyTradePlan(row) : null;
-  const upside = dailyUpsidePotential(row);
-  const resistancePrice = Number(row.resistance);
-  const possibleTop = upside?.target ?? (Number.isFinite(resistancePrice) && resistancePrice > Number(row.price) ? resistancePrice : null);
+  const resistancePrice = Number(row.longTrendResistance);
+  const possibleTop = Number.isFinite(resistancePrice) && resistancePrice > Number(row.price) ? resistancePrice : null;
   const reasonText =
     reasons.length
       ? reasons
@@ -453,9 +452,9 @@ function coinCard(row) {
           <strong>${price(row.price)}</strong>
         </div>
         <div class="metric">
-          Olası yükseliş sınırı (direnç)
+          Günlük trendin olası üst direnci
           <strong>${possibleTop ? price(possibleTop) : "Hesaplanamadı"}</strong>
-          <small>Bu fiyat düşüş trendinin başlayacağını kesin olarak göstermez.</small>
+          <small>Son 180 günlük geçmiş direnç. Düşüş trendine geçiş ancak sonraki fiyat hareketleriyle teyit edilebilir.</small>
         </div>
 
 
