@@ -2080,7 +2080,7 @@ const externalRateLimits = new Map();
 const externalWait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function getExternalJSON(url, label = "Dış borsa") {
   const host = new URL(url).hostname;
-  const minimumGap = host.includes("btcturk") ? 1200 : 200;
+  const minimumGap = /btcturk/.test(host) ? 1500 : /bitexen|kucoin\.tr|okx\.com|paribu|bitci|mexc/.test(host) ? 900 : 200;
   let lastError;
   for (let attempt = 0; attempt < 4; attempt++) {
     const wait = Math.max(0, (externalRateLimits.get(host) || 0) - Date.now());
@@ -6035,7 +6035,7 @@ async function scanMarket() {
         const symbols = await p.symbols();
         if (!Array.isArray(symbols)||symbols.length===0) throw Error("Aktif TRY işlem çifti bulunamadı");
         counts[p.key].symbols = symbols;
-        const batchSize = p.key === "btcturk" ? 1 : 5;
+        const batchSize = ["btcturk","okxtr","kucointr","bitexen","paribu","bitci","mexctr"].includes(p.key) ? 1 : 5;
         for (let i=0;i<symbols.length;i+=batchSize) {
           const batch = symbols.slice(i,i+batchSize);
           const responses = await Promise.allSettled(batch.map(async symbol=>{
@@ -6055,7 +6055,7 @@ async function scanMarket() {
             const result = response.value;
             if (result && (result.confirmed || result.candidate)) results[p.key].push(result);
           }
-          await new Promise(resolve=>setTimeout(resolve,p.key==="btcturk"?1200:350));
+          await new Promise(resolve=>setTimeout(resolve,p.key==="btcturk"?1500:900));
         }
         if(successfulCandles===0) throw Error("Günlük analiz için 205 tamamlanmış mum alınamadı; başarısız parite: "+failedCandles+"; ilk hata: "+firstCandleError);
       } catch (error) {
