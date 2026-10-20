@@ -605,7 +605,7 @@ function renderExchange(data) {
   if (exchangeData.ok) {
 
     statusEl.textContent =
-      `${exchangeName} tarama aktif`;
+      data.scanning ? `${exchangeName} taranıyor` : `${exchangeName} tarama tamamlandı`;
 
   } else {
 
@@ -621,7 +621,7 @@ function renderExchange(data) {
       Number(
         exchangeData.scanned || 0
       )
-    } coin | Teyit: ${
+    } / ${Number(exchangeData.total || exchangeData.scanned || 0)} coin | Teyit: ${
       Number(
         exchangeData.confirmed || 0
       )
@@ -655,6 +655,11 @@ function renderExchange(data) {
     return;
   }
 
+
+  if (!rows.length && data.scanning) {
+    cards.innerHTML = `<div class="empty-card">${exchangeName} günlük mumları taranıyor. Bulunan coinler beklenmeden gösterilecek. (${Number(exchangeData.scanned||0)} / ${Number(exchangeData.total||0)})</div>`;
+    return;
+  }
 
   if (!rows.length) {
 
