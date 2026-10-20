@@ -5937,7 +5937,17 @@ async function scanMarket() {
       mediumCandidates.push({symbol:String(symbol).replace(/[-_]USDT$/,"/USDT"),source,...setup});
     }
   }
-  const closedDaily=raw=>raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]})).filter(x=>[x.time,x.open,x.high,x.low,x.close,x.volume].every(Number.isFinite)&&x.close>0&&x.time+86400000<=Date.now()).sort((a,b)=>a.time-b.time);
+  const closedDaily=raw=>{
+    const days=new Map(),now=Date.now();
+    for(const x of raw){
+      const stamp=Number(x[0]);
+      const time=stamp<1e11?stamp*1000:stamp;
+      const candle={time,open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]};
+      if(!Object.values(candle).every(Number.isFinite)||candle.open<=0||candle.close<=0||candle.low<=0||candle.high<candle.low||candle.volume<0||time+86400000>now)continue;
+      days.set(time,candle);
+    }
+    return [...days.values()].sort((a,b)=>a.time-b.time);
+  };
   const providers = [
     {key:"okxtr",name:"OKX TR",symbols:async()=>{
       const j=await getExternalJSON("https://tr.okx.com/api/v5/public/instruments?instType=SPOT","OKX TR");
@@ -5959,7 +5969,7 @@ async function scanMarket() {
     },normalize:s=>s.replace("-","/")},
     {key:"btcturk",name:"BTCTURK",symbols:async()=>{
       const j=await getExternalJSON("https://api.btcturk.com/api/v2/server/exchangeinfo","BtcTurk");
-      return (j.data?.symbols||[]).filter(x=>x.denominator==="TRY"&&x.status==="TRADING").map(x=>x.name);
+      return (j.data?.symbols||[]).filter(x=>String(x.denominator||x.quoteAsset||"").toUpperCase()==="TRY"&&(!x.status||["TRADING","ACTIVE"].includes(String(x.status).toUpperCase()))).map(x=>x.name).filter(Boolean);
     },candles:async symbol=>{
       const to=Math.floor(Date.now()/1000),from=to-265*86400;
       const j=await getExternalJSON("https://graph-api.btcturk.com/v1/klines/history?symbol="+encodeURIComponent(symbol)+"&resolution=1D&from="+from+"&to="+to,"BtcTurk");
