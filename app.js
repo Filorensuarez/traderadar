@@ -68,7 +68,7 @@ let radarLoading =
 let radarLoaded =
   false;
 let selectedExchange =
-  "binancetr";
+  "okxtr";
 
 let lastData =
   null;
@@ -209,13 +209,13 @@ scenarioButton.addEventListener(
 
 function selectExchange(exchange) {
   selectedExchange = exchange;
-  for (const key of ["binancetr"]) {
+  for (const key of ["okxtr","btcturk","paribu","bitexen","kucointr","bitci","mexctr"]) {
     const button = document.querySelector("#"+key+"Button");
     if (button) button.classList.toggle("active",exchange===key);
   }
   if (lastData) renderExchange(lastData);
 }
-for (const key of ["binancetr"]) {
+for (const key of ["okxtr","btcturk","paribu","bitexen","kucointr","bitci","mexctr"]) {
   const button = document.querySelector("#"+key+"Button");
   if (button) button.addEventListener("click",()=>selectExchange(key));
 }
@@ -600,7 +600,7 @@ function renderExchange(data) {
       : [];
 
 
-  const exchangeName = ({binancetr:"BINANCE TR"})[selectedExchange] || selectedExchange.toUpperCase();
+  const exchangeName = ({okxtr:"OKX TR",btcturk:"BTCTURK",paribu:"PARIBU",bitexen:"BITEXEN",kucointr:"KUCOIN TR",bitci:"BITCI",mexctr:"MEXC TR"})[selectedExchange] || selectedExchange.toUpperCase();
 
   if (exchangeData.ok) {
 
