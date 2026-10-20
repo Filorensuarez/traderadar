@@ -5995,7 +5995,7 @@ async function scanMarket() {
       if(!Array.isArray(j.t))throw Error("BtcTurk günlük mum verisi alınamadı");
       return closedDaily(j.t.map((t,i)=>[t*1000,j.o[i],j.h[i],j.l[i],j.c[i],j.v[i]]));
     },normalize:s=>s.replace(/TRY$/,"/TRY")},
-    ,{key:"okxglobal",name:"OKX GLOBAL",currency:"USDT",symbols:async()=>{
+    {key:"okxglobal",name:"OKX GLOBAL",currency:"USDT",symbols:async()=>{
       const j=await getExternalJSON("https://www.okx.com/api/v5/public/instruments?instType=SPOT","OKX GLOBAL");
       if(j.code!=="0"||!Array.isArray(j.data))throw Error("OKX GLOBAL sembol yanıtı geçersiz");
       return j.data.filter(x=>x.quoteCcy==="USDT"&&x.state==="live").map(x=>x.instId);
