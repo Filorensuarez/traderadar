@@ -5957,8 +5957,17 @@ async function scanMarket() {
       if(!Array.isArray(j.t))throw Error("BtcTurk günlük mum verisi alınamadı");
       return closedDaily(j.t.map((t,i)=>[t*1000,j.o[i],j.h[i],j.l[i],j.c[i],j.v[i]]));
     },normalize:s=>s.replace(/TRY$/,"/TRY")},
-    ...["paribu","bitexen","kucointr","bitci","mexctr"].map((key,i)=>({
-      key,name:["PARIBU","BITEXEN","KUCOIN TR","BITCI","MEXC TR"][i],
+    {key:"kucointr",name:"KUCOIN TR",symbols:async()=>{
+      const j=await getExternalJSON("https://api.kucoin.tr/api/v2/symbols","KuCoin TR");
+      if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR sembol yanıtı geçersiz");
+      return j.data.filter(x=>x.quoteCurrency==="TRY"&&x.enableTrading!==false).map(x=>x.symbol);
+    },candles:async symbol=>{
+      const j=await getExternalJSON("https://api.kucoin.tr/api/v1/market/candles?type=1day&symbol="+encodeURIComponent(symbol),"KuCoin TR");
+      if(j.code!=="200000"||!Array.isArray(j.data))throw Error("KuCoin TR mum yanıtı geçersiz");
+      return closedDaily(j.data.map(x=>[Number(x[0])*1000,x[1],x[3],x[4],x[2],x[5]]));
+    },normalize:s=>s.replace("-","/")},
+    ...["paribu","bitexen","bitci","mexctr"].map((key,i)=>({
+      key,name:["PARIBU","BITEXEN","BITCI","MEXC TR"][i],
       symbols:async()=>{throw Error("Doğrulanmış TRY günlük mum API bağlantısı henüz yok");},
       candles:async()=>[],normalize:s=>s
     }))
