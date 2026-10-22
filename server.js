@@ -1,3 +1,4 @@
+import {startLiveRise,liveRiseSnapshot} from "./live-rise-radar.js";
 import {paperStats} from "./paper-performance-72h.js";
 import {startDailyTouch,scanDailyTouch,dailyTouchStatus,stopDailyTouch} from "./daily-touch-watch.js";
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
@@ -7788,6 +7789,8 @@ app.get(
    SUNUCU
 ========================= */
 
+app.get("/api/live-rise",(_req,res)=>{res.set("Cache-Control","no-store");res.json(liveRiseSnapshot());});
+
 app.listen(
   PORT,
   () => {
@@ -7812,6 +7815,7 @@ setInterval(
 
 /* Legacy scenario, minute radar and trade-flow jobs are retired.
    Daily confirmation and X Manager endpoints remain available. */
+startLiveRise();
 startFlowRadar();
 startOkxFlow();
 startKucoinFlow();
