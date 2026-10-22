@@ -102,6 +102,10 @@ function openView(view) {
   const xmanager = view === "xmanager";
   const decision = view === "decision";
   const flow = view === "flow";
+  const liveRise = view === "liveRise";
+  document.querySelector("#liveRise").hidden = !liveRise;
+  document.querySelector("#liveRiseButton").classList.toggle("active",liveRise);
+  if(liveRise)loadLiveRise();
 
 
 
@@ -2723,3 +2727,29 @@ document.querySelector("#mediumWatchRefresh").addEventListener("click",loadMediu
 document.querySelector("#flowButton").addEventListener("click",()=>openView("flow"));
 
 
+
+let liveRiseBusy=false;
+async function loadLiveRise(){
+ if(liveRiseBusy||document.querySelector("#liveRise").hidden)return;
+ liveRiseBusy=true;
+ const status=document.querySelector("#liveRiseStatus"),cards=document.querySelector("#liveRiseCards");
+ try{
+  const response=await fetch("/api/live-rise",{cache:"no-store"});
+  if(!response.ok)throw Error("HTTP "+response.status);
+  const data=await response.json();
+  const feeds=Object.values(data.feeds||{});
+  status.textContent=feeds.map(f=>f.name+": "+(f.connected?"Bağlı":"Bağlantı yok"+(f.error?" ("+f.error+")":""))).join(" | ")+" | "+(data.rows||[]).length+" sinyal";
+  cards.replaceChildren();
+  for(const row of data.rows||[]){
+    const card=document.createElement("article");card.className="coin-card";
+    const heading=document.createElement("h3");heading.textContent=row.symbol+" • "+row.source;
+    const detail=document.createElement("p");detail.textContent="Fiyat: "+row.price+" USDT | 10 sn: "+(row.change10s===null?"—":"%"+row.change10s)+" | 60 sn: "+(row.change60s===null?"—":"%"+row.change60s);
+    const time=document.createElement("p");time.textContent="Tespit: "+new Date(row.detectedAt).toLocaleString("tr-TR")+" • Erken hareket (günlük teyit değil)";
+    card.append(heading,detail,time);cards.append(card);
+  }
+  if(!data.rows?.length){const p=document.createElement("p");p.textContent="Canlı akış izleniyor; henüz eşik aşan hareket yok.";cards.append(p);}
+ }catch(e){status.textContent="Canlı radar verisi alınamadı: "+e.message;}
+ finally{liveRiseBusy=false;}
+}
+document.querySelector("#liveRiseButton").addEventListener("click",()=>openView("liveRise"));
+setInterval(loadLiveRise,2000);
