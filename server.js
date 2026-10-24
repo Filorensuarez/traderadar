@@ -1,6 +1,6 @@
 import {startLiveRise,liveRiseSnapshot} from "./live-rise-radar.js";
 import {paperStats} from "./paper-performance-72h.js";
-import {startDailyTouch,scanDailyTouch,dailyTouchStatus,stopDailyTouch} from "./daily-touch-watch.js";
+import {startDailyTouch,scanDailyTouch,dailyTouchStatus,stopDailyTouch,setDailyTouchThreshold} from "./daily-touch-watch.js";
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
 import {startHourlyPullbacks,scanHourlyPullbacks,hourlyPullbackStatus} from "./hourly-pullback-watch.js";
 
@@ -82,7 +82,9 @@ app.get("/api/daily-touch",(req,res)=>{res.set("Cache-Control","no-store");res.j
 app.post("/api/daily-touch/scan",(req,res)=>{
  res.set("Cache-Control","no-store");
  const busy=dailyTouchStatus().running;
- if(!busy)scanDailyTouch().catch(console.error);
+ if(busy)return res.status(409).json({error:"Önce mevcut taramayı durdurun"});
+ try{setDailyTouchThreshold(req.query.threshold??2)}catch(e){return res.status(400).json({error:e.message})}
+ scanDailyTouch().catch(console.error);
  res.json({started:!busy,...dailyTouchStatus()});
 });
 app.post("/api/daily-touch/stop",(req,res)=>{res.set("Cache-Control","no-store");res.json(stopDailyTouch());});
