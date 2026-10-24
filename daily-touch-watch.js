@@ -1,9 +1,11 @@
 import {dailyContact} from "./daily-touch-model.js";
 import {eligibleDailyTouchMarkets} from "./daily-touch-markets.js";
 const BASE="https://data-api.binance.vision",REPEAT_MS=60*1000;
+let targetPct=2;
+export function setDailyTouchThreshold(value){const n=Number(value);if(!Number.isFinite(n)||n<0.1||n>50)throw Error("Yükseliş oranı %0,1 ile %50 arasında olmalı");targetPct=n;state.thresholdPct=n;return n;}
 const MIN_REQUEST_GAP=160;
 const state={
-  running:false,status:"idle",startedAt:0,updatedAt:0,checked:0,eligible:0,
+  running:false,status:"idle",thresholdPct:2,startedAt:0,updatedAt:0,checked:0,eligible:0,
   failed:0,remaining:0,rows:[],error:null,waitUntil:0,
   notice:"Son 10 tamamlanmış 1 dakikalık mumun ortalama kapanışı, hemen öncesindeki 30 tamamlanmış 1 dakikalık mumun ortalamasından en az %2 yüksekse bildirilir. EMA ve hacim filtresi yoktur."
 };
@@ -69,6 +71,8 @@ export async function scanDailyTouch(){
     if(!Array.isArray(raw))throw Error("1 dakikalık OHLC verisi geçersiz");
     const candles=raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
     const result=dailyContact(candles);
+    result.match=Number.isFinite(result.gainPct)&&result.gainPct>=targetPct;
+    result.thresholdPct=targetPct;
     if(result.match){
       const gapPct=result.gainPct;
       matches.push({...result,exchange:"BINANCE",market:market.symbol,
