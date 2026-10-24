@@ -399,9 +399,10 @@
  <div id="pullbackCards" class="coin-grid"></div>
 </section>
 <section id="dailyTouch" hidden>
- <div class="section-head"><div><h2>Temas Araması — %2 Momentum</h2>
- <p class="description">Son 10 tamamlanmış 1 dakikalık mumun ortalama kapanışı, bu mumlardan önceki 30 tamamlanmış 1 dakikalık mumun ortalama kapanışından en az %2 yüksek olduğunda sinyal oluşur. EMA, hacim ve alıcı sayısı filtresi uygulanmaz. Geçmiş hareket gelecekteki yükselişi garanti etmez.</p></div>
+ <div class="section-head"><div><h2>Temas Araması — Ayarlanabilir Momentum</h2>
+ <p class="description">Son 10 tamamlanmış 1 dakikalık mumun ortalama kapanışı, bu mumlardan önceki 30 tamamlanmış 1 dakikalık mumun ortalama kapanışından seçtiğiniz oranda yüksek olduğunda sinyal oluşur. EMA, hacim ve alıcı sayısı filtresi uygulanmaz. Geçmiş hareket gelecekteki yükselişi garanti etmez.</p></div>
  <div style="display:flex;gap:9px;flex-wrap:wrap">
+ <label style="display:flex;align-items:center;gap:7px;color:#dce7f5">Hedef yükseliş (%) <input id="dailyTouchThreshold" type="number" min="0.1" max="50" step="0.1" value="2" inputmode="decimal" style="width:85px;padding:9px;border-radius:8px;background:#15243a;color:white;border:1px solid #60718a"></label>
  <button id="dailyTouchScan" class="refresh-button" type="button">Tümünü Tara</button>
  <button id="dailyTouchNotify" class="refresh-button" type="button">Bildirimleri Aç</button>
  <button id="dailyTouchStop" class="refresh-button" type="button" disabled>Durdur</button></div></div>
