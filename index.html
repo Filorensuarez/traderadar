@@ -91,6 +91,7 @@
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
   <button id="dailyTouchButton" class="tab" type="button" data-view="dailyTouch">Temas Araması</button>
   <button id="momentumButton" class="tab" type="button" data-view="momentum">Patlama</button>
+  <button id="quietVolumeButton" class="tab" type="button" data-view="quietVolume">Sessiz Hacim Alarmı</button>
   <button id="pullbackButton" class="tab" type="button" data-view="hourlyPullback" style="display:none" aria-hidden="true">Büyük Geri Çekilmeler</button>
   <button id="capitalButton" class="tab" type="button" data-view="capital" style="display:none" aria-hidden="true">Sermaye Yönetimi</button>
   <button id="whaleButton" class="tab" data-view="whale" type="button" style="display:none" aria-hidden="true">Büyük Yatırımcı Takibi</button>
@@ -409,6 +410,21 @@
  <p id="dailyTouchStatus" class="updated-line" aria-live="polite">Tarama hazırlanıyor...</p>
  <div id="dailyTouchCards" class="coin-grid"></div>
 </section>
+<section id="quietVolume" hidden>
+ <h2>Sessiz Hacim Alarmı — Canlı Alış Uyanışı</h2>
+ <p class="description">Binance Spot USDT gerçekleşmiş işlemleri canlı izlenir. Son 2 dakikada düşük hacimli olan bir paritede, son 15 saniyelik alış hacmi önceki dönemin ortalamasına göre hızlanırsa alarm oluşturulur. Bu bölüm periyodik mum taraması yapmaz. İlk 2 dakikada başlangıç verisi biriktirir. Alış yönü, borsanın gerçekleşen işlemdeki alıcı/taker bilgisine göre değerlendirilir; yatırımcı kimliği belirlenemez.</p>
+ <div class="info-box">
+ <label for="quietFactor">Alış hacmi hızlanma katsayısı</label> <input class="x-field" id="quietFactor" type="number" min="2" max="100" step="1" value="5" style="max-width:110px">
+ <label for="quietRatio">Son 15 sn minimum alış oranı (%)</label> <input class="x-field" id="quietRatio" type="number" min="50" max="100" step="1" value="70" style="max-width:110px">
+ <label for="quietMinUsdt">Son 15 sn minimum alış hacmi (USDT)</label> <input class="x-field" id="quietMinUsdt" type="number" min="10" step="10" value="500" style="max-width:130px">
+ <p class="description">Düşük hacim filtresi: önceki 2 dakikadaki 15 saniyelik dilim başına toplam hacim, son 15 saniyedeki minimum alış hacminin altında olmalı. 2 dakikalık verinin tamamı birikmeden sinyal verilmez. Alarm eşikleri değiştirilebilir.</p>
+ <button id="quietStart" class="refresh-button" type="button">Canlı İzlemeyi Başlat</button>
+ <button id="quietStop" class="refresh-button" type="button">Durdur</button>
+ <p id="quietStatus" aria-live="polite">Hazır.</p>
+ <p id="quietStats" class="updated-line">İzlenen: 0 • Hazır: 0 • Alarm: 0</p>
+ </div><div id="quietCards" class="coin-grid"></div>
+ <p class="description">İlk sürüm, bağlantı ve cihaz yükünü sınırlamak için Binance USDT piyasasındaki hacme göre seçilen en fazla 160 pariteyi izler. Tüm borsaları kapsamaz. Telefon arka plandayken bağlantı durabilir. Alım sinyali veya kazanç garantisi değildir.</p>
+</section>
 <section id="momentum" hidden>
  <h2>Patlama — Yükseliş ve Risk Planı</h2>
  <p class="description">Yalnızca OKX TR aktif spot pariteleri taranır. Son kapanmış 3 adet 1 dakikalık mum incelenir. Son mumun kapanış fiyatı, bu 3 mumdan önceki 30 mumun ortalama kapanış fiyatından belirlediğiniz oranda yüksekse takip listesine alınır. Hacim ve alıcı işlemi şartı aranmaz. Bölüm açıkken tarama 60 saniyede bir yenilenir.</p>
@@ -444,6 +460,7 @@
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./patlama-ui.js?v=okxtr-price-only-4"></script>
+  <script defer src="./quiet-volume-ui.js?v=1"></script>
 
   <script defer src="./tab-navigation-fix.js"></script>
   <script defer src="/install-app.js?v=1"></script>
