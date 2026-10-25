@@ -32,10 +32,10 @@ ws.onclose=()=>{if(token!==session||!active)return;for(const sym of symbols)stat
 async function start(){stop();const cfg=settings();if(!(cfg.factor>=2&&cfg.factor<=100&&cfg.ratio>=.5&&cfg.ratio<=1&&cfg.min>=10)){status("Filtre değerleri geçersiz.");return}
 active=true;const token=++session;started=Date.now();alarms=0;universe=0;el("quietCards").textContent="Piyasa listesi alınıyor...";status("Binance USDT pariteleri hazırlanıyor...");
 try{
-const [exchange,tickers]=await Promise.all([fetch("https://data-api.binance.vision/api/v3/exchangeInfo").then(r=>r.json()),fetch("https://data-api.binance.vision/api/v3/ticker/24hr").then(r=>r.json())]);
+const exchange=await fetch("https://data-api.binance.vision/api/v3/exchangeInfo").then(r=>r.json());
 if(!active||token!==session)return;
 const allowed=new Set((exchange.symbols||[]).filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT"&&s.isSpotTradingAllowed!==false&&!/(UP|DOWN|BULL|BEAR)USDT$/.test(s.symbol)).map(s=>s.symbol));
-const symbols=(Array.isArray(tickers)?tickers:[]).filter(t=>allowed.has(t.symbol)).sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).slice(0,160).map(t=>t.symbol);
+const symbols=[...allowed];
 if(!symbols.length)throw Error("Uygun USDT paritesi bulunamadı");
 universe=symbols.length;el("quietCards").textContent="Alış hacmi uyanışı bekleniyor...";for(let i=0;i<symbols.length;i+=40)connect(symbols.slice(i,i+40),token);stats();
 }catch(e){if(token===session){status("Başlatılamadı: "+e.message);stop(false)}}
