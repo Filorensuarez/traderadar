@@ -410,8 +410,9 @@
  <div id="dailyTouchCards" class="coin-grid"></div>
 </section>
 <section id="momentum" hidden>
- <h2>Patlama — %2 Yükseliş Takibi</h2>
- <p class="description">Yalnızca OKX TR aktif spot pariteleri taranır. Son kapanmış 3 adet 1 dakikalık mum incelenir. Son mumun kapanış fiyatı, bu 3 mumdan önceki 30 mumun ortalama kapanış fiyatından en az %2 yüksekse takip listesine alınır. Hacim ve alıcı işlemi şartı aranmaz. Bölüm açıkken tarama 60 saniyede bir yenilenir.</p>
+ <h2>Patlama — Yükseliş ve Risk Planı</h2>
+ <p class="description">Yalnızca OKX TR aktif spot pariteleri taranır. Son kapanmış 3 adet 1 dakikalık mum incelenir. Son mumun kapanış fiyatı, bu 3 mumdan önceki 30 mumun ortalama kapanış fiyatından belirlediğiniz oranda yüksekse takip listesine alınır. Hacim ve alıcı işlemi şartı aranmaz. Bölüm açıkken tarama 60 saniyede bir yenilenir.</p>
+ <div class="info-box"><label for="patlamaThreshold">Hedef yükseliş (%)</label> <input class="x-field" id="patlamaThreshold" type="number" min="0.1" max="50" step="0.1" value="1" style="max-width:110px"> <label for="patlamaCapital">Aktif işlem bütçesi (TL)</label> <input class="x-field" id="patlamaCapital" type="number" min="0" value="20000" style="max-width:145px"> <label for="patlamaRisk">İşlem başı risk (TL)</label> <input class="x-field" id="patlamaRisk" type="number" min="1" value="200" style="max-width:120px"> <label for="patlamaStop">Stop mesafesi (%)</label> <input class="x-field" id="patlamaStop" type="number" min="0.1" max="50" step="0.1" value="2" style="max-width:110px"><p id="patlamaRiskPlan" aria-live="polite"></p><p class="description">Günlük zarar limiti: 400 TL • Haftalık: 1.000 TL • Aynı anda en fazla 2 pozisyon • Kaldıraç yok. Bu sınırlar manuel takip edilir; otomatik emir gönderilmez. Komisyon ve kayma dahil değildir.</p></div>
  <button id="patlamaScan" class="refresh-button" type="button">Patlama Tara</button>
  <p id="patlamaStatus" aria-live="polite">Tarama başlatılmadı.</p>
  <div id="patlamaCards" class="coin-grid"></div>
