@@ -1,3 +1,4 @@
+import {startQuietRadar,quietSnapshot,onQuietAlert} from "./quiet-volume-server.js";
 import {startLiveRise,liveRiseSnapshot} from "./live-rise-radar.js";
 import {paperStats} from "./paper-performance-72h.js";
 import {startDailyTouch,scanDailyTouch,dailyTouchStatus,stopDailyTouch,setDailyTouchThreshold} from "./daily-touch-watch.js";
@@ -7791,6 +7792,7 @@ app.get(
    SUNUCU
 ========================= */
 
+app.get("/api/quiet-volume",(_req,res)=>{res.set("Cache-Control","no-store");res.set("Access-Control-Allow-Origin","https://filorensuarez.github.io");res.json(quietSnapshot());});
 app.get("/api/live-rise",(_req,res)=>{res.set("Cache-Control","no-store");res.json(liveRiseSnapshot());});
 
 app.listen(
@@ -7817,6 +7819,8 @@ setInterval(
 
 /* Legacy scenario, minute radar and trade-flow jobs are retired.
    Daily confirmation and X Manager endpoints remain available. */
+onQuietAlert(alert=>sendPush({title:"Sessiz Hacim: "+alert.symbol,body:"Alış hacmi "+alert.acceleration+"x • Alış oranı %"+alert.buyRatio,url:"/"}));
+startQuietRadar();
 startLiveRise();
 startFlowRadar();
 startOkxFlow();
