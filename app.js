@@ -451,6 +451,11 @@ function coinCard(row) {
 
 
       <p class="description" style="font-size:0.8em">${escapeHTML(row.riskNote || "Teknik gösterge; kazanç garantisi yoktur.")}</p>
+      <div class="description" style="margin:10px 0;padding:10px;border:1px solid #40546d;border-radius:8px">
+        <strong>Dakikalık kontrol:</strong> ${escapeHTML(row.intraday?.status || "Veri bekleniyor")}
+        <div>5 dk: %${number(row.intraday?.momentum5,2)} · 15 dk: %${number(row.intraday?.momentum15,2)} · Hacim: ${number(row.intraday?.volumeRatio,2)}x</div>
+        <div>${escapeHTML(row.intraday?.note || "Anlık doğrulama bulunmuyor.")}</div>
+      </div>
       <div class="metrics">
 
         <div class="metric">
