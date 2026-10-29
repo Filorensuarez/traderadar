@@ -6,6 +6,8 @@ const CONFIRM={minScore:85,minVolumeRatio:1.7,minClosePosition:0.65,maxUpperWick
 const pending=new Map(),confirmed=new Map(),history=[];
 const earlyHistory=[];
 const earlyCandidates=new Map();
+const preparationCandidates=new Map();
+const PREP_TTL=10*60000;
 const ema=(values,period)=>{if(values.length<period)return NaN;const k=2/(period+1);let v=average(values.slice(0,period));for(const p of values.slice(period))v+=(p-v)*k;return v};
 const average=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:0;
 function recordOutcomes(symbol,price,time){
@@ -32,7 +34,7 @@ export function setDailyTouchThreshold(value){const n=Number(value);if(!Number.i
 const MIN_REQUEST_GAP=160;
 const state={
   running:false,status:"idle",thresholdPct:2,startedAt:0,updatedAt:0,checked:0,eligible:0,
-  failed:0,remaining:0,rows:[],earlyRows:[],error:null,waitUntil:0,
+  failed:0,remaining:0,rows:[],earlyRows:[],preparationRows:[],error:null,waitUntil:0,
   notice:"Momentum, EMA20/50, direnç, hacim, taker alış oranı, spread ve ikinci zamanlı teyit gerekir. Sonuç istatistikleri sunucu yeniden başlarsa sıfırlanır; kesin yükseliş garantisi yoktur."
 };
 let stopRequested=false;
@@ -80,11 +82,12 @@ export async function scanDailyTouch(){
  if(state.running)return dailyTouchStatus();
  stopRequested=false;
  Object.assign(state,{running:true,status:"running",startedAt:Date.now(),checked:0,
-   failed:0,eligible:0,remaining:0,error:null,waitUntil:0,rows:[],earlyRows:[]});
+   failed:0,eligible:0,remaining:0,error:null,waitUntil:0,rows:[],earlyRows:[],preparationRows:[]});
  for(const [key,p] of pending)if(Date.now()-p.time>CONFIRM.maxConfirmationMs)pending.delete(key);
  for(const [key,p] of confirmed)if(Date.now()-p.time>15*60000)confirmed.delete(key);
  const matches=[];
  const earlyRows=[];
+ const preparationRows=[];
  try{
   const ticker=await json(BASE+"/api/v3/ticker/24hr");
   let info=null;
@@ -118,6 +121,14 @@ export async function scanDailyTouch(){
     const recovered=last.close>recentLow*1.015&&last.close>prev.close;
     const emaTurning=ema7>ema25&&last.close>ema7&&ema7>ema(closes.slice(0,-3),7);
     const earlyTrend=emaTurning&&(ema25>ema99||last.close>ema99);
+    // PREPARATION: identify compression before the existing +2% contact threshold.
+    const prior20=closed.slice(-40,-20),recent20=closed.slice(-20);
+    const priorWidth=(Math.max(...prior20.map(x=>x.high))-Math.min(...prior20.map(x=>x.low)))/Math.max(average(prior20.map(x=>x.close)),1e-12);
+    const recentWidth=(Math.max(...recent20.map(x=>x.high))-Math.min(...recent20.map(x=>x.low)))/Math.max(average(recent20.map(x=>x.close)),1e-12);
+    const priorVolume=average(prior20.map(x=>x.quoteVolume));
+    const recentVolume=average(recent20.map(x=>x.quoteVolume));
+    const compressed=priorWidth>0&&recentWidth<priorWidth*0.8&&recentVolume<priorVolume*0.85;
+    const emaSlope=ema7/Math.max(ema(closes.slice(0,-3),7),1e-12)-1;
     const resistance=Math.max(...closed.slice(-22,-2).map(x=>x.high));
     const takerRatio=recent.reduce((s,x)=>s+x.takerBuyQuote,0)/Math.max(recent.reduce((s,x)=>s+x.quoteVolume,0),1);
     const t=tickerBySymbol.get(market.symbol)||{};
@@ -135,12 +146,25 @@ export async function scanDailyTouch(){
       chasePct<=CONFIRM.maxChasePct&&dailyRangePct>=5;
     // PARTI-style early recovery: independent watchlist, not a confirmed trade signal.
     // Require a valid 10/30 baseline and cap the 15-minute rise to avoid late chasing.
+    const prepPass=closed.length>=110&&compressed&&emaSlope>0&&last.close>ema7&&
+      result.gainPct<targetPct&&fiveRisePct<2.5&&fiveRisePct> -1&&
+      spreadPct<=CONFIRM.maxSpreadPct&&dayVolume>=CONFIRM.minQuoteVolume24h;
+    if(prepPass){
+      const hit={exchange:"BINANCE",market:market.symbol,symbol:market.symbol.replace(/(USDT|TRY)$/,"/$1"),
+        stage:"preparation",close:last.close,day:last.time,score:Math.min(60,Math.round(25+Math.min(20,100*(1-recentWidth/priorWidth))+Math.min(15,100*(1-recentVolume/Math.max(priorVolume,1))))),
+        gainPct:Number(result.gainPct.toFixed(2)),widthRatio:Number((recentWidth/priorWidth).toFixed(2)),
+        volumeRatio:Number((recentVolume/Math.max(priorVolume,1)).toFixed(2))};
+      preparationCandidates.set(market.symbol,{time:Date.now(),hit});
+      state.preparationRows=[...preparationCandidates.values()].map(x=>x.hit).sort((a,b)=>b.score-a.score);
+    }
     const earlyPass=closed.length>=110&&result.gainPct>=targetPct&&
       earlyTrend&&recovered&&fiveRisePct>=0.5&&fiveRisePct<=7&&
       volumeRatio>=2&&takerRatio>=0.58&&
       spreadPct<=CONFIRM.maxSpreadPct&&dayVolume>=CONFIRM.minQuoteVolume24h&&
       chasePct<=8&&last.close>last.open;
     if(earlyPass){
+      preparationCandidates.delete(market.symbol);
+      state.preparationRows=state.preparationRows.filter(x=>x.market!==market.symbol);
       const early={...result,exchange:"BINANCE",market:market.symbol,
         symbol:market.symbol.replace(/(USDT|TRY)$/,"/$1"),stage:"early",
         score:Math.min(84,Math.round(40+Math.min(volumeRatio,4)*7+Math.min(fiveRisePct,5)*3+Math.min(takerRatio,0.8)*20)),
@@ -176,6 +200,7 @@ export async function scanDailyTouch(){
       target5:Number((last.close*1.05).toPrecision(9)),target10:Number((last.close*1.10).toPrecision(9)),
       stopExample:Number((last.close*0.98).toPrecision(9)),dailyRangePct:Number(dailyRangePct.toFixed(2))};
     confirmed.set(market.symbol,{time:now,hit});
+    preparationCandidates.delete(market.symbol);
     history.push({market:market.symbol,entry:last.close,time:now,complete:false});
     if(history.length>500)history.shift();
     matches.push(hit);publish(matches);
@@ -191,6 +216,8 @@ export async function scanDailyTouch(){
     await snooze(MIN_REQUEST_GAP);
    }
   }
+  for(const [key,value] of preparationCandidates)if(Date.now()-value.time>PREP_TTL)preparationCandidates.delete(key);
+  state.preparationRows=[...preparationCandidates.values()].map(x=>x.hit).filter(x=>!earlyCandidates.has(x.market)&&!confirmed.has(x.market)).sort((a,b)=>b.score-a.score);
   publish([...confirmed.values()].map(x=>({...x.hit,stage:"confirmed"})));
   for(const [key,value] of earlyCandidates)if(Date.now()-value.time>15*60000)earlyCandidates.delete(key);
   state.earlyRows=[...earlyCandidates.values()].map(x=>x.hit).filter(x=>!confirmed.has(x.market)).sort((a,b)=>b.score-a.score);

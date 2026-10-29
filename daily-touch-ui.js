@@ -1,16 +1,24 @@
 const TOUCH_API=location.hostname==="filorensuarez.github.io"?"https://traderadar-yro7.onrender.com":location.origin;
 const status=document.getElementById("dailyTouchStatus"),cards=document.getElementById("dailyTouchCards"),scanButton=document.getElementById("dailyTouchScan"),stopButton=document.getElementById("dailyTouchStop");
-const seen=new Set(),seenEarly=new Set();let initialLoad=true;
+const seen=new Set(),seenEarly=new Set(),seenPrep=new Set();let initialLoad=true;
 const fmt=(n,d=4)=>Number.isFinite(n)?n.toLocaleString("tr-TR",{maximumFractionDigits:d}):"—";
 function notify(x){const key=x.market+":"+x.day;if(seen.has(key))return;seen.add(key);if(typeof Notification!=="undefined"&&Notification.permission==="granted")new Notification("TradeRadar: momentum",{body:x.symbol+" | 10/30 ortalama farkı: %"+fmt(x.gainPct,2)});}
 async function refresh(){
  try{
  const r=await fetch(TOUCH_API+"/api/daily-touch",{cache:"no-store",signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error("HTTP "+r.status);
  const d=await r.json();
- status.textContent="Durum: "+({running:"Taranıyor",completed:"Tarama tamamlandı",stopped:"Durduruldu","rate-limited":"Veri sağlayıcı bekleniyor",error:"Hata",idle:"Hazır"}[d.status]||d.status)+" | İncelenen: "+d.checked+" / "+d.eligible+" | Erken aday: "+(d.earlyRows||[]).length+" | Teyitli aday: "+d.rows.length+" | Veri hatası: "+d.failed;
+ status.textContent="Durum: "+({running:"Taranıyor",completed:"Tarama tamamlandı",stopped:"Durduruldu","rate-limited":"Veri sağlayıcı bekleniyor",error:"Hata",idle:"Hazır"}[d.status]||d.status)+" | İncelenen: "+d.checked+" / "+d.eligible+" | Hazırlık: "+(d.preparationRows||[]).length+" | Erken aday: "+(d.earlyRows||[]).length+" | Teyitli aday: "+d.rows.length+" | Veri hatası: "+d.failed;
  scanButton.disabled=!!d.running;stopButton.disabled=!d.running;cards.replaceChildren();
- const early=d.earlyRows||[];
- if(!d.rows.length&&!early.length){const p=document.createElement("p");p.textContent="Henüz tüm trend, hacim, alıcı baskısı, likidite ve ikinci teyit koşullarını sağlayan coin yok.";cards.append(p);}
+ const early=d.earlyRows||[],preparation=d.preparationRows||[];
+ if(!d.rows.length&&!early.length&&!preparation.length){const p=document.createElement("p");p.textContent="Henüz tüm trend, hacim, alıcı baskısı, likidite ve ikinci teyit koşullarını sağlayan coin yok.";cards.append(p);}
+ for(const x of preparation){
+ const key=x.market+":"+x.day;
+ if(initialLoad)seenPrep.add(key);
+ else if(!seenPrep.has(key)){seenPrep.add(key);if(typeof Notification!=="undefined"&&Notification.permission==="granted")new Notification("TradeRadar: hazırlık izleme",{body:x.symbol+" | Sıkışma ve hacim daralması"});}
+ const card=document.createElement("article");card.className="coin-card";
+ const h=document.createElement("h3");h.textContent=x.symbol+" • HAZIRLIK (izleme) • "+fmt(x.score,0)+"/60";card.append(h);
+ const p=document.createElement("p");p.textContent="Fiyat: "+fmt(x.close,8)+" | Fiyat aralığı oranı: "+fmt(x.widthRatio,2)+" | Hacim oranı: "+fmt(x.volumeRatio,2)+" | 10/30 farkı: %"+fmt(x.gainPct,2);card.append(p);cards.append(card);
+ }
  for(const x of early){
  const earlyKey=x.market+":"+x.day;
  if(initialLoad)seenEarly.add(earlyKey);
