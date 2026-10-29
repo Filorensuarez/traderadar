@@ -7,9 +7,15 @@ async function refresh(){
  try{
  const r=await fetch(TOUCH_API+"/api/daily-touch",{cache:"no-store",signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error("HTTP "+r.status);
  const d=await r.json();
- status.textContent="Durum: "+({running:"Taranıyor",completed:"Tarama tamamlandı",stopped:"Durduruldu","rate-limited":"Veri sağlayıcı bekleniyor",error:"Hata",idle:"Hazır"}[d.status]||d.status)+" | İncelenen: "+d.checked+" / "+d.eligible+" | Teyitli aday: "+d.rows.length+" | Veri hatası: "+d.failed;
+ status.textContent="Durum: "+({running:"Taranıyor",completed:"Tarama tamamlandı",stopped:"Durduruldu","rate-limited":"Veri sağlayıcı bekleniyor",error:"Hata",idle:"Hazır"}[d.status]||d.status)+" | İncelenen: "+d.checked+" / "+d.eligible+" | Erken aday: "+(d.earlyRows||[]).length+" | Teyitli aday: "+d.rows.length+" | Veri hatası: "+d.failed;
  scanButton.disabled=!!d.running;stopButton.disabled=!d.running;cards.replaceChildren();
- if(!d.rows.length){const p=document.createElement("p");p.textContent="Henüz tüm trend, hacim, alıcı baskısı, likidite ve ikinci teyit koşullarını sağlayan coin yok.";cards.append(p);}
+ const early=d.earlyRows||[];
+ if(!d.rows.length&&!early.length){const p=document.createElement("p");p.textContent="Henüz tüm trend, hacim, alıcı baskısı, likidite ve ikinci teyit koşullarını sağlayan coin yok.";cards.append(p);}
+ for(const x of early){
+ const card=document.createElement("article");card.className="coin-card";
+ const h=document.createElement("h3");h.textContent=x.symbol+" • ERKEN TOPARLANMA • "+fmt(x.score,0)+"/84";card.append(h);
+ const p=document.createElement("p");p.textContent="PARTI modeli (izleme, alım teyidi değil) | 10/30 farkı: %"+fmt(x.gainPct,2)+" | 5 dk: %"+fmt(x.fiveRisePct,2)+" | Hacim: "+fmt(x.volumeRatio,2)+"x | Taker alış: %"+fmt(x.takerBuyRatio,1);card.append(p);cards.append(card);
+ }
  for(const x of d.rows){
  if(initialLoad)seen.add(x.market+":"+x.day);else if(typeof Notification!=="undefined")notify(x);
  const card=document.createElement("article");card.className="coin-card";
