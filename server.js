@@ -14,6 +14,7 @@ import {startFlowRadar,flowSnapshot,firstReactionSnapshot} from "./flow-radar.js
 import express from "express";
 import webpush from "web-push";
 import fs from "fs";
+import path from "path";
 import { detectMinutePatterns } from "./minute-patterns.js";
 import { detectPrePumpSetup } from "./pre-pump-setup.js";
 import { buildDecisionPlans } from "./decision-engine.js";
@@ -5508,7 +5509,7 @@ const dailySignalSeen=new Set(dailySignalHistory.map(x=>x.id));
 const dailyConfirmationPending=new Set();
 function saveDailySignals(){
   try{
-    fs.mkdirSync(new URL(".",new URL("file://"+(dailySignalStore.startsWith("/")?dailySignalStore:process.cwd()+"/"+dailySignalStore))).pathname,{recursive:true});
+    fs.mkdirSync(path.dirname(path.resolve(dailySignalStore)),{recursive:true});
     const tmp=dailySignalStore+".tmp";
     fs.writeFileSync(tmp,JSON.stringify(dailySignalHistory));
     fs.renameSync(tmp,dailySignalStore);
