@@ -5808,7 +5808,8 @@ async function scanMarket() {
         counts[p.key].symbols = symbols;
         counts[p.key].processed = 0;
         publish();
-        const batchSize = p.key==="btcturk"?1:p.key==="okxtr"?2:6;
+        // Conservative concurrency: reduce serial waiting without flooding exchange APIs.
+        const batchSize = p.key==="btcturk"?2:p.key==="okxtr"?3:6;
         for (let i=0;i<symbols.length;i+=batchSize) {
           const batch = symbols.slice(i,i+batchSize);
           const responses = await Promise.allSettled(batch.map(async symbol=>{
@@ -5856,7 +5857,7 @@ async function scanMarket() {
           counts[p.key].processed += batch.length;
           results[p.key].sort((a,b)=>Number(b.confirmed)-Number(a.confirmed)||b.score-a.score);
           publish();
-          await new Promise(resolve=>setTimeout(resolve,p.key==="btcturk"?1500:p.key==="okxtr"?500:120));
+          await new Promise(resolve=>setTimeout(resolve,p.key==="btcturk"?800:p.key==="okxtr"?350:120));
         }
         if(successfulCandles===0) throw Error("Günlük analiz için 205 tamamlanmış mum alınamadı; başarısız parite: "+failedCandles+"; ilk hata: "+firstCandleError);
       } catch (error) {
