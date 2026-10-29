@@ -5703,11 +5703,15 @@ async function scanMarket() {
             const askDepth=asks.reduce((s,x)=>s+x[0]*x[1],0);
             const depthRatio=bidDepth/Math.max(askDepth,1e-9);
             if(!(spreadPct>=0&&spreadPct<=0.35&&depthRatio>=0.65))return;
+            let multi;
+            try{multi=await multitimeframeCheck(provider,symbol);}
+            catch(e){console.warn("Çoklu zaman:",id,e.message);return;}
+            if(!multi.verified)return;
             const market=results[provider.key];
             const row=market?.find(x=>x.symbol===provider.normalize(symbol));
             if(!row||!row.dailyConfirmed)return;
             row.intraday={...row.intraday,status:"İKİNCİ TEYİT TAMAM",verified:true,
-              secondPrice:second,followThrough:true,spreadPct:Number(spreadPct.toFixed(3)),bidAskDepthRatio:Number(depthRatio.toFixed(2))};
+              secondPrice:second,followThrough:true,spreadPct:Number(spreadPct.toFixed(3)),bidAskDepthRatio:Number(depthRatio.toFixed(2)),multiTimeframe:multi};
             row.confirmed=true;row.candidate=false;
             row.reasons.push("30 saniye sonra fiyat teyidi");
             const key=id+":"+new Date().toISOString().slice(0,10);
@@ -5738,6 +5742,29 @@ async function scanMarket() {
       volumeRatio:Number(volumeRatio.toFixed(2)),momentum5:Number(momentum5.toFixed(2)),
       momentum15:Number(momentum15.toFixed(2)),takerRatio:takerRatio===null?null:Number((takerRatio*100).toFixed(1)),
       note:takerRatio===null?"Borsada agresif alış verisi sağlanmadı.":"Binance taker alış oranı ölçüldü."};
+  }
+  // 15 dakika ve 1 saat yönü: kapanmış 1 dakikalık mumların toplulaştırılmış fiyatı.
+  // Eksik veri halinde yeni bir teyit uydurulmaz.
+  async function multitimeframeCheck(provider,symbol){
+    if(provider.key==="btcturk")return {verified:false,reason:"Dakikalık veri desteği yok"};
+    let rows;
+    if(provider.key==="binanceglobal"){
+      const j=await getExternalJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=240","BINANCE GLOBAL");
+      rows=j.map(x=>({t:+x[0],close:+x[4],high:+x[2],low:+x[3],volume:+x[7]}));
+    }else{
+      const host=provider.key==="okxtr"?"https://tr.okx.com":"https://eea.okx.com";
+      const j=await getExternalJSON(host+"/api/v5/market/history-candles?instId="+encodeURIComponent(symbol)+"&bar=1m&limit=100",provider.name);
+      rows=(j.data||[]).map(x=>({t:+x[0],close:+x[4],high:+x[2],low:+x[3],volume:+x[7]}));
+    }
+    rows=rows.filter(x=>x.t+60000<=Date.now()&&x.close>0).sort((a,b)=>a.t-b.t);
+    if(rows.length<90)return {verified:false,reason:"Çoklu zaman verisi eksik"};
+    const current=rows.at(-1).close;
+    const price15=rows.at(-16).close,price60=rows.at(-61).close;
+    const change15=(current/price15-1)*100,change60=(current/price60-1)*100;
+    const avg20=rows.slice(-20).reduce((s,x)=>s+x.close,0)/20;
+    return {verified:change15>0&&change60>0&&current>avg20,
+      change15:Number(change15.toFixed(2)),change60:Number(change60.toFixed(2)),
+      reason:"15 ve 60 dakikalık fiyat yönü"};
   }
   const results = {};
   const counts = {};
