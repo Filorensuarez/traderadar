@@ -430,6 +430,7 @@
  <p class="description">Yalnızca OKX TR aktif spot pariteleri taranır. Son kapanmış 3 adet 1 dakikalık mum incelenir. Son mumun kapanış fiyatı, bu 3 mumdan önceki 30 mumun ortalama kapanış fiyatından belirlediğiniz oranda yüksekse takip listesine alınır. Hacim ve alıcı işlemi şartı aranmaz. Bölüm açıkken tarama 60 saniyede bir yenilenir.</p>
  <div class="info-box"><label for="patlamaThreshold">Hedef yükseliş (%)</label> <input class="x-field" id="patlamaThreshold" type="number" min="0.1" max="50" step="0.1" value="1" style="max-width:110px"> <label for="patlamaCapital">Aktif işlem bütçesi (TL)</label> <input class="x-field" id="patlamaCapital" type="number" min="0" value="20000" style="max-width:145px"> <label for="patlamaRisk">İşlem başı risk (TL)</label> <input class="x-field" id="patlamaRisk" type="number" min="1" value="200" style="max-width:120px"> <label for="patlamaStop">Stop mesafesi (%)</label> <input class="x-field" id="patlamaStop" type="number" min="0.1" max="50" step="0.1" value="2" style="max-width:110px"><p id="patlamaRiskPlan" aria-live="polite"></p><p class="description">Günlük zarar limiti: 400 TL • Haftalık: 1.000 TL • Aynı anda en fazla 2 pozisyon • Kaldıraç yok. Bu sınırlar manuel takip edilir; otomatik emir gönderilmez. Komisyon ve kayma dahil değildir.</p></div>
  <button id="patlamaScan" class="refresh-button" type="button">Patlama Tara</button>
+ <div class="info-box"><h3>Dipten Dönüş Adayları</h3><p class="description">OKX TR spot paritelerinde son 48 saatlik fiyat aralığının alt %32 bölümünde bulunan, RSI(14) değeri 20–48 arasında olan ve kapanmış 1 saatlik mumda yukarı dönüş gösteren pariteleri tarar. Hacim ve EMA20 ek değerlendirme puanı verir. Bu tarama kesin yükseliş tahmini değildir.</p><button id="patlamaDipScan" class="refresh-button" type="button">Dipten Dönüş Adaylarını Tara</button><p id="patlamaDipStatus" aria-live="polite">Dip taraması başlatılmadı.</p><div id="patlamaDipCards" class="coin-grid"></div></div>
  <p id="patlamaStatus" aria-live="polite">Tarama başlatılmadı.</p>
  <div id="patlamaCards" class="coin-grid"></div>
 </section>
@@ -460,7 +461,7 @@
   <script defer src="./whale-monitor.js"></script>
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
-  <script type="module" src="./patlama-ui.js?v=okxtr-price-only-4"></script>
+  <script type="module" src="./patlama-ui.js?v=dip-1"></script>
   <script defer src="./quiet-volume-ui.js?v=2"></script>
 
   <script defer src="./tab-navigation-fix.js"></script>
