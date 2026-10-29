@@ -2,7 +2,7 @@ const TOUCH_API=location.hostname==="filorensuarez.github.io"?"https://traderada
 const status=document.getElementById("dailyTouchStatus"),cards=document.getElementById("dailyTouchCards"),scanButton=document.getElementById("dailyTouchScan"),stopButton=document.getElementById("dailyTouchStop");
 const seen=new Set();let initialLoad=true;const thresholdInput=document.getElementById("dailyTouchThreshold");
 const fmt=(n,d=4)=>Number.isFinite(n)?n.toLocaleString("tr-TR",{maximumFractionDigits:d}):"—";
-function notify(x){const key=x.market+":"+x.day;if(seen.has(key))return;seen.add(key);if(Notification.permission==="granted")new Notification("TradeRadar: momentum",{body:x.symbol+" | 10/30 ortalama farkı: %"+fmt(x.gainPct,2)});}
+function notify(x){const key=x.market+":"+x.day;if(seen.has(key))return;seen.add(key);if(typeof Notification!=="undefined"&&Notification.permission==="granted")new Notification("TradeRadar: momentum",{body:x.symbol+" | 10/30 ortalama farkı: %"+fmt(x.gainPct,2)});}
 async function refresh(){
  try{
  const r=await fetch(TOUCH_API+"/api/daily-touch",{cache:"no-store",signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error("HTTP "+r.status);
@@ -14,7 +14,7 @@ async function refresh(){
  if(initialLoad)seen.add(x.market+":"+x.day);else if(typeof Notification!=="undefined")notify(x);
  const card=document.createElement("article");card.className="coin-card";
  const h=document.createElement("h3");h.textContent=x.symbol+" • %"+fmt(x.thresholdPct??d.thresholdPct??2,2)+" MOMENTUM";card.append(h);
- for(const line of ["Son 10 mum ortalaması: "+fmt(x.recent,8),"Önceki 30 mum ortalaması: "+fmt(x.baseline,8),"Fark: %"+fmt(x.gainPct,2)+" | Son fiyat: "+fmt(x.close,8),"Son kapalı mum: "+new Date(x.day).toLocaleString("tr-TR")]){const p=document.createElement("p");p.textContent=line;card.append(p);}
+ for(const line of ["Son 10 mum ortalaması: "+fmt(x.recent,8),"Önceki 30 mum ortalaması: "+fmt(x.baseline,8),"Fark: %"+fmt(x.gainPct,2)+" | Hacim teyidi: "+fmt(x.volumeRatio,2)+"x | Son fiyat: "+fmt(x.close,8),"Son kapalı mum: "+new Date(x.day).toLocaleString("tr-TR")]){const p=document.createElement("p");p.textContent=line;card.append(p);}
  const link=document.createElement("a");link.textContent="Binance grafiğini aç ↗";link.href="https://www.binance.com/tr/trade/"+encodeURIComponent(x.market.replace(/(USDT|TRY)$/,"_$1"));link.target="_blank";link.rel="noopener noreferrer";card.append(link);cards.append(card);
  }
  initialLoad=false;
