@@ -136,10 +136,11 @@ export async function scanDailyTouch(){
     if(e.cancelled)break;
     state.failed++;
     state.error=String(e.message).slice(0,140);
+   }finally{
+    state.checked++;
+    state.remaining=all.length-state.checked;
+    await snooze(MIN_REQUEST_GAP);
    }
-   state.checked++;
-   state.remaining=all.length-state.checked;
-   await snooze(MIN_REQUEST_GAP);
   }
   publish([...confirmed.values()].map(x=>x.hit));
   state.updatedAt=Date.now();
