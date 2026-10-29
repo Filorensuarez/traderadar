@@ -1,3 +1,4 @@
+import {chartContext} from "./daily-touch-chart.js";
 import fs from "node:fs";
 import path from "node:path";
 import {liveTouchSnapshot,setLiveTouchSymbols} from "./daily-touch-live.js";
@@ -136,6 +137,7 @@ export async function scanDailyTouch(){
     const result=dailyContact(candles);
     const closed=candles.filter(x=>x.time+60000<=Date.now()).sort((a,b)=>a.time-b.time);
     const last=closed.at(-1),prev=closed.at(-2);
+    const chart=chartContext(closed);
     if(last)recordOutcomes(market.symbol,last.close,last.time,last.high,last.low);
     if(!last||!prev||!Number.isFinite(result.gainPct))continue;
     const base=closed.slice(-35,-5),recent=closed.slice(-5);
@@ -180,7 +182,7 @@ export async function scanDailyTouch(){
       spreadPct<=CONFIRM.maxSpreadPct&&dayVolume>=CONFIRM.minQuoteVolume24h;
     if(prepPass){
       const hit={exchange:"BINANCE",market:market.symbol,symbol:market.symbol.replace(/(USDT|TRY)$/,"/$1"),
-        stage:"preparation",close:last.close,day:last.time,score:Math.min(60,Math.round(25+Math.min(20,100*(1-recentWidth/priorWidth))+Math.min(15,100*(1-recentVolume/Math.max(priorVolume,1))))),
+        stage:"preparation",chart,close:last.close,day:last.time,score:Math.min(60,Math.round(25+Math.min(20,100*(1-recentWidth/priorWidth))+Math.min(15,100*(1-recentVolume/Math.max(priorVolume,1))))),
         gainPct:Number(result.gainPct.toFixed(2)),widthRatio:Number((recentWidth/priorWidth).toFixed(2)),
         volumeRatio:Number((recentVolume/Math.max(priorVolume,1)).toFixed(2))};
       preparationCandidates.set(market.symbol,{time:Date.now(),hit});
@@ -196,7 +198,7 @@ export async function scanDailyTouch(){
       preparationCandidates.delete(market.symbol);
       state.preparationRows=state.preparationRows.filter(x=>x.market!==market.symbol);
       const early={...result,exchange:"BINANCE",market:market.symbol,
-        symbol:market.symbol.replace(/(USDT|TRY)$/,"/$1"),stage:"early",
+        symbol:market.symbol.replace(/(USDT|TRY)$/,"/$1"),stage:"early",chart,
         score:Math.min(84,Math.round(40+Math.min(volumeRatio,4)*7+Math.min(fiveRisePct,5)*3+Math.min(takerRatio,0.8)*20)),
         volumeRatio:Number(volumeRatio.toFixed(2)),takerBuyRatio:Number((takerRatio*100).toFixed(1)),
         spreadPct:Number(spreadPct.toFixed(3)),fiveRisePct:Number(fiveRisePct.toFixed(2)),
@@ -223,7 +225,7 @@ export async function scanDailyTouch(){
     const score=Math.min(100,Math.round(50+Math.min(volumeRatio,4)*5+Math.min(takerRatio,0.9)*20+
       Math.min(followThroughPct,1)*10+Math.min(result.gainPct,6)));
     if(score<CONFIRM.minScore)continue;
-    const hit={...result,exchange:"BINANCE",market:market.symbol,
+    const hit={...result,chart,exchange:"BINANCE",market:market.symbol,
       symbol:market.symbol.replace(/(USDT|TRY)$/,"/$1"),gapPct:result.gainPct,
       volumeRatio:Number(volumeRatio.toFixed(2)),takerBuyRatio:Number((takerRatio*100).toFixed(1)),
       spreadPct:Number(spreadPct.toFixed(3)),followThroughPct:Number(followThroughPct.toFixed(2)),
