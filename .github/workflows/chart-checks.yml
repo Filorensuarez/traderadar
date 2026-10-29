@@ -1,0 +1,18 @@
+name: TradeRadar chart checks
+on:
+  push:
+    paths:
+      - 'daily-touch-*.js'
+      - '.github/workflows/chart-checks.yml'
+  workflow_dispatch:
+jobs:
+  indicators:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node daily-touch-chart.test.js
+      - run: node --check daily-touch-backtest.js
+      - run: node --check daily-touch-fetch-history.js
