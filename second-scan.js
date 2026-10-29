@@ -23,7 +23,7 @@ async function inspect(symbol,now){
  const previousVolumePerMin=average(minutes.map(c=>Number(c[7])));
  if(!(previousPrice>0&&previousVolumePerMin>0))return null;
  const pricePct=(recentPrice/previousPrice-1)*100,volumeX=recentVolumePerMin/previousVolumePerMin;
- if(pricePct<2||volumeX<3)return null;
+ if(pricePct<2||volumeX<2)return null;
  return {symbol,pricePct:+pricePct.toFixed(2),volumeX:+volumeX.toFixed(2),price:+Number(seconds.at(-1)[4]),updatedAt:Date.now()};
 }
 export async function runSecondScan(){
