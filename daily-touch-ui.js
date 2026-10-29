@@ -3,6 +3,13 @@ const status=document.getElementById("dailyTouchStatus"),cards=document.getEleme
 const seen=new Set(),seenEarly=new Set(),seenPrep=new Set();let initialLoad=true;
 const fmt=(n,d=4)=>Number.isFinite(n)?n.toLocaleString("tr-TR",{maximumFractionDigits:d}):"—";
 function notify(x){const key=x.market+":"+x.day;if(seen.has(key))return;seen.add(key);if(typeof Notification!=="undefined"&&Notification.permission==="granted")new Notification("TradeRadar: momentum",{body:x.symbol+" | 10/30 ortalama farkı: %"+fmt(x.gainPct,2)});}
+function chartPanel(card,x){
+ const c=x.chart;if(!c?.ready)return;
+ const p=document.createElement("p");
+ const flag=v=>v?"Evet":"Hayır";
+ p.textContent="GRAFİK | Teknik: "+c.score+"/7 | Bollinger sıkışma: "+flag(c.squeeze)+" (genişlik %"+fmt(c.bbWidthPct,2)+") | RSI: "+fmt(c.rsi,1)+" / pozitif uyumsuzluk: "+flag(c.bullishDivergence)+" | MACD dönüş: "+flag(c.macdTurning)+" | VWAP üstü: "+flag(c.aboveVwap)+" | 1/3/5 dk: "+(c.multi||[]).map(v=>v.period+"dk "+(v.up?"↑":"↓/—")).join(", ");
+ card.append(p);
+}
 async function refresh(){
  try{
  const r=await fetch(TOUCH_API+"/api/daily-touch",{cache:"no-store",signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error("HTTP "+r.status);
@@ -15,7 +22,7 @@ async function refresh(){
  for(const x of live.filter(x=>x.warning)){
  const card=document.createElement("article");card.className="coin-card";
  const h=document.createElement("h3");h.textContent=x.market+" • 10 SANİYELİK ALIŞ İVMESİ (izleme)";card.append(h);
- const p=document.createElement("p");p.textContent="Alış payı: %"+fmt(x.buyRatio*100,1)+" | İlk 5 kademe alış dengesi: %"+fmt(x.imbalance*100,1)+" | 10 sn işlem hacmi: "+fmt(x.quoteVolume10s,0)+" | Fiyat hareketi: %"+fmt(x.movePct,2);card.append(p);cards.append(card);
+ const p=document.createElement("p");p.textContent="Alış payı: %"+fmt(x.buyRatio*100,1)+" | İlk 5 kademe alış dengesi: %"+fmt(x.imbalance*100,1)+" | 10 sn işlem hacmi: "+fmt(x.quoteVolume10s,0)+" | Fiyat hareketi: %"+fmt(x.movePct,2);card.append(p);chartPanel(card,x);cards.append(card);
  }
  for(const x of preparation){
  const key=x.market+":"+x.day;
@@ -38,7 +45,7 @@ async function refresh(){
  const card=document.createElement("article");card.className="coin-card";
  const h=document.createElement("h3");h.textContent=x.symbol+" • ÇOKLU TEYİT • "+fmt(x.score,0)+"/100";card.append(h);
  for(const line of ["Son 10 mum ortalaması: "+fmt(x.recent,8),"Önceki 30 mum ortalaması: "+fmt(x.baseline,8),"Fark: %"+fmt(x.gainPct,2)+" | Hacim: "+fmt(x.volumeRatio,2)+"x | Taker alış: %"+fmt(x.takerBuyRatio,1)+" | Spread: %"+fmt(x.spreadPct,3)+" | İkinci teyit: +%"+fmt(x.followThroughPct,2)+" | Puan: "+fmt(x.score,0)+" | Fiyat: "+fmt(x.close,8),"Günlük fiyat aralığı: %"+fmt(x.dailyRangePct,2)+" | %5 hedef: "+fmt(x.target5,8)+" | %10 hedef: "+fmt(x.target10,8)+" | Örnek %2 zarar-kes: "+fmt(x.stopExample,8),"Son kapalı mum: "+new Date(x.day).toLocaleString("tr-TR")]){const p=document.createElement("p");p.textContent=line;card.append(p);}
- const link=document.createElement("a");link.textContent="Binance grafiğini aç ↗";link.href="https://www.binance.com/tr/trade/"+encodeURIComponent(x.market.replace(/(USDT|TRY)$/,"_$1"));link.target="_blank";link.rel="noopener noreferrer";card.append(link);cards.append(card);
+ const link=document.createElement("a");link.textContent="Binance grafiğini aç ↗";link.href="https://www.binance.com/tr/trade/"+encodeURIComponent(x.market.replace(/(USDT|TRY)$/,"_$1"));link.target="_blank";link.rel="noopener noreferrer";card.append(link);chartPanel(card,x);cards.append(card);
  }
  initialLoad=false;
  if(d.error){const p=document.createElement("p");p.textContent="Son hata: "+d.error;cards.append(p);}

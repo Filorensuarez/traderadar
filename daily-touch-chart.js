@@ -15,14 +15,25 @@ export function chartContext(candles){
  const lowA=Math.min(...lows.slice(0,8)),lowB=Math.min(...lows.slice(8));
  const rsiA=Math.min(...rsis.slice(0,8)),rsiB=Math.min(...rsis.slice(8));
  const bullishDivergence=lowB<lowA&&rsiB>rsiA+2;
- const macd=(end)=>ema(closes.slice(0,end),12)-ema(closes.slice(0,end),26);
- const hist=(end)=>macd(end)-ema(Array.from({length:34},(_,i)=>macd(end-33+i)).filter(Number.isFinite),9);
- const h0=hist(n),h1=hist(n-1),h2=hist(n-2);
- const macdTurning=Number.isFinite(h0)&&h0>h1&&h1>=h2;
+ const macdLine=closes.map((_,i)=>i>=25?ema(closes.slice(0,i+1),12)-ema(closes.slice(0,i+1),26):NaN);
+ const macdValues=macdLine.filter(Number.isFinite);
+ const histogram=macdValues.map((v,i)=>i>=8?v-ema(macdValues.slice(0,i+1),9):NaN);
+ const h0=histogram.at(-1),h1=histogram.at(-2),h2=histogram.at(-3);
+ const macdTurning=Number.isFinite(h0)&&Number.isFinite(h1)&&Number.isFinite(h2)&&h0>h1&&h1>=h2;
  const typical=c.slice(-30).map(x=>(x.high+x.low+x.close)/3);
  const volume=c.slice(-30).map(x=>x.quoteVolume);
  const vwap=volume.reduce((s,v,i)=>s+v*typical[i],0)/Math.max(volume.reduce((s,v)=>s+v,0),1e-12);
- const tf=(period)=>{const count=Math.floor(c.length/period);const bars=[];for(let i=count-1;i>=Math.max(0,count-6);i--){const slice=c.slice(c.length-(i+1)*period,c.length-i*period);if(slice.length===period)bars.push({close:slice.at(-1).close,open:slice[0].open,high:Math.max(...slice.map(x=>x.high))});}return {period,up:bars.length>=3&&bars.at(-1).close>bars.at(-2).close&&bars.at(-1).close>bars.at(-1).open,close:bars.at(-1)?.close??null};};
+ const tf=period=>{
+  const groups=new Map();
+  for(const candle of c){
+   const start=Math.floor(candle.time/(period*60000))*period*60000;
+   const arr=groups.get(start)||[];arr.push(candle);groups.set(start,arr);
+  }
+  const bars=[...groups.entries()].filter(([start,arr])=>arr.length===period&&arr.every((x,i)=>x.time===start+i*60000))
+   .sort((a,b)=>a[0]-b[0]).map(([,arr])=>({open:arr[0].open,close:arr.at(-1).close}));
+  const last=bars.at(-1),prev=bars.at(-2);
+  return {period,up:!!(last&&prev&&last.close>prev.close&&last.close>last.open),close:last?.close??null};
+ };
  const multi=[tf(1),tf(3),tf(5)];
  const score=[squeeze,bullishDivergence,macdTurning,last.close>vwap,multi[0].up,multi[1].up,multi[2].up].filter(Boolean).length;
  return {ready:true,bbWidthPct:Number((bb.width*100).toFixed(2)),squeeze,rsi:Number(rsi(closes).toFixed(1)),bullishDivergence,macdHistogram:Number(h0.toFixed(6)),macdTurning,vwap,aboveVwap:last.close>vwap,multi,score,scoreMax:7};
