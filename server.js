@@ -25,8 +25,6 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 
 const app = express();
-app.get("/api/second-scan",(_req,res)=>{res.set("Cache-Control","no-store");res.json(secondScanStatus());});
-app.post("/api/second-scan/start",(_req,res)=>{if(secondScanStatus().running)return res.status(409).json({error:"Tarama sürüyor"});runSecondScan().catch(console.error);res.json({started:true});});
 // TradeRadar GitHub Pages cross-origin API access (including POST and preflight).
 app.use("/api", (req,res,next)=>{
   // These API endpoints expose public market data and do not use browser credentials.
@@ -38,6 +36,8 @@ app.use("/api", (req,res,next)=>{
   if(req.method==="OPTIONS")return res.sendStatus(204);
   next();
 });
+app.get("/api/second-scan",(_req,res)=>{res.set("Cache-Control","no-store");res.json(secondScanStatus());});
+app.post("/api/second-scan/start",(_req,res)=>{if(secondScanStatus().running)return res.status(409).json({error:"Tarama sürüyor"});runSecondScan().catch(console.error);res.json({started:true});});
 // Binance TR public market-data proxy for the GitHub Pages frontend.
 // Only fixed public endpoints are permitted; no keys or user-provided URLs.
 const trCache=new Map();
