@@ -36,7 +36,7 @@ export function setLiveTouchSymbols(markets=[]){
  socket=ws;lastConnect=Date.now();
  ws.on("message",raw=>{
   try{
-   const msg=JSON.parse(String(raw)),data=msg.data||{},market=String(data.s||"");
+   const msg=JSON.parse(String(raw)),data=msg.data||{},market=String(data.s||String(msg.stream||"").split("@")[0]).toUpperCase();
    if(!selected.includes(market))return;
    const v=live.get(market)||{trades:[],bid:0,ask:0,updated:0};
    if(data.e==="aggTrade"){
