@@ -26,9 +26,12 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 const app = express();
 // TradeRadar GitHub Pages cross-origin API access (including POST and preflight).
 app.use("/api", (req,res,next)=>{
-  res.set("Access-Control-Allow-Origin","https://filorensuarez.github.io");
+  // These API endpoints expose public market data and do not use browser credentials.
+  // Allow installed PWAs, GitHub Pages and custom frontend origins to read them.
+  res.set("Access-Control-Allow-Origin","*");
   res.set("Access-Control-Allow-Methods","GET, POST, OPTIONS");
   res.set("Access-Control-Allow-Headers","Content-Type");
+  res.set("Access-Control-Max-Age","600");
   if(req.method==="OPTIONS")return res.sendStatus(204);
   next();
 });
@@ -36,7 +39,7 @@ app.use("/api", (req,res,next)=>{
 // Only fixed public endpoints are permitted; no keys or user-provided URLs.
 const trCache=new Map();
 app.get("/api/binance-tr/:kind",async(req,res)=>{
- res.set("Access-Control-Allow-Origin","https://filorensuarez.github.io");
+ res.set("Access-Control-Allow-Origin","*");
  res.set("Cache-Control","no-store");
  const kind=req.params.kind;
  const symbol=String(req.query.symbol||"");
