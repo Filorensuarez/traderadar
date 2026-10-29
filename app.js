@@ -2759,3 +2759,24 @@ async function loadLiveRise(){
 }
 document.querySelector("#liveRiseButton").addEventListener("click",()=>openView("liveRise"));
 setInterval(loadLiveRise,2000);
+
+/* Haftalık kesin teyit performansı: haftalık kohort, gözlemlenen +%5/+%10 */
+async function refreshWeeklyPerformance(){
+  const status=document.getElementById("weeklyPerformanceStatus");
+  const metrics=document.getElementById("weeklyPerformanceMetrics");
+  if(!status||!metrics)return;
+  try{
+    const response=await fetch("https://traderadar-yro7.onrender.com/api/daily-confirmations/weekly-performance",{cache:"no-store"});
+    if(!response.ok)throw Error("HTTP "+response.status);
+    const data=await response.json();
+    const fmt=v=>v==null?"Henüz ölçülmedi":"%"+Number(v).toFixed(1);
+    const start=new Date(data.weekStart).toLocaleDateString("tr-TR");
+    const end=new Date(data.weekEnd).toLocaleDateString("tr-TR");
+    status.textContent="Dönem: "+start+" – "+end+" | Teyitli sinyal: "+data.confirmedSignals+" | Fiyatı izlenen: "+data.observedSignals;
+    metrics.textContent="+%5 gözlemlenen: "+data.hit5+" ("+fmt(data.observedHit5RatePct)+") · +%10 gözlemlenen: "+data.hit10+" ("+fmt(data.observedHit10RatePct)+")"+(data.lastSampleAt?" · Son ölçüm: "+new Date(data.lastSampleAt).toLocaleString("tr-TR"):"");
+    if(!data.storageConfigured)metrics.textContent+=" · Uyarı: kalıcı kayıt yolu ayarlanmamış";
+  }catch(e){status.textContent="Haftalık performans verisine erişilemiyor.";metrics.textContent="Sunucu yanıtı bekleniyor.";}
+}
+refreshWeeklyPerformance();
+setInterval(refreshWeeklyPerformance,60000);
+
