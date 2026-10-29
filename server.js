@@ -7279,7 +7279,13 @@ app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
   const targetFirst=mature24h.filter(x=>x.firstOutcome==="TARGET_5").length;
   const stopFirst=mature24h.filter(x=>x.firstOutcome==="STOP_3").length;
   // Illustrative round-trip trading costs; exchange-specific fee tiers vary.
-  const costAssumption={buyFeePct:0.1,sellFeePct:0.1,buySlippagePct:0.1,sellSlippagePct:0.1};
+  const boundedCost=(key,fallback)=>{const value=Number(process.env[key]);return Number.isFinite(value)&&value>=0&&value<=5?value:fallback;};
+  const costAssumption={
+    buyFeePct:boundedCost("SIGNAL_BUY_FEE_PCT",0.1),
+    sellFeePct:boundedCost("SIGNAL_SELL_FEE_PCT",0.1),
+    buySlippagePct:boundedCost("SIGNAL_BUY_SLIPPAGE_PCT",0.1),
+    sellSlippagePct:boundedCost("SIGNAL_SELL_SLIPPAGE_PCT",0.1)
+  };
   const roundTripCostPct=Object.values(costAssumption).reduce((a,b)=>a+b,0);
   const net24hReturns=mature24h.filter(x=>x.entry>0&&x.price24h>0)
     .map(x=>(x.price24h/x.entry-1)*100-roundTripCostPct);
