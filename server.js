@@ -5714,10 +5714,10 @@ async function scanMarket() {
             if(!multi.verified)return;
             const market=results[provider.key];
             const row=market?.find(x=>x.symbol===provider.normalize(symbol));
-            if(!row||!row.dailyConfirmed)return;
+            if(!row||!row.dailyConfirmed||row.confirmed)return;
             row.intraday={...row.intraday,status:"İKİNCİ TEYİT TAMAM",verified:true,
               secondPrice:second,followThrough:true,spreadPct:Number(spreadPct.toFixed(3)),bidAskDepthRatio:Number(depthRatio.toFixed(2)),multiTimeframe:multi};
-            row.confirmed=true;row.candidate=false;
+            row.confirmed=true;row.candidate=false;row.tradeReady=true;row.signalStage="TÜM TEYİTLER GEÇİLDİ";
             row.reasons.push("30 saniye sonra fiyat teyidi");
             const key=id+":"+new Date().toISOString().slice(0,10);
             if(!dailySignalSeen.has(key)){
@@ -5814,6 +5814,8 @@ async function scanMarket() {
             }
             // Günlük teyit tek başına gerçek zamanlı alım sinyali değildir.
             result.dailyConfirmed=result.confirmed;
+            result.tradeReady=false;
+            result.signalStage=result.dailyConfirmed?(result.intraday?.status==="İKİNCİ TEYİT BEKLENİYOR"?"İKİNCİ TEYİT BEKLENİYOR":"GÜNLÜK ADAY - ANLIK TEYİT YOK"):"TEKNİK İZLEME ADAYI";
             if(result.confirmed&&!result.intraday.verified){
               result.confirmed=false;
               result.candidate=true;
