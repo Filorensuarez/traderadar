@@ -5773,9 +5773,23 @@ async function scanMarket() {
   }
   const results = {};
   const counts = {};
+  const previousCompleted=cache && !cache.scanning ? cache : (cache?.lastCompleted||null);
   const publish = () => {
-    const out={ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanning:scanning,scanned:providers.reduce((n,p)=>n+(counts[p.key].processed||0),0),rows:results.okxtr,error:counts.okxtr.error};
-    for(const p of providers)out[p.key]={ok:!counts[p.key].error,error:counts[p.key].error,scanned:counts[p.key].processed||0,total:counts[p.key].symbols.length,confirmed:results[p.key].filter(x=>x.confirmed).length,candidates:results[p.key].filter(x=>x.candidate).length,rows:results[p.key]};
+    const progress={scanned:providers.reduce((n,p)=>n+(counts[p.key].processed||0),0),
+      total:providers.reduce((n,p)=>n+counts[p.key].symbols.length,0),exchanges:{}};
+    const out={ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),
+      scanning:true,scanned:progress.scanned,scanProgress:progress,
+      lastCompleted:previousCompleted,error:counts.okxtr.error};
+    for(const p of providers){
+      const current={ok:!counts[p.key].error,error:counts[p.key].error,
+        scanned:counts[p.key].processed||0,total:counts[p.key].symbols.length,
+        confirmed:results[p.key].filter(x=>x.confirmed).length,
+        candidates:results[p.key].filter(x=>x.candidate).length,rows:results[p.key]};
+      progress.exchanges[p.key]={scanned:current.scanned,total:current.total,error:current.error};
+      const prior=previousCompleted?.[p.key];
+      out[p.key]=prior ? {...prior,previousScan:true,liveProgress:progress.exchanges[p.key]} : current;
+    }
+    out.rows=out.okxtr.rows;
     cache=out;
   };
   for (const p of providers) {
@@ -5860,10 +5874,10 @@ async function scanMarket() {
       out[p.key] = {ok:!counts[p.key].error,error:counts[p.key].error,scanned:counts[p.key].symbols.length,confirmed:counts[p.key].confirmed||0,candidates:counts[p.key].candidates||0,rows:results[p.key]};
       console.log(p.name+": "+counts[p.key].symbols.length+" coin / "+(counts[p.key].confirmed||0)+" teyit / "+(counts[p.key].candidates||0)+" aday / "+(counts[p.key].error||"OK"));
     }
-    cache = {...out,scanning:false};
+    cache = {...out,scanning:false,lastCompleted:null,scanProgress:{scanned:out.scanned,total:out.scanned,complete:true}};
   } catch (error) {
     console.error("Genel günlük tarama hatası:",error.message);
-    cache = {...cache,ok:false,error:error.message};
+    cache = {...cache,ok:false,error:error.message,scanning:false,scanError:true};
   } finally {
     scanning = false;
   }
