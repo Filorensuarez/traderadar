@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {chartContext} from "./daily-touch-chart.js";
+import {dailyContact} from "./daily-touch-model.js";
+const start=Date.UTC(2026,0,1,0,0,0);
+const candles=Array.from({length:180},(_,i)=>{const close=100+i*.025+Math.sin(i/7)*.12;return {time:start+i*60000,open:close-.01,high:close+.08,low:close-.08,close,quoteVolume:12000,volume:120,takerBuyQuote:7000};});
+const a=chartContext(candles);
+assert.equal(a.ready,true);
+assert.equal(a.multi.length,3);
+assert.deepEqual(a.multi.map(x=>x.period),[1,3,5]);
+assert.ok(a.score>=0&&a.score<=7);
+assert.ok(Number.isFinite(a.rsi)&&Number.isFinite(a.macdHistogram)&&Number.isFinite(a.vwap));
+assert.ok(a.multi.every(x=>x.close!==null));
+const shifted=candles.slice(0,-2);
+const b=chartContext(shifted);
+assert.equal(b.multi[2].close,candles[174].close,"5m bar must use last fully closed aligned bar");
+assert.equal(b.multi[1].close,candles[176].close,"3m bar must use last fully closed aligned bar");
+assert.ok(Number.isFinite(dailyContact(candles,start+180*60000).gainPct));
+console.log("Chart indicator and timeframe tests passed");
