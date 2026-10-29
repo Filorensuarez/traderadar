@@ -72,8 +72,9 @@ app.get("/api/okx-tr/:kind",async(req,res)=>{
  const kind=req.params.kind,instId=String(req.query.instId||"");
  if(!["instruments","candles","trades"].includes(kind))return res.status(404).json({error:"Unsupported endpoint"});
  if(kind!=="instruments"&&!/^[A-Z0-9]+-[A-Z0-9]+$/.test(instId))return res.status(400).json({error:"Invalid instrument"});
- const path=kind==="instruments"?"/api/v5/public/instruments?instType=SPOT":kind==="candles"?"/api/v5/market/candles?instId="+encodeURIComponent(instId)+"&bar=1m&limit=100":"/api/v5/market/trades?instId="+encodeURIComponent(instId)+"&limit=500";
- const key=kind+":"+instId,ttl=kind==="instruments"?300000:kind==="candles"?12000:3000;
+ const bar=req.query.bar==="1H"?"1H":"1m";
+ const path=kind==="instruments"?"/api/v5/public/instruments?instType=SPOT":kind==="candles"?"/api/v5/market/candles?instId="+encodeURIComponent(instId)+"&bar="+bar+"&limit=100":"/api/v5/market/trades?instId="+encodeURIComponent(instId)+"&limit=500";
+ const key=kind+":"+instId+":"+(kind==="candles"?bar:""),ttl=kind==="instruments"?300000:kind==="candles"?12000:3000;
  const old=okxTrCache.get(key);if(old&&Date.now()-old.at<ttl)return res.json(old.data);
  try{
   const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),10000);
