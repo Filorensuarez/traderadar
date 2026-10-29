@@ -5799,7 +5799,7 @@ async function scanMarket() {
   }
   console.log("Günlük yükseliş teyidi: seçilen Türkiye borsaları taranıyor.");
   try {
-    for (const p of providers) {
+    await Promise.all(providers.map(async p => {
       try {
         let successfulCandles=0;
         let failedCandles=0;
@@ -5868,7 +5868,7 @@ async function scanMarket() {
       results[p.key].sort((a,b)=>Number(b.confirmed)-Number(a.confirmed)||b.score-a.score);
       counts[p.key].confirmed = results[p.key].filter(x=>x.confirmed).length;
       counts[p.key].candidates = results[p.key].filter(x=>x.candidate).length;
-    }
+    }));
     mediumWatchCache = {updatedAt:Date.now(),scanned:mediumScanned,rows:mediumCandidates.sort((a,b)=>b.score-a.score)};
     recordSignals("daily",providers.flatMap(p=>results[p.key]).filter(row=>row.confirmed));
     const out = {ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanned:providers.reduce((n,p)=>n+counts[p.key].symbols.length,0),rows:results.okxtr,error:counts.okxtr.error};
