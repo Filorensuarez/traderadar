@@ -7276,6 +7276,13 @@ app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
   const mature24hHit10=mature24h.filter(x=>x.hit10).length;
   const targetFirst=mature24h.filter(x=>x.firstOutcome==="TARGET_5").length;
   const stopFirst=mature24h.filter(x=>x.firstOutcome==="STOP_3").length;
+  // Illustrative round-trip trading costs; exchange-specific fee tiers vary.
+  const costAssumption={buyFeePct:0.1,sellFeePct:0.1,buySlippagePct:0.1,sellSlippagePct:0.1};
+  const roundTripCostPct=Object.values(costAssumption).reduce((a,b)=>a+b,0);
+  const net24hReturns=mature24h.filter(x=>x.entry>0&&x.price24h>0)
+    .map(x=>(x.price24h/x.entry-1)*100-roundTripCostPct);
+  const meanNet24hReturnPct=net24hReturns.length
+    ?Number((net24hReturns.reduce((a,b)=>a+b,0)/net24hReturns.length).toFixed(2)):null;
   const stale=rows.filter(x=>!x.lastCheckedAt||Date.now()-x.lastCheckedAt>15*60000);
   res.json({ok:true,weekStart:new Date(start).toISOString(),weekEnd:new Date(end).toISOString(),
     resetPolicy:"Her pazartesi 00:00 UTC yeni haftaya geçilir; eski kayıtlar arşivde tutulur.",
@@ -7285,6 +7292,8 @@ app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
     completed24h:mature24h.length,completed7d:fullyObserved.length,unobservedOrStale:stale.length,
     completed24hHit5:mature24hHit5,completed24hHit10:mature24hHit10,
     observedTargetFirst:targetFirst,observedStopFirst:stopFirst,
+    illustrativeCostAssumption:costAssumption,illustrativeRoundTripCostPct:roundTripCostPct,
+    illustrativeMeanNet24hReturnPct:meanNet24hReturnPct,
     completed24hHit5RatePct:mature24h.length?Number((mature24hHit5/mature24h.length*100).toFixed(1)):null,
     completed24hHit10RatePct:mature24h.length?Number((mature24hHit10/mature24h.length*100).toFixed(1)):null,
     observedHit10RatePct:evaluated.length?Number((hits10/evaluated.length*100).toFixed(1)):null,
