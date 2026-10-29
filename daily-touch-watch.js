@@ -3,7 +3,7 @@ import {eligibleDailyTouchMarkets} from "./daily-touch-markets.js";
 const BASE="https://data-api.binance.vision",REPEAT_MS=60*1000;
 const CONFIRM={minVolumeRatio:1.7,minClosePosition:0.65,maxUpperWickRatio:0.4,minTakerBuyRatio:0.58,maxSpreadPct:0.35,minQuoteVolume24h:1000000,minFollowThroughPct:0.15,minConfirmationMs:30000,maxConfirmationMs:180000,maxChasePct:8};
 const pending=new Map(),confirmed=new Map(),history=[];
-const ema=(values,period)=>{const k=2/(period+1);return values.reduce((v,p,i)=>i?v+(p-v)*k:p,0)};
+const ema=(values,period)=>{if(values.length<period)return NaN;const k=2/(period+1);let v=average(values.slice(0,period));for(const p of values.slice(period))v+=(p-v)*k;return v};
 const average=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:0;
 function recordOutcomes(symbol,price,time){
  for(const item of history)if(item.market===symbol&&!item.complete){
@@ -91,8 +91,8 @@ export async function scanDailyTouch(){
     const result=dailyContact(candles);
     const closed=candles.filter(x=>x.time+60000<=Date.now()).sort((a,b)=>a.time-b.time);
     const last=closed.at(-1),prev=closed.at(-2);
+    if(last)recordOutcomes(market.symbol,last.close,last.time);
     if(!last||!prev||!Number.isFinite(result.gainPct))continue;
-    recordOutcomes(market.symbol,last.close,last.time);
     const base=closed.slice(-35,-5),recent=closed.slice(-5);
     const volumeRatio=average(recent.map(x=>x.quoteVolume))/Math.max(average(base.map(x=>x.quoteVolume)),1);
     const range=last.high-last.low,closePosition=range>0?(last.close-last.low)/range:0;
