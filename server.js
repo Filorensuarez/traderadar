@@ -5536,7 +5536,7 @@ async function updateDailySignalPerformance(){
   dailyTrackingBusy=true;
   try{
     const now=Date.now();
-    const active=dailySignalHistory.filter(x=>now-x.detectedAt<=24*3600000+10*60000&&x.status==="TEYİTLİ");
+    const active=dailySignalHistory.filter(x=>now-x.detectedAt<=7*86400000+10*60000&&x.providerKey&&x.marketSymbol&&x.entry>0);
     for(const rec of active.slice(-100)){
       try{
         const quote=await dailySignalTicker(rec);
@@ -5553,6 +5553,7 @@ async function updateDailySignalPerformance(){
         if(now-rec.detectedAt>=3600000&&!rec.price1h)rec.price1h=quote.price;
         if(now-rec.detectedAt>=4*3600000&&!rec.price4h)rec.price4h=quote.price;
         if(now-rec.detectedAt>=24*3600000&&!rec.price24h)rec.price24h=quote.price;
+        if(now-rec.detectedAt>=7*86400000&&!rec.price7d)rec.price7d=quote.price;
       }catch(e){console.warn("Sinyal performansı:",rec.symbol,e.message);}
     }
     for(const rec of dailySignalHistory){
@@ -7236,6 +7237,31 @@ app.get("/api/daily-confirmations/health",(req,res)=>{
     historyStoreConfigured:dailyStorePersistent,historyStoreWritable:storeWritable,
     historyStoreError:storeError,
     note:"Kalıcı disk bağlılığı bu API ile doğrulanamaz; Render yapılandırması ayrıca kontrol edilmelidir."});
+});
+// Weekly scorecard resets its visible cohort every Monday 00:00 UTC.
+// Only fully confirmed signals count; observed highs are sampled, not guaranteed fills.
+function currentSignalWeek(now=Date.now()){
+  const d=new Date(now),day=d.getUTCDay();
+  const start=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-(day+6)%7);
+  return {start,end:start+7*86400000};
+}
+app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
+  res.set("Cache-Control","no-store");
+  const {start,end}=currentSignalWeek();
+  const rows=dailySignalHistory.filter(x=>x.detectedAt>=start&&x.detectedAt<end&&
+    x.providerKey&&x.marketSymbol&&Number(x.entry)>0);
+  const observed=rows.filter(x=>Number.isFinite(x.lastPrice)&&x.lastCheckedAt>x.detectedAt);
+  const hits5=rows.filter(x=>x.hit5).length,hits10=rows.filter(x=>x.hit10).length;
+  const evaluated=rows.filter(x=>x.lastCheckedAt>x.detectedAt);
+  res.json({ok:true,weekStart:new Date(start).toISOString(),weekEnd:new Date(end).toISOString(),
+    resetPolicy:"Her pazartesi 00:00 UTC yeni haftaya geçilir; eski kayıtlar arşivde tutulur.",
+    confirmedSignals:rows.length,observedSignals:observed.length,
+    hit5:hits5,hit10:hits10,
+    observedHit5RatePct:evaluated.length?Number((hits5/evaluated.length*100).toFixed(1)):null,
+    observedHit10RatePct:evaluated.length?Number((hits10/evaluated.length*100).toFixed(1)):null,
+    lastSampleAt:rows.reduce((v,x)=>Math.max(v,x.lastCheckedAt||0),0)||null,
+    storageConfigured:dailyStorePersistent,rows:rows.slice(-100).reverse(),
+    notice:"Yalnızca kesin teyitli sinyaller izlenir. Yaklaşık 5 dakikalık fiyat örneklemesi ara zirveleri kaçırabilir. Bu oranlar gerçekleşmiş işlem kârı veya 7 günlük tamamlanmış başarı oranı değildir. Render kalıcı disk olmadan yeniden başlatmada kayıtlar kaybolabilir."});
 });
 app.get("/api/daily-confirmations/history",(req,res)=>{
   res.set("Cache-Control","no-store");
