@@ -1,3 +1,4 @@
+import {runSecondScan,secondScanStatus} from "./second-scan.js";
 import {startQuietRadar,quietSnapshot,onQuietAlert} from "./quiet-volume-server.js";
 import {startLiveRise,liveRiseSnapshot} from "./live-rise-radar.js";
 import {paperStats} from "./paper-performance-72h.js";
@@ -24,6 +25,8 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 
 const app = express();
+app.get("/api/second-scan",(_req,res)=>{res.set("Cache-Control","no-store");res.json(secondScanStatus());});
+app.post("/api/second-scan/start",(_req,res)=>{if(secondScanStatus().running)return res.status(409).json({error:"Tarama sürüyor"});runSecondScan().catch(console.error);res.json({started:true});});
 // TradeRadar GitHub Pages cross-origin API access (including POST and preflight).
 app.use("/api", (req,res,next)=>{
   // These API endpoints expose public market data and do not use browser credentials.
