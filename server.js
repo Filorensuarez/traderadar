@@ -7253,11 +7253,14 @@ app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
   const observed=rows.filter(x=>Number.isFinite(x.lastPrice)&&x.lastCheckedAt>x.detectedAt);
   const hits5=rows.filter(x=>x.hit5).length,hits10=rows.filter(x=>x.hit10).length;
   const evaluated=rows.filter(x=>x.lastCheckedAt>x.detectedAt);
+  const mature24h=rows.filter(x=>x.detectedAt<=Date.now()-86400000&&x.price24h>0);
+  const stale=rows.filter(x=>!x.lastCheckedAt||Date.now()-x.lastCheckedAt>15*60000);
   res.json({ok:true,weekStart:new Date(start).toISOString(),weekEnd:new Date(end).toISOString(),
     resetPolicy:"Her pazartesi 00:00 UTC yeni haftaya geçilir; eski kayıtlar arşivde tutulur.",
     confirmedSignals:rows.length,observedSignals:observed.length,
     hit5:hits5,hit10:hits10,
     observedHit5RatePct:evaluated.length?Number((hits5/evaluated.length*100).toFixed(1)):null,
+    completed24h:mature24h.length,unobservedOrStale:stale.length,
     observedHit10RatePct:evaluated.length?Number((hits10/evaluated.length*100).toFixed(1)):null,
     lastSampleAt:rows.reduce((v,x)=>Math.max(v,x.lastCheckedAt||0),0)||null,
     storageConfigured:dailyStorePersistent,rows:rows.slice(-100).reverse(),
