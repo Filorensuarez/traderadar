@@ -1,3 +1,4 @@
+const TRADE_API_BASE = location.hostname === "filorensuarez.github.io" ? "https://traderadar-yro7.onrender.com" : location.origin;
 const cards = document.querySelector("#cards");
 const statusEl = document.querySelector("#status");
 const updatedEl = document.querySelector("#updated");
@@ -722,7 +723,7 @@ async function loadData() {
 
     const response =
       await fetch(
-        "/api/daily-confirmations",
+        TRADE_API_BASE+"/api/daily-confirmations",
         {
           cache:
             "no-store"
@@ -1273,8 +1274,8 @@ async function loadMinuteRadar(
 
     const url =
       force
-        ? `/api/minute-radar?t=${Date.now()}`
-        : "/api/minute-radar";
+        ? TRADE_API_BASE+`/api/minute-radar?t=${Date.now()}`
+        : TRADE_API_BASE+"/api/minute-radar";
 
 
     const response =
@@ -1900,7 +1901,7 @@ async function loadScenarios() {
   scenarioRefreshButton.disabled = true;
   scenarioStatus.textContent = "Piyasa taranıyor...";
   try {
-    const response = await fetch("/api/scenarios", {cache:"no-store"});
+    const response = await fetch(TRADE_API_BASE+"/api/scenarios", {cache:"no-store"});
     if (!response.ok) throw Error("HTTP " + response.status);
     renderScenarios(await response.json());
   } catch (error) {
@@ -2063,7 +2064,7 @@ async function enablePushNotifications() {
 
     const keyResponse =
       await fetch(
-        "/api/push/public-key",
+        TRADE_API_BASE+"/api/push/public-key",
         {
           cache:
             "no-store"
@@ -2134,7 +2135,7 @@ async function enablePushNotifications() {
 
     const response =
       await fetch(
-        "/api/push/subscribe",
+        TRADE_API_BASE+"/api/push/subscribe",
         {
 
           method:
@@ -2524,7 +2525,7 @@ async function xMakeChart(symbol,exchange) {
   xManagerStatus.textContent="Gerçek USDT mumları yükleniyor...";
   xChartPanel.hidden=true;
   const params=new URLSearchParams({symbol,exchange});
-  const response=await fetch("/api/x/chart?"+params,{cache:"no-store"});
+  const response=await fetch(TRADE_API_BASE+"/api/x/chart?"+params,{cache:"no-store"});
   const data=await response.json();
   if(!response.ok)throw Error(data.error||"Grafik verisi alınamadı");
   xChartDraw(data);
@@ -2577,7 +2578,7 @@ async function loadSignalStatistics(){
   statsLoading=true;statsRefreshButton.disabled=true;
   statsStatus.textContent="Son 36 saatlik kayıtlar inceleniyor...";
   try{
-    const response=await fetch("/api/signal-statistics",{cache:"no-store"});
+    const response=await fetch(TRADE_API_BASE+"/api/signal-statistics",{cache:"no-store"});
     if(!response.ok)throw Error("HTTP "+response.status);
     const data=await response.json();
     const prep=data.groups?.prepump;
@@ -2627,7 +2628,7 @@ async function loadDecisionPlans(){
   const btn=document.querySelector("#decisionRefresh");
   btn.disabled=true;status.textContent="Güncel sinyal eşleşmeleri kontrol ediliyor...";
   try {
-    const r=await fetch("/api/decision-plans",{cache:"no-store"});
+    const r=await fetch(TRADE_API_BASE+"/api/decision-plans",{cache:"no-store"});
     if(!r.ok)throw Error("HTTP "+r.status);
     const d=await r.json();
     const fmt=n=>Number(n).toLocaleString("en-US",{maximumSignificantDigits:8});
@@ -2665,7 +2666,7 @@ mediumButton.addEventListener("click",async()=>{
   }
   mediumButton.disabled=true;result.textContent="Tamamlanmış günlük mumlar inceleniyor...";
   try{
-    const response=await fetch("/api/medium-trend?symbol="+encodeURIComponent(symbol)+"&exchange="+encodeURIComponent(exchange),{cache:"no-store"});
+    const response=await fetch(TRADE_API_BASE+"/api/medium-trend?symbol="+encodeURIComponent(symbol)+"&exchange="+encodeURIComponent(exchange),{cache:"no-store"});
     const d=await response.json();
     if(!response.ok||!d.ok)throw Error(d.error||"Veri alınamadı");
     result.replaceChildren();
@@ -2697,7 +2698,7 @@ async function loadMediumWatch(){
   button.disabled=true;
   status.textContent="Son tarama sonuçları alınıyor...";
   try{
-    const response=await fetch("/api/medium-watch",{cache:"no-store"});
+    const response=await fetch(TRADE_API_BASE+"/api/medium-watch",{cache:"no-store"});
     if(!response.ok)throw Error("HTTP "+response.status);
     const data=await response.json();
     cards.replaceChildren();
@@ -2740,7 +2741,7 @@ async function loadLiveRise(){
  liveRiseBusy=true;
  const status=document.querySelector("#liveRiseStatus"),cards=document.querySelector("#liveRiseCards");
  try{
-  const response=await fetch("/api/live-rise",{cache:"no-store"});
+  const response=await fetch(TRADE_API_BASE+"/api/live-rise",{cache:"no-store"});
   if(!response.ok)throw Error("HTTP "+response.status);
   const data=await response.json();
   const feeds=Object.values(data.feeds||{});
