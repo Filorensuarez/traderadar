@@ -2,7 +2,8 @@ import WebSocket from "ws";
 const states=new Map(),sockets=new Set(),alarms=[];
 let universe=0,connections=0,lastError="",started=0,listener=null;
 const BASE="https://data-api.binance.vision";
-const RULES={warmupSeconds:120,windowSeconds:15,baselineSeconds:105,minBuyUsdt:750,minBuyRatio:0.65,minAcceleration:3,minPrice15sPct:0.25,minPrice60sPct:0.4,maxPrice60sPct:4,maxSpreadProxyPct:1.5,cooldownSeconds:90};
+const RULES={warmupSeconds:120,windowSeconds:15,baselineSeconds:105,minBuyUsdt:5000,minBuyRatio:0.78,minAcceleration:5,minPrice15sPct:0.35,minPrice60sPct:1.2,maxPrice60sPct:3.5,maxSpreadProxyPct:2.5,cooldownSeconds:1800,confirmationSeconds:30,minFollowThroughPct:0.7,globalCooldownSeconds:90};
+let lastGlobalAlarm=0;
 const num=(v,n=2)=>Number(v.toFixed(n));
 function onTrade(d){
  const now=Date.now(),price=Number(d.p),qty=Number(d.q),value=price*qty;
@@ -30,12 +31,21 @@ function onTrade(d){
  if(buy<RULES.minBuyUsdt||buyRatio<RULES.minBuyRatio||acceleration<RULES.minAcceleration||
  price15sPct<RULES.minPrice15sPct||price60sPct<RULES.minPrice60sPct||
  price60sPct>RULES.maxPrice60sPct||spreadProxyPct>RULES.maxSpreadProxyPct)return;
- s.lastAlarm=now;
+ // Phase 1: remember a candidate; never publish the first impulse.
+ if(!s.candidate){s.candidate={at:now,price,firstRatio:buyRatio,firstAcceleration:acceleration};return;}
+ const candidate=s.candidate;
+ if(now-candidate.at>90000){s.candidate={at:now,price};return;}
+ if(now-candidate.at<RULES.confirmationSeconds*1000)return;
+ const followThroughPct=(price/candidate.price-1)*100;
+ // Phase 2: the price must advance again, not merely retain a brief spike.
+ if(followThroughPct<RULES.minFollowThroughPct){s.candidate=null;return;}
+ if(now-lastGlobalAlarm<RULES.globalCooldownSeconds*1000)return;
+ s.candidate=null;s.lastAlarm=now;lastGlobalAlarm=now;
  const score=Math.min(100,Math.round(25+Math.min(acceleration,8)*4+buyRatio*20+
  Math.min(price15sPct,1.5)*12+Math.min(price60sPct,2)*5));
  const alert={symbol:d.s,price,time:now,buyUsdt:Math.round(buy),buyRatio:Math.round(buyRatio*100),
  acceleration:num(acceleration,1),price15sPct:num(price15sPct),price60sPct:num(price60sPct),
- score,signal:"YÜKSELİŞ BAŞLANGICI ADAYI"};
+ score,followThroughPct:num(followThroughPct),signal:"İKİ AŞAMALI YÜKSELİŞ TEYİDİ"};
  alarms.unshift(alert);if(alarms.length>150)alarms.pop();
  if(listener)Promise.resolve(listener(alert)).catch(e=>console.error("quiet push",e.message));
 }
