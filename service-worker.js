@@ -50,7 +50,7 @@ self.addEventListener(
 
         url:
           data.url ||
-          "/#scenario"
+          "./#scenario"
       }
     };
 
@@ -74,7 +74,7 @@ self.addEventListener(
 
     const targetUrl =
       event.notification.data?.url ||
-      "/#scenario";
+      "./#scenario";
 
 
     event.waitUntil(
