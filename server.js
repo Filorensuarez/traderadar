@@ -5659,7 +5659,17 @@ async function scanMarket() {
     },normalize:s=>s.replace("-","/")},
     {key:"binanceglobal",name:"BINANCE GLOBAL",currency:"USDT",symbols:async()=>{
       // Binance'in herkese açık piyasa-verisi alan adı; hesap/trading API'si değil.
-      const j=await getExternalJSON("https://data-api.binance.vision/api/v3/exchangeInfo","BINANCE GLOBAL");
+      let j;
+      try{
+        j=await getExternalJSON("https://data-api.binance.vision/api/v3/exchangeInfo","BINANCE GLOBAL");
+      }catch(primaryError){
+        console.warn("Binance birincil piyasa veri adresi:",primaryError.message);
+        try{
+          j=await getExternalJSON("https://api.binance.com/api/v3/exchangeInfo","BINANCE GLOBAL YEDEK");
+        }catch(backupError){
+          throw Error("Binance piyasa veri adresleri erişilemedi: "+primaryError.message+"; yedek: "+backupError.message);
+        }
+      }
       if(!Array.isArray(j.symbols))throw Error("Binance Global sembol verisi alınamadı");
       return j.symbols.filter(x=>x.quoteAsset==="USDT"&&x.status==="TRADING"&&x.isSpotTradingAllowed!==false).map(x=>x.symbol);
     },candles:async symbol=>{
