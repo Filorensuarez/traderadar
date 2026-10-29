@@ -7754,14 +7754,19 @@ setInterval(
 /* Legacy scenario, minute radar and trade-flow jobs are retired.
    Daily confirmation and X Manager endpoints remain available. */
 onQuietAlert(alert=>sendPush({title:"Sessiz Hacim: "+alert.symbol,body:"Alış hacmi "+alert.acceleration+"x • Alış oranı %"+alert.buyRatio,url:"/"}));
-startQuietRadar();
-startLiveRise();
-startFlowRadar();
-startOkxFlow();
-startKucoinFlow();
-startMinuteMomentum();
+// Keep the core daily scanner available on small Render instances.
+// Optional continuous WebSocket scanners are opt-in because multiple concurrent
+// market feeds can exhaust the free instance or fail during reconnect storms.
 startDailyTouch();
-startHourlyPullbacks();
+if(process.env.ENABLE_EXTRA_RADARS==="1"){
+  startQuietRadar();
+  startLiveRise();
+  startFlowRadar();
+  startOkxFlow();
+  startKucoinFlow();
+  startMinuteMomentum();
+  startHourlyPullbacks();
+}
 setInterval(()=>refreshMarketCaps().catch(e=>
  console.error("Piyasa değeri güncellemesi:",e.message)),60*60*1000);
 // Historical five-candle notification job removed.

@@ -73,7 +73,7 @@ function okxRestart(){
   if(okxRestartTimer)return;
   okxRestartTimer=setTimeout(()=>{
     okxRestartTimer=null;
-    for(const ws of [...sockets])if(ws.url.includes("okx")){ws.removeAllListeners("close");ws.terminate();sockets.delete(ws);}
+    for(const ws of [...sockets])if(ws.url.includes("okx")){ws.removeAllListeners("close");ws.on("close",()=>sockets.delete(ws));ws.terminate();sockets.delete(ws);}
     okx();
   },1000);
 }
