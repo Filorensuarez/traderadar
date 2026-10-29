@@ -5497,6 +5497,7 @@ let mediumWatchCache={updatedAt:0,scanned:0,rows:[]};
 
 const dailySignalHistory=[];
 const dailySignalSeen=new Set();
+const dailyConfirmationPending=new Set();
 async function scanMarket() {
   if (scanning) return;
   scanning = true;
@@ -5605,10 +5606,47 @@ async function scanMarket() {
     const takerRatio=takerAvailable?recent.reduce((s,x)=>s+x.buy,0)/Math.max(recent.reduce((s,x)=>s+x.quote,0),1e-9):null;
     const pass=volumeRatio>=1.5&&momentum5>=0.2&&momentum15>=0.4&&last.close>ema20m&&last.close>resistance15*0.997&&
       (takerRatio===null||takerRatio>=0.55);
-    // İkinci teyit: ilk veri geçerliyse 30 saniye sonra yeni kapanmış mumla fiyat korunmalı.
+    // Ana taramayı 31 saniye bloke etme: adaylar asenkron teyit kuyruğuna girer.
     let followThrough=false,secondPrice=null;
     if(pass){
-      await new Promise(resolve=>setTimeout(resolve,31000));
+      const id=provider.key+":"+symbol;
+      if(!dailyConfirmationPending.has(id)){
+        dailyConfirmationPending.add(id);
+        setTimeout(async()=>{
+          try{
+            const check=provider.key==="binanceglobal"
+              ?await getExternalJSON("https://data-api.binance.vision/api/v3/ticker/price?symbol="+encodeURIComponent(symbol),"BINANCE GLOBAL")
+              :await getExternalJSON((provider.key==="okxtr"?"https://tr.okx.com":"https://eea.okx.com")+
+                "/api/v5/market/ticker?instId="+encodeURIComponent(symbol),provider.name);
+            const second=Number(provider.key==="binanceglobal"?check.price:check.data?.[0]?.last);
+            if(!(Number.isFinite(second)&&second>=last.close*1.0015))return;
+            const market=results[provider.key];
+            const row=market?.find(x=>x.symbol===provider.normalize(symbol));
+            if(!row||!row.dailyConfirmed)return;
+            row.intraday={...row.intraday,status:"İKİNCİ TEYİT TAMAM",verified:true,
+              secondPrice:second,followThrough:true};
+            row.confirmed=true;row.candidate=false;
+            row.reasons.push("30 saniye sonra fiyat teyidi");
+            const key=id+":"+new Date().toISOString().slice(0,10);
+            if(!dailySignalSeen.has(key)){
+              dailySignalSeen.add(key);
+              dailySignalHistory.push({id:key,exchange:provider.name,symbol:row.symbol,
+                entry:second,detectedAt:Date.now(),score:row.score,status:"TEYİTLİ",
+                maxPrice:second,minPrice:second,hit5:false,hit10:false});
+              if(dailySignalHistory.length>500)dailySignalHistory.shift();
+            }
+            publish();
+          }catch(e){console.warn("Asenkron teyit:",id,e.message);}
+          finally{dailyConfirmationPending.delete(id);}
+        },31000);
+      }
+      return {status:"İKİNCİ TEYİT BEKLENİYOR",verified:false,
+        firstPrice:last.close,volumeRatio:Number(volumeRatio.toFixed(2)),
+        momentum5:Number(momentum5.toFixed(2)),momentum15:Number(momentum15.toFixed(2)),
+        takerRatio:takerRatio===null?null:Number((takerRatio*100).toFixed(1)),
+        note:"30 saniye sonra ikinci fiyat kontrolü arka planda yapılır."};
+    }
+    if(false){
       try{
         if(provider.key==="binanceglobal"){
           const check=await getExternalJSON("https://data-api.binance.vision/api/v3/ticker/price?symbol="+encodeURIComponent(symbol),"BINANCE GLOBAL");
