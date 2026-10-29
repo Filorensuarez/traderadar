@@ -10,17 +10,22 @@ const preparationCandidates=new Map();
 const PREP_TTL=10*60000;
 const ema=(values,period)=>{if(values.length<period)return NaN;const k=2/(period+1);let v=average(values.slice(0,period));for(const p of values.slice(period))v+=(p-v)*k;return v};
 const average=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:0;
-function recordOutcomes(symbol,price,time){
+function recordOutcomes(symbol,price,time,high=price,low=price){
  for(const item of earlyHistory)if(item.market===symbol&&!item.complete){
   const elapsed=time-item.candleTime;
   if(elapsed<0)continue;
+  item.maxGainPct=Math.max(item.maxGainPct??-Infinity,(high/item.entry-1)*100);
+  item.maxDrawdownPct=Math.min(item.maxDrawdownPct??Infinity,(low/item.entry-1)*100);
   for(const [minutes,key] of [[5,"after5mPct"],[15,"after15mPct"],[30,"after30mPct"],[60,"after60mPct"]]){
    if(elapsed>=minutes*60000&&item[key]===null)item[key]=Number(((price/item.entry-1)*100).toFixed(2));
   }
   if(item.after60mPct!==null)item.complete=true;
  }
  for(const item of history)if(item.market===symbol&&!item.complete){
-  const elapsed=Date.now()-item.time;
+  const elapsed=time-item.candleTime;
+  if(elapsed<0)continue;
+  item.maxGainPct=Math.max(item.maxGainPct??-Infinity,(high/item.entry-1)*100);
+  item.maxDrawdownPct=Math.min(item.maxDrawdownPct??Infinity,(low/item.entry-1)*100);
   if(elapsed>=300000&&!item.after5m)item.after5mPct=Number(((price/item.entry-1)*100).toFixed(2)),item.after5m=true;
   if(elapsed>=900000&&!item.after15m)item.after15mPct=Number(((price/item.entry-1)*100).toFixed(2)),item.after15m=true;
   if(elapsed>=1800000&&!item.after30m)item.after30mPct=Number(((price/item.entry-1)*100).toFixed(2)),item.after30m=true;
@@ -31,7 +36,9 @@ export function dailyTouchPerformance(){return {sampleSize:history.length,comple
 
 let targetPct=2;
 export function setDailyTouchThreshold(value){const n=Number(value);if(!Number.isFinite(n)||n<0.1||n>50)throw Error("Yükseliş oranı %0,1 ile %50 arasında olmalı");targetPct=n;state.thresholdPct=n;return n;}
-const MIN_REQUEST_GAP=160;
+const MIN_REQUEST_GAP=160,SCAN_WORKERS=3;
+let nextRequestAt=0;
+async function throttle(){const now=Date.now();const wait=Math.max(0,nextRequestAt-now);nextRequestAt=Math.max(now,nextRequestAt)+MIN_REQUEST_GAP;if(wait)await snooze(wait);}
 const state={
   running:false,status:"idle",thresholdPct:2,startedAt:0,updatedAt:0,checked:0,eligible:0,
   failed:0,remaining:0,rows:[],earlyRows:[],preparationRows:[],error:null,waitUntil:0,
@@ -99,16 +106,21 @@ export async function scanDailyTouch(){
   const bookBySymbol=new Map(books.map(t=>[t.symbol,t]));
   state.eligible=all.length;state.remaining=all.length;
   // No slice, max-count, daily-volume threshold, or rotation: every active spot pair.
-  for(const market of all){
-   if(stopRequested)break;
+  // Prioritize recently prepared symbols; bound concurrency to limit API pressure.
+  const ordered=[...all].sort((a,b)=>Number(preparationCandidates.has(b.symbol))-Number(preparationCandidates.has(a.symbol))||b.volume24h-a.volume24h);
+  let cursor=0;
+  async function worker(){
+  while(cursor<ordered.length&&!stopRequested){
+   const market=ordered[cursor++];
    try{
+    await throttle();
     const raw=await json(BASE+"/api/v3/klines?symbol="+encodeURIComponent(market.symbol)+"&interval=1m&limit=200");
     if(!Array.isArray(raw))throw Error("1 dakikalık OHLC verisi geçersiz");
     const candles=raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],quoteVolume:+x[7],takerBuyQuote:+x[10]}));
     const result=dailyContact(candles);
     const closed=candles.filter(x=>x.time+60000<=Date.now()).sort((a,b)=>a.time-b.time);
     const last=closed.at(-1),prev=closed.at(-2);
-    if(last)recordOutcomes(market.symbol,last.close,last.time);
+    if(last)recordOutcomes(market.symbol,last.close,last.time,last.high,last.low);
     if(!last||!prev||!Number.isFinite(result.gainPct))continue;
     const base=closed.slice(-35,-5),recent=closed.slice(-5);
     const volumeRatio=average(recent.map(x=>x.quoteVolume))/Math.max(average(base.map(x=>x.quoteVolume)),1);
@@ -138,7 +150,8 @@ export async function scanDailyTouch(){
     const dayVolume=Number(t.quoteVolume);
     const chasePct=(last.close/Math.min(...closed.slice(-15).map(x=>x.low))-1)*100;
     const dailyRangePct=(Number(t.highPrice)/Math.max(Number(t.lowPrice),1e-12)-1)*100;
-    const pass=result.gainPct>=targetPct&&closed.length>=90&&last.close>prev.close&&last.close>last.open&&
+    const falseBreakout=last.close<resistance||upperWickRatio>0.45||takerRatio<0.53;
+    const pass=!falseBreakout&&result.gainPct>=targetPct&&closed.length>=90&&last.close>prev.close&&last.close>last.open&&
       volumeRatio>=CONFIRM.minVolumeRatio&&closePosition>=CONFIRM.minClosePosition&&
       upperWickRatio<=CONFIRM.maxUpperWickRatio&&last.close>ema20&&ema20>ema50&&
       last.close>resistance&&takerRatio>=CONFIRM.minTakerBuyRatio&&
@@ -175,7 +188,7 @@ export async function scanDailyTouch(){
       const existing=earlyCandidates.get(market.symbol);
       if(!existing||Date.now()-existing.time>15*60000){
        earlyCandidates.set(market.symbol,{time:Date.now(),hit:early});
-       earlyHistory.push({market:market.symbol,entry:last.close,time:Date.now(),candleTime:last.time,complete:false,after5mPct:null,after15mPct:null,after30mPct:null,after60mPct:null});
+       earlyHistory.push({market:market.symbol,entry:last.close,time:Date.now(),candleTime:last.time,complete:false,maxGainPct:0,maxDrawdownPct:0,after5mPct:null,after15mPct:null,after30mPct:null,after60mPct:null});
        if(earlyHistory.length>500)earlyHistory.shift();
       }
       state.earlyRows=[...earlyCandidates.values()].map(x=>x.hit).filter(x=>!confirmed.has(x.market)).sort((a,b)=>b.score-a.score);
@@ -201,7 +214,7 @@ export async function scanDailyTouch(){
       stopExample:Number((last.close*0.98).toPrecision(9)),dailyRangePct:Number(dailyRangePct.toFixed(2))};
     confirmed.set(market.symbol,{time:now,hit});
     preparationCandidates.delete(market.symbol);
-    history.push({market:market.symbol,entry:last.close,time:now,complete:false});
+    history.push({market:market.symbol,entry:last.close,time:now,candleTime:last.time,complete:false,maxGainPct:0,maxDrawdownPct:0});
     if(history.length>500)history.shift();
     matches.push(hit);publish(matches);
     state.earlyRows=state.earlyRows.filter(x=>x.market!==market.symbol);
@@ -213,9 +226,10 @@ export async function scanDailyTouch(){
    }finally{
     state.checked++;
     state.remaining=all.length-state.checked;
-    await snooze(MIN_REQUEST_GAP);
    }
   }
+  }
+  await Promise.all(Array.from({length:SCAN_WORKERS},()=>worker()));
   for(const [key,value] of preparationCandidates)if(Date.now()-value.time>PREP_TTL)preparationCandidates.delete(key);
   state.preparationRows=[...preparationCandidates.values()].map(x=>x.hit).filter(x=>!earlyCandidates.has(x.market)&&!confirmed.has(x.market)).sort((a,b)=>b.score-a.score);
   publish([...confirmed.values()].map(x=>({...x.hit,stage:"confirmed"})));
