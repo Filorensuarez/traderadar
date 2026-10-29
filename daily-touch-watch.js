@@ -11,7 +11,12 @@ const earlyHistory=[];
 const earlyCandidates=new Map();
 const preparationCandidates=new Map();
 const STORE=process.env.TOUCH_DATA_FILE||path.join(process.cwd(),"data","daily-touch-history.json");
-function saveHistory(){try{fs.mkdirSync(path.dirname(STORE),{recursive:true});const tmp=STORE+".tmp";fs.writeFileSync(tmp,JSON.stringify({history,earlyHistory}));fs.renameSync(tmp,STORE);}catch(e){console.warn("Temas kayıt:",e.message);}}
+let saveTimer=null;
+function saveHistory(){
+ if(saveTimer)return;
+ saveTimer=setTimeout(()=>{saveTimer=null;writeHistory();},1000);
+}
+function writeHistory(){try{fs.mkdirSync(path.dirname(STORE),{recursive:true});const tmp=STORE+".tmp";fs.writeFileSync(tmp,JSON.stringify({history,earlyHistory}));fs.renameSync(tmp,STORE);}catch(e){console.warn("Temas kayıt:",e.message);}}
 try{const data=JSON.parse(fs.readFileSync(STORE,"utf8"));history.push(...(data.history||[]).slice(-500));earlyHistory.push(...(data.earlyHistory||[]).slice(-500));}catch(e){if(e.code!=="ENOENT")console.warn("Temas geçmişi:",e.message);}
 function weekly(rows){const start=Date.now()-7*86400000;const sample=rows.filter(x=>x.time>=start);const complete=sample.filter(x=>x.complete&&Number.isFinite(x.after60mPct));const wins=complete.filter(x=>x.after60mPct>0).length;return {sampleSize:sample.length,completed:complete.length,wins,winRatePct:complete.length?Number((100*wins/complete.length).toFixed(1)):null,avg60mPct:complete.length?Number((complete.reduce((a,x)=>a+x.after60mPct,0)/complete.length).toFixed(2)):null};}
 const PREP_TTL=10*60000;
@@ -21,7 +26,7 @@ function recordOutcomes(symbol,price,time,high=price,low=price){
  let changed=false;
  for(const item of earlyHistory)if(item.market===symbol&&!item.complete){
   const elapsed=time-item.candleTime;
-  if(elapsed<0)continue;
+  if(elapsed<=0)continue;
   changed=true;
   item.maxGainPct=Math.max(item.maxGainPct??-Infinity,(high/item.entry-1)*100);
   item.maxDrawdownPct=Math.min(item.maxDrawdownPct??Infinity,(low/item.entry-1)*100);
@@ -32,7 +37,7 @@ function recordOutcomes(symbol,price,time,high=price,low=price){
  }
  for(const item of history)if(item.market===symbol&&!item.complete){
   const elapsed=time-item.candleTime;
-  if(elapsed<0)continue;
+  if(elapsed<=0)continue;
   changed=true;
   item.maxGainPct=Math.max(item.maxGainPct??-Infinity,(high/item.entry-1)*100);
   item.maxDrawdownPct=Math.min(item.maxDrawdownPct??Infinity,(low/item.entry-1)*100);
@@ -43,7 +48,7 @@ function recordOutcomes(symbol,price,time,high=price,low=price){
  }
  if(changed)saveHistory();
 }
-export function dailyTouchPerformance(){return {weekly:{early:weekly(earlyHistory),confirmed:weekly(history)},sampleSize:history.length,completed:history.filter(x=>x.complete).length,rows:history.slice(-100),earlySampleSize:earlyHistory.length,earlyCompleted:earlyHistory.filter(x=>x.complete).length,earlyRows:earlyHistory.slice(-100)}}
+export function dailyTouchPerformance(){return {storage:{path:STORE,configured:!!process.env.TOUCH_DATA_FILE},weekly:{early:weekly(earlyHistory),confirmed:weekly(history)},sampleSize:history.length,completed:history.filter(x=>x.complete).length,rows:history.slice(-100),earlySampleSize:earlyHistory.length,earlyCompleted:earlyHistory.filter(x=>x.complete).length,earlyRows:earlyHistory.slice(-100)}}
 
 let targetPct=2;
 export function setDailyTouchThreshold(value){const n=Number(value);if(!Number.isFinite(n)||n<0.1||n>50)throw Error("Yükseliş oranı %0,1 ile %50 arasında olmalı");targetPct=n;state.thresholdPct=n;return n;}
