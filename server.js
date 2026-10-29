@@ -5496,7 +5496,9 @@ function analyze(symbol,candles) {
 let mediumWatchCache={updatedAt:0,scanned:0,rows:[]};
 
 // Set DAILY_SIGNAL_STORE to a persistent mounted disk path on Render.
+// Render: mount a persistent disk and set DAILY_SIGNAL_STORE=/var/data/daily-signal-history.json.
 const dailySignalStore=process.env.DAILY_SIGNAL_STORE||"./daily-signal-history.json";
+const dailyStorePersistent=Boolean(process.env.DAILY_SIGNAL_STORE);
 let dailySignalHistory=[];
 try{
   const saved=JSON.parse(fs.readFileSync(dailySignalStore,"utf8"));
@@ -5506,6 +5508,7 @@ const dailySignalSeen=new Set(dailySignalHistory.map(x=>x.id));
 const dailyConfirmationPending=new Set();
 function saveDailySignals(){
   try{
+    fs.mkdirSync(new URL(".",new URL("file://"+(dailySignalStore.startsWith("/")?dailySignalStore:process.cwd()+"/"+dailySignalStore))).pathname,{recursive:true});
     const tmp=dailySignalStore+".tmp";
     fs.writeFileSync(tmp,JSON.stringify(dailySignalHistory));
     fs.renameSync(tmp,dailySignalStore);
@@ -7200,6 +7203,21 @@ app.get("/api/daily-confirmations/backtest",async(req,res)=>{
       hit5:signals.filter(x=>x.hit5).length,hit10:signals.filter(x=>x.hit10).length,
       notice:"Bu test yalnızca günlük teknik adayları ve sonraki günlük mumun tepe/dibini karşılaştırır. Dakikalık, ikinci teyit, emir defteri ve haber filtreleri geçmişe uygulanmamıştır; canlı başarı oranı değildir."});
   }catch(e){res.status(502).json({error:"Geçmiş veri alınamadı",detail:String(e.message).slice(0,160)});}
+});
+app.get("/api/daily-confirmations/health",(req,res)=>{
+  let storeWritable=false,storeError=null;
+  try{
+    const dir=dailySignalStore.includes("/")?dailySignalStore.slice(0,dailySignalStore.lastIndexOf("/")):".";
+    fs.accessSync(dir,fs.constants.W_OK);
+    storeWritable=true;
+  }catch(e){storeError=String(e.message).slice(0,160);}
+  res.set("Cache-Control","no-store");
+  res.json({ok:true,scannerRunning:scanning,lastScanAt:cache.updatedAt||null,
+    scanned:cache.scanned||0,historyCount:dailySignalHistory.length,
+    pendingSecondChecks:dailyConfirmationPending.size,
+    historyStoreConfigured:dailyStorePersistent,historyStoreWritable:storeWritable,
+    historyStoreError:storeError,
+    note:"Kalıcı disk bağlılığı bu API ile doğrulanamaz; Render yapılandırması ayrıca kontrol edilmelidir."});
 });
 app.get("/api/daily-confirmations/history",(req,res)=>{
   res.set("Cache-Control","no-store");
