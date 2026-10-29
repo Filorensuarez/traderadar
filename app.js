@@ -435,17 +435,17 @@ function coinCard(row) {
         </div>
 
         <div class="score">
-          ${number(row.score, 0)}/100
+          ${number(row.score, 0)}/100 <small style="display:block;font-size:0.38em;font-weight:400">Günlük teknik puan</small>
         </div>
 
       </div>
 
 
-      <div class="confirmation ${row.confirmed ? "confirmed" : "candidate"}">
+      <div class="confirmation ${row.tradeReady === true && row.confirmed ? "confirmed" : "candidate"}">
   ${
-    row.confirmed
-      ? "KIRILIM TEYİDİ"
-      : "ERKEN YÜKSELİŞ ADAYI"
+    row.tradeReady === true && row.confirmed
+      ? "TÜM TEKNİK TEYİTLER GEÇİLDİ"
+      : (row.signalStage || "ERKEN YÜKSELİŞ ADAYI")
   }
 </div>
 
@@ -453,7 +453,7 @@ function coinCard(row) {
       <p class="description" style="font-size:0.8em">${escapeHTML(row.riskNote || "Teknik gösterge; kazanç garantisi yoktur.")}</p>
       <div class="description" style="margin:10px 0;padding:10px;border:1px solid #40546d;border-radius:8px">
         <strong>Dakikalık kontrol:</strong> ${escapeHTML(row.intraday?.status || "Veri bekleniyor")}
-        <div>5 dk: %${number(row.intraday?.momentum5,2)} · 15 dk: %${number(row.intraday?.momentum15,2)} · Hacim: ${number(row.intraday?.volumeRatio,2)}x</div>
+        <div>5 dk: ${Number.isFinite(row.intraday?.momentum5) ? "%"+number(row.intraday.momentum5,2) : "Veri doğrulanamadı"} · 15 dk: ${Number.isFinite(row.intraday?.momentum15) ? "%"+number(row.intraday.momentum15,2) : "Veri doğrulanamadı"} · Hacim: ${Number.isFinite(row.intraday?.volumeRatio) ? number(row.intraday.volumeRatio,2)+"x" : "Veri doğrulanamadı"}</div>
         <div>${escapeHTML(row.intraday?.note || "Anlık doğrulama bulunmuyor.")}</div>
       </div>
       <div class="metrics">
