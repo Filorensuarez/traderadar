@@ -5537,7 +5537,11 @@ async function updateDailySignalPerformance(){
   try{
     const now=Date.now();
     const active=dailySignalHistory.filter(x=>now-x.detectedAt<=7*86400000+10*60000&&x.providerKey&&x.marketSymbol&&x.entry>0);
-    for(const rec of active.slice(-100)){
+    // Rotate sampling across all active signals; do not permanently starve older records.
+    const sampleLimit=100;
+    const due=active.filter(x=>!x.lastCheckedAt||now-x.lastCheckedAt>=4*60000)
+      .sort((a,b)=>(a.lastCheckedAt||0)-(b.lastCheckedAt||0));
+    for(const rec of due.slice(0,sampleLimit)){
       try{
         const quote=await dailySignalTicker(rec);
         if(!quote||!(quote.price>0))continue;
@@ -7253,6 +7257,7 @@ app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
   const observed=rows.filter(x=>Number.isFinite(x.lastPrice)&&x.lastCheckedAt>x.detectedAt);
   const hits5=rows.filter(x=>x.hit5).length,hits10=rows.filter(x=>x.hit10).length;
   const evaluated=rows.filter(x=>x.lastCheckedAt>x.detectedAt);
+  const fullyObserved=rows.filter(x=>x.price7d>0);
   const mature24h=rows.filter(x=>x.detectedAt<=Date.now()-86400000&&x.price24h>0);
   const stale=rows.filter(x=>!x.lastCheckedAt||Date.now()-x.lastCheckedAt>15*60000);
   res.json({ok:true,weekStart:new Date(start).toISOString(),weekEnd:new Date(end).toISOString(),
@@ -7260,7 +7265,7 @@ app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
     confirmedSignals:rows.length,observedSignals:observed.length,
     hit5:hits5,hit10:hits10,
     observedHit5RatePct:evaluated.length?Number((hits5/evaluated.length*100).toFixed(1)):null,
-    completed24h:mature24h.length,unobservedOrStale:stale.length,
+    completed24h:mature24h.length,completed7d:fullyObserved.length,unobservedOrStale:stale.length,
     observedHit10RatePct:evaluated.length?Number((hits10/evaluated.length*100).toFixed(1)):null,
     lastSampleAt:rows.reduce((v,x)=>Math.max(v,x.lastCheckedAt||0),0)||null,
     storageConfigured:dailyStorePersistent,rows:rows.slice(-100).reverse(),
