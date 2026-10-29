@@ -1,6 +1,6 @@
 (()=>{
 const el=id=>document.getElementById(id);
-const DEFAULT_API=location.hostname==="filorensuarez.github.io"?"":location.origin;
+const DEFAULT_API=location.hostname==="filorensuarez.github.io"?"https://traderadar-yro7.onrender.com":location.origin;
 const API=(localStorage.getItem("traderadar-api-base")||DEFAULT_API).replace(/\/$/,"");
 let timer=null,seen=new Set();
 async function refresh(){
