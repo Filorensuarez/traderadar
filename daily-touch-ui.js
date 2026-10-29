@@ -1,6 +1,6 @@
 const TOUCH_API=location.hostname==="filorensuarez.github.io"?"https://traderadar-yro7.onrender.com":location.origin;
 const status=document.getElementById("dailyTouchStatus"),cards=document.getElementById("dailyTouchCards"),scanButton=document.getElementById("dailyTouchScan"),stopButton=document.getElementById("dailyTouchStop");
-const seen=new Set();let initialLoad=true;
+const seen=new Set(),seenEarly=new Set();let initialLoad=true;
 const fmt=(n,d=4)=>Number.isFinite(n)?n.toLocaleString("tr-TR",{maximumFractionDigits:d}):"—";
 function notify(x){const key=x.market+":"+x.day;if(seen.has(key))return;seen.add(key);if(typeof Notification!=="undefined"&&Notification.permission==="granted")new Notification("TradeRadar: momentum",{body:x.symbol+" | 10/30 ortalama farkı: %"+fmt(x.gainPct,2)});}
 async function refresh(){
@@ -12,6 +12,9 @@ async function refresh(){
  const early=d.earlyRows||[];
  if(!d.rows.length&&!early.length){const p=document.createElement("p");p.textContent="Henüz tüm trend, hacim, alıcı baskısı, likidite ve ikinci teyit koşullarını sağlayan coin yok.";cards.append(p);}
  for(const x of early){
+ const earlyKey=x.market+":"+x.day;
+ if(initialLoad)seenEarly.add(earlyKey);
+ else if(!seenEarly.has(earlyKey)){seenEarly.add(earlyKey);if(typeof Notification!=="undefined"&&Notification.permission==="granted")new Notification("TradeRadar: erken toparlanma",{body:x.symbol+" | Hacim: "+fmt(x.volumeRatio,2)+"x | 5 dk: %"+fmt(x.fiveRisePct,2)});}
  const card=document.createElement("article");card.className="coin-card";
  const h=document.createElement("h3");h.textContent=x.symbol+" • ERKEN TOPARLANMA • "+fmt(x.score,0)+"/84";card.append(h);
  const p=document.createElement("p");p.textContent="PARTI modeli (izleme, alım teyidi değil) | 10/30 farkı: %"+fmt(x.gainPct,2)+" | 5 dk: %"+fmt(x.fiveRisePct,2)+" | Hacim: "+fmt(x.volumeRatio,2)+"x | Taker alış: %"+fmt(x.takerBuyRatio,1);card.append(p);cards.append(card);
