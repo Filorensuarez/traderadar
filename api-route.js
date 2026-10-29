@@ -1,7 +1,7 @@
 /* Route legacy same-origin API requests to the Render backend on GitHub Pages. */
 (()=>{
   if(location.hostname!=="filorensuarez.github.io")return;
-  const backend=(localStorage.getItem("traderadar-api-base")||"https://traderadar-yro7.onrender.com").replace(/\\/$/,"");
+  const backend=(localStorage.getItem("traderadar-api-base")||"https://traderadar-yro7.onrender.com").replace(/\/$/,"");
   const original=window.fetch.bind(window);
   window.fetch=(input,init)=>{
     if(typeof input==="string"&&input.startsWith("/api/"))input=backend+input;
