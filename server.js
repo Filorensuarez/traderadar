@@ -5673,7 +5673,13 @@ async function scanMarket() {
       if(!Array.isArray(j.symbols))throw Error("Binance Global sembol verisi alınamadı");
       return j.symbols.filter(x=>x.quoteAsset==="USDT"&&x.status==="TRADING"&&x.isSpotTradingAllowed!==false).map(x=>x.symbol);
     },candles:async symbol=>{
-      const j=await getExternalJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=260","BINANCE GLOBAL");
+      let j;
+      const query="/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=260";
+      try{j=await getExternalJSON("https://data-api.binance.vision"+query,"BINANCE GLOBAL");}
+      catch(primaryError){
+        try{j=await getExternalJSON("https://api.binance.com"+query,"BINANCE GLOBAL YEDEK");}
+        catch(backupError){throw Error("Binance günlük mum verisi erişilemedi: "+primaryError.message+"; yedek: "+backupError.message);}
+      }
       if(!Array.isArray(j))throw Error("Binance Global günlük mum verisi alınamadı");
       return closedDaily(j);
     },normalize:s=>s.replace(/USDT$/,"/USDT")}
