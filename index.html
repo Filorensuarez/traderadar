@@ -411,19 +411,17 @@
  <div id="dailyTouchCards" class="coin-grid"></div>
 </section>
 <section id="quietVolume" hidden>
- <h2>Sessiz Hacim Alarmı — Canlı Alış Uyanışı</h2>
- <p class="description">Binance Spot USDT gerçekleşmiş işlemleri canlı izlenir. Son 2 dakikada düşük hacimli olan bir paritede, son 15 saniyelik alış hacmi önceki dönemin ortalamasına göre hızlanırsa alarm oluşturulur. Bu bölüm periyodik mum taraması yapmaz; izleme Railway sunucusunda sürer. İlk 2 dakikada başlangıç verisi biriktirir. Alış yönü, borsanın gerçekleşen işlemdeki alıcı/taker bilgisine göre değerlendirilir; yatırımcı kimliği belirlenemez.</p>
+ <h2>Sessiz Hacim — Hızlı Yükseliş Başlangıcı</h2>
+ <p class="description">Binance Spot USDT işlemleri canlı izlenir. Fiyat henüz yükselmeye başlarken 15 saniyelik fiyat ivmesi, 60 saniyelik yön, agresif alış oranı ve önceki 105 saniyeye göre alış hacmi hızlanması birlikte aranır. Yalnızca tüm koşulları karşılayan adaylar gösterilir. Bu, gelecekte hızlı yükseliş garantisi değildir.</p>
  <div class="info-box">
- <label for="quietFactor">Alış hacmi hızlanma katsayısı</label> <input class="x-field" id="quietFactor" type="number" min="2" max="100" step="1" value="5" disabled title="Sunucu eşiği: 5x" style="max-width:110px">
- <label for="quietRatio">Son 15 sn minimum alış oranı (%)</label> <input class="x-field" id="quietRatio" type="number" min="50" max="100" step="1" value="70" disabled title="Sunucu eşiği: %70" style="max-width:110px">
- <label for="quietMinUsdt">Son 15 sn minimum alış hacmi (USDT)</label> <input class="x-field" id="quietMinUsdt" type="number" min="10" step="10" value="500" disabled title="Sunucu eşiği: 500 USDT" style="max-width:130px">
- <p class="description">Düşük hacim filtresi: önceki 2 dakikadaki 15 saniyelik dilim başına toplam hacim, son 15 saniyedeki minimum alış hacminin altında olmalı. 2 dakikalık verinin tamamı birikmeden sinyal verilmez. Alarm eşikleri değiştirilebilir.</p>
- <p><label for="quietServerUrl">Ücretsiz sunucu adresi (HTTPS)</label> <input id="quietServerUrl" type="url" placeholder="https://sunucunuz.example" style="width:min(100%,360px)"> <button id="quietServerSave" class="refresh-button" type="button">Sunucuyu Kaydet</button></p><button id="quietStart" class="refresh-button" type="button">Canlı İzlemeyi Başlat</button>
- <button id="quietStop" class="refresh-button" type="button">Ekran Yenilemeyi Durdur</button> <button id="quietPush" class="refresh-button" type="button">Telefon Bildirimlerini Aç</button>
+ <p><strong>Tarama formülü:</strong> 15 sn fiyat artışı ≥ %0,25; 60 sn artışı %0,40–%4,00; son 15 sn agresif alış oranı ≥ %65; alış hacmi ≥ 750 USDT; önceki 105 sn dilim ortalamasına göre alış ivmesi ≥ 3 kat. Son 15 sn fiyat aralığı ≤ %1,5. İlk 120 saniye veri toplanır.</p>
+ <button id="quietStart" class="refresh-button" type="button">Canlı İzlemeyi Başlat</button>
+ <button id="quietStop" class="refresh-button" type="button">Ekran Yenilemeyi Durdur</button>
+ <button id="quietPush" class="refresh-button" type="button">Telefon Bildirimlerini Aç</button>
  <p id="quietStatus" aria-live="polite">Hazır.</p>
  <p id="quietStats" class="updated-line">İzlenen: 0 • Hazır: 0 • Alarm: 0</p>
  </div><div id="quietCards" class="coin-grid"></div>
- <p class="description">Binance Spot üzerindeki uygun tüm USDT pariteleri hacim sıralaması veya adet sınırı olmadan izlenir. Çok sayıda canlı bağlantı telefonun pilini, belleğini ve internetini zorlayabilir; tüm borsaları kapsamaz. Sunucu izleme yapar; telefon ekranı kapalıyken push bildirimleri için izin ve VAPID ayarları gerekir. Alım sinyali veya kazanç garantisi değildir.</p>
+ <p class="description">Puan, teknik filtrelerin ağırlıklı göstergesidir; başarı olasılığı değildir. Sunucu uykuya geçerse canlı takip kesilir. Emir verilmez, kazanç garantisi yoktur.</p>
 </section>
 <section id="momentum" hidden>
  <h2>Patlama — Yükseliş ve Risk Planı</h2>
@@ -462,7 +460,7 @@
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./patlama-ui.js?v=dip-1"></script>
-  <script defer src="./quiet-volume-ui.js?v=2"></script>
+  <script defer src="./quiet-volume-ui.js?v=breakout-1"></script>
 
   <script defer src="./tab-navigation-fix.js"></script>
   <script defer src="./install-app.js?v=2"></script>
