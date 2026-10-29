@@ -5495,6 +5495,8 @@ function analyze(symbol,candles) {
 
 let mediumWatchCache={updatedAt:0,scanned:0,rows:[]};
 
+const dailySignalHistory=[];
+const dailySignalSeen=new Set();
 async function scanMarket() {
   if (scanning) return;
   scanning = true;
@@ -5577,9 +5579,7 @@ async function scanMarket() {
   ];
   // İkinci katman: adaylarda son kapanmış 1 dakikalık mumlarla anlık teyit.
   // API yoksa doğrulanmış gibi gösterme.
-  const intradayPending=new Map();
-  const dailySignalHistory=[];
-  const dailySignalSeen=new Set();
+  // Sinyal kayıtları taramalar arasında korunur; sunucu yeniden başlarsa sıfırlanır.
   async function intradayCheck(provider,symbol) {
     let raw;
     if(provider.key==="binanceglobal"){
@@ -5610,20 +5610,15 @@ async function scanMarket() {
     if(pass){
       await new Promise(resolve=>setTimeout(resolve,31000));
       try{
-        const check=provider.key==="binanceglobal"
-          ?await getExternalJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=3","BINANCE GLOBAL")
-          :await getExternalJSON((provider.key==="okxtr"?"https://tr.okx.com":"https://eea.okx.com")+
-            "/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar=1m&limit=3",provider.name);
-        const rows=provider.key==="binanceglobal"?check:check.data;
-        if(Array.isArray(rows)){
-          const completed=rows.map(x=>({time:+x[0],close:+x[4]}))
-            .filter(x=>x.time+60000<=Date.now()&&x.close>0).sort((a,b)=>a.time-b.time);
-          const newest=completed.at(-1);
-          if(newest&&newest.time>last.time){
-            secondPrice=newest.close;
-            followThrough=secondPrice>=last.close*1.0015;
-          }
+        if(provider.key==="binanceglobal"){
+          const check=await getExternalJSON("https://data-api.binance.vision/api/v3/ticker/price?symbol="+encodeURIComponent(symbol),"BINANCE GLOBAL");
+          secondPrice=Number(check.price);
+        }else{
+          const host=provider.key==="okxtr"?"https://tr.okx.com":"https://eea.okx.com";
+          const check=await getExternalJSON(host+"/api/v5/market/ticker?instId="+encodeURIComponent(symbol),provider.name);
+          secondPrice=Number(check.data?.[0]?.last);
         }
+        followThrough=Number.isFinite(secondPrice)&&secondPrice>=last.close*1.0015;
       }catch(e){console.warn("Günlük ikinci teyit:",provider.name,symbol,e.message);}
     }
     return {status:pass?(followThrough?"İKİNCİ TEYİT TAMAM":"İKİNCİ TEYİT BEKLENİYOR"):"ANLIK TEYİT YOK",verified:pass&&followThrough,
@@ -7037,6 +7032,11 @@ app.get("/api/decision-plans",(req,res)=>{
    GÜNLÜK TEYİT API
 ========================= */
 
+app.get("/api/daily-confirmations/history",(req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json({total:dailySignalHistory.length,rows:dailySignalHistory.slice(-100),
+    notice:"Sinyal geçmişi yalnızca sunucu belleğinde tutulur; yeniden başlatmada kaybolur. Hedef başarı oranı henüz hesaplanmaz."});
+});
 app.get(
   "/api/daily-confirmations",
   async (
