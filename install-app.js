@@ -41,7 +41,7 @@
   });
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/service-worker.js").catch(error => {
+      navigator.serviceWorker.register("./service-worker.js", {scope:"./"}).catch(error => {
         console.warn("Uygulama hizmeti başlatılamadı:", error);
       });
     }, {once:true});
