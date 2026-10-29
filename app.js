@@ -444,12 +444,13 @@ function coinCard(row) {
       <div class="confirmation ${row.confirmed ? "confirmed" : "candidate"}">
   ${
     row.confirmed
-      ? "YÜKSELİŞ TEYİDİ"
-      : "YÜKSELİŞ ADAYI"
+      ? "KIRILIM TEYİDİ"
+      : "ERKEN YÜKSELİŞ ADAYI"
   }
 </div>
 
 
+      <p class="description" style="font-size:0.8em">${escapeHTML(row.riskNote || "Teknik gösterge; kazanç garantisi yoktur.")}</p>
       <div class="metrics">
 
         <div class="metric">
