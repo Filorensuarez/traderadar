@@ -9,7 +9,7 @@ async function refresh(){
   status.textContent=(d.running?"Taranıyor":"Tarama tamamlandı")+" • Kontrol: "+d.checked+"/"+d.total+" • Eşleşme: "+d.rows.length+" • Veri hatası: "+d.errors+(d.error?" • "+d.error:"");
   cards.replaceChildren();
   if(!d.rows.length){const p=document.createElement("p");p.textContent=d.running?"Koşulları sağlayan coinler aranıyor.":"Şu anda iki koşulu birlikte sağlayan coin yok.";cards.append(p);}
-  for(const x of d.rows){const card=document.createElement("div");card.className="info-box";const h=document.createElement("h3");h.textContent=x.symbol.replace("USDT","/USDT");const p=document.createElement("p");p.textContent="Fiyat farkı: +%"+x.pricePct+" • Hacim: "+x.volumeX+"x";card.append(h,p);cards.append(card);}
+  for(const x of d.rows){const card=document.createElement("div");card.className="info-box";const h=document.createElement("h3");h.textContent=x.symbol.replace("USDT","/USDT");const p=document.createElement("p");p.textContent="Fiyat farkı: +%"+x.pricePct+"";card.append(h,p);cards.append(card);}
  }catch(e){status.textContent="Sunucu verisi alınamadı: "+e.message;button.disabled=false;}
 }
 button.addEventListener("click",async()=>{

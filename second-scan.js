@@ -21,9 +21,9 @@ async function inspect(symbol,now){
  const previousPrice=average(minutes.map(c=>Number(c[4])));
  const recentVolumePerMin=seconds.reduce((a,c)=>a+Number(c[7]),0)/5;
  const previousVolumePerMin=average(minutes.map(c=>Number(c[7])));
- if(!(previousPrice>0&&previousVolumePerMin>0))return null;
+ if(!(previousPrice>0))return null;
  const pricePct=(recentPrice/previousPrice-1)*100,volumeX=recentVolumePerMin/previousVolumePerMin;
- if(pricePct<2||volumeX<2)return null;
+ if(pricePct<2)return null;
  return {symbol,pricePct:+pricePct.toFixed(2),volumeX:+volumeX.toFixed(2),price:+Number(seconds.at(-1)[4]),updatedAt:Date.now()};
 }
 export async function runSecondScan(){
@@ -43,7 +43,7 @@ export async function runSecondScan(){
    state.checked++;
   }});
   await Promise.all(workers);
-  state.rows.sort((a,b)=>b.volumeX-a.volumeX||b.pricePct-a.pricePct);
+  state.rows.sort((a,b)=>b.pricePct-a.pricePct);
  }catch(e){state.error=String(e.message||e);}
  finally{state.running=false;state.updatedAt=Date.now();}
  return secondScanStatus();
