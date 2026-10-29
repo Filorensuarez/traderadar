@@ -5682,11 +5682,32 @@ async function scanMarket() {
                 "/api/v5/market/ticker?instId="+encodeURIComponent(symbol),provider.name);
             const second=Number(provider.key==="binanceglobal"?check.price:check.data?.[0]?.last);
             if(!(Number.isFinite(second)&&second>=last.close*1.0015))return;
+            // Spread ve ilk 5 kademe derinlik filtresi: doğrulanamayan likiditeye teyit verme.
+            let depth;
+            try{
+              if(provider.key==="binanceglobal"){
+                const d=await getExternalJSON("https://data-api.binance.vision/api/v3/depth?symbol="+encodeURIComponent(symbol)+"&limit=5","BINANCE GLOBAL");
+                depth={bids:d.bids,asks:d.asks};
+              }else{
+                const host=provider.key==="okxtr"?"https://tr.okx.com":"https://eea.okx.com";
+                const d=await getExternalJSON(host+"/api/v5/market/books?instId="+encodeURIComponent(symbol)+"&sz=5",provider.name);
+                depth={bids:d.data?.[0]?.bids,asks:d.data?.[0]?.asks};
+              }
+            }catch(e){console.warn("Derinlik verisi:",id,e.message);return;}
+            const bids=(depth.bids||[]).map(x=>[Number(x[0]),Number(x[1])]).filter(x=>x[0]>0&&x[1]>0);
+            const asks=(depth.asks||[]).map(x=>[Number(x[0]),Number(x[1])]).filter(x=>x[0]>0&&x[1]>0);
+            if(!bids.length||!asks.length)return;
+            const bestBid=Math.max(...bids.map(x=>x[0])),bestAsk=Math.min(...asks.map(x=>x[0]));
+            const spreadPct=(bestAsk-bestBid)/((bestAsk+bestBid)/2)*100;
+            const bidDepth=bids.reduce((s,x)=>s+x[0]*x[1],0);
+            const askDepth=asks.reduce((s,x)=>s+x[0]*x[1],0);
+            const depthRatio=bidDepth/Math.max(askDepth,1e-9);
+            if(!(spreadPct>=0&&spreadPct<=0.35&&depthRatio>=0.65))return;
             const market=results[provider.key];
             const row=market?.find(x=>x.symbol===provider.normalize(symbol));
             if(!row||!row.dailyConfirmed)return;
             row.intraday={...row.intraday,status:"İKİNCİ TEYİT TAMAM",verified:true,
-              secondPrice:second,followThrough:true};
+              secondPrice:second,followThrough:true,spreadPct:Number(spreadPct.toFixed(3)),bidAskDepthRatio:Number(depthRatio.toFixed(2))};
             row.confirmed=true;row.candidate=false;
             row.reasons.push("30 saniye sonra fiyat teyidi");
             const key=id+":"+new Date().toISOString().slice(0,10);
