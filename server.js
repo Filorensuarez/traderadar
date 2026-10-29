@@ -1,7 +1,7 @@
 import {startQuietRadar,quietSnapshot,onQuietAlert} from "./quiet-volume-server.js";
 import {startLiveRise,liveRiseSnapshot} from "./live-rise-radar.js";
 import {paperStats} from "./paper-performance-72h.js";
-import {startDailyTouch,scanDailyTouch,dailyTouchStatus,dailyTouchPerformance,stopDailyTouch,setDailyTouchThreshold,dailyTouchPerformance} from "./daily-touch-watch.js";
+import {startDailyTouch,scanDailyTouch,dailyTouchStatus,dailyTouchPerformance,stopDailyTouch,setDailyTouchThreshold} from "./daily-touch-watch.js";
 import {startMinuteMomentum,scanMinuteMomentum,minuteMomentumStatus} from "./minute-momentum-watch.js";
 import {startHourlyPullbacks,scanHourlyPullbacks,hourlyPullbackStatus} from "./hourly-pullback-watch.js";
 
@@ -90,7 +90,7 @@ app.get("/api/okx-tr/:kind",async(req,res)=>{
 
 app.get("/api/daily-touch/performance",(req,res)=>{res.set("Cache-Control","no-store");res.json(dailyTouchPerformance());});
 app.get("/api/daily-touch",(req,res)=>{res.set("Cache-Control","no-store");res.json(dailyTouchStatus());});
-app.get("/api/daily-touch/performance",(req,res)=>{res.set("Cache-Control","no-store");res.json(dailyTouchPerformance());});
+
 app.post("/api/daily-touch/scan",(req,res)=>{
  res.set("Cache-Control","no-store");
  const busy=dailyTouchStatus().running;
