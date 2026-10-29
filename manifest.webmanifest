@@ -2,9 +2,9 @@
   "name": "TradeRadar - Teknik Yükseliş Radarı",
   "short_name": "TradeRadar",
   "description": "Kripto piyasalarda teknik sinyalleri, momentum ve V tipi dip yapılarını takip edin.",
-  "id": "/",
-  "start_url": "/",
-  "scope": "/",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#07101f",
   "theme_color": "#101b2e",
@@ -12,19 +12,19 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/icons/traderadar-192.png",
+      "src": "./icons/traderadar-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/traderadar-512.png",
+      "src": "./icons/traderadar-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/traderadar.svg",
+      "src": "./icons/traderadar.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
