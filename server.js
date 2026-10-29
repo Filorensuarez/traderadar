@@ -5557,6 +5557,13 @@ async function updateDailySignalPerformance(){
         rec.observedMin=Math.min(rec.observedMin||rec.entry,quote.price);
         rec.hit5=rec.observedMax>=rec.entry*1.05;
         rec.hit10=rec.observedMax>=rec.entry*1.10;
+        if(rec.hit5&&!rec.firstHit5At)rec.firstHit5At=rec.lastCheckedAt;
+        if(rec.hit10&&!rec.firstHit10At)rec.firstHit10At=rec.lastCheckedAt;
+        if(rec.observedMin<=rec.entry*0.97&&!rec.firstStop3At)rec.firstStop3At=rec.lastCheckedAt;
+        if(!rec.firstOutcomeAt){
+          const events=[["TARGET_5",rec.firstHit5At],["STOP_3",rec.firstStop3At]].filter(x=>Number.isFinite(x[1])).sort((a,b)=>a[1]-b[1]);
+          if(events.length){rec.firstOutcome=events[0][0];rec.firstOutcomeAt=events[0][1];}
+        }
         rec.maxGainPct=Number(((rec.observedMax/rec.entry-1)*100).toFixed(2));
         rec.maxDrawdownPct=Number(((rec.observedMin/rec.entry-1)*100).toFixed(2));
         if(now-rec.detectedAt>=3600000&&!rec.price1h)rec.price1h=quote.price;
