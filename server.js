@@ -5503,6 +5503,10 @@ const dailySignalStore=process.env.DAILY_SIGNAL_STORE||"./daily-signal-history.j
 const dailyStorePersistent=Boolean(process.env.DAILY_SIGNAL_STORE);
 const dailyStorePathIsAbsolute=path.isAbsolute(dailySignalStore);
 const dailyStoreExpectedPersistent=Boolean(process.env.DAILY_SIGNAL_STORE)&&dailyStorePathIsAbsolute;
+const dailyStoreMountHint=process.env.RENDER_DISK_MOUNT_PATH||null;
+const dailyStoreUnderDeclaredMount=Boolean(dailyStoreMountHint&&dailyStorePathIsAbsolute&&
+  (path.resolve(dailySignalStore)===path.resolve(dailyStoreMountHint)||
+   path.resolve(dailySignalStore).startsWith(path.resolve(dailyStoreMountHint)+path.sep)));
 let dailyStoreLastSaveOk=false;
 let dailyStoreLastSaveAt=null;
 let dailyStoreLastError=null;
@@ -7306,7 +7310,7 @@ app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
     completed24hHit10RatePct:mature24h.length?Number((mature24hHit10/mature24h.length*100).toFixed(1)):null,
     observedHit10RatePct:evaluated.length?Number((hits10/evaluated.length*100).toFixed(1)):null,
     lastSampleAt:rows.reduce((v,x)=>Math.max(v,x.lastCheckedAt||0),0)||null,
-    storageConfigured:dailyStorePersistent,storageAbsolutePath:dailyStorePathIsAbsolute,storagePersistenceUnverified:true,storageLastSaveOk:dailyStoreLastSaveOk,storageLastSaveAt:dailyStoreLastSaveAt,storageLastSaveError:dailyStoreLastError,rows:rows.slice(-100).reverse(),
+    storageConfigured:dailyStorePersistent,storageAbsolutePath:dailyStorePathIsAbsolute,storageUnderDeclaredMount:dailyStoreUnderDeclaredMount,storagePersistenceUnverified:true,storageLastSaveOk:dailyStoreLastSaveOk,storageLastSaveAt:dailyStoreLastSaveAt,storageLastSaveError:dailyStoreLastError,rows:rows.slice(-100).reverse(),
     notice:"Yalnızca kesin teyitli sinyaller izlenir. Yaklaşık 5 dakikalık fiyat örneklemesi ara zirveleri kaçırabilir. Bu oranlar gerçekleşmiş işlem kârı veya 7 günlük tamamlanmış başarı oranı değildir. Render kalıcı disk olmadan yeniden başlatmada kayıtlar kaybolabilir."});
 });
 app.get("/api/daily-confirmations/history",(req,res)=>{
