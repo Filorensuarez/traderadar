@@ -1,30 +1,58 @@
 import WebSocket from "ws";
-const states=new Map(),sockets=new Set(),alarms=[];let universe=0,connections=0,lastError="",started=0;
+const states=new Map(),sockets=new Set(),alarms=[];
+let universe=0,connections=0,lastError="",started=0,listener=null;
 const BASE="https://data-api.binance.vision";
-const config={factor:5,ratio:.7,min:500};
+const RULES={warmupSeconds:120,windowSeconds:15,baselineSeconds:105,minBuyUsdt:750,minBuyRatio:0.65,minAcceleration:3,minPrice15sPct:0.25,minPrice60sPct:0.4,maxPrice60sPct:4,maxSpreadProxyPct:1.5,cooldownSeconds:90};
+const num=(v,n=2)=>Number(v.toFixed(n));
 function onTrade(d){
- const now=Date.now(),price=Number(d.p),qty=Number(d.q),v=price*qty;if(!d.s||!(v>0))return;
- let x=states.get(d.s);if(!x){x={first:now,buckets:new Map(),lastAlarm:0};states.set(d.s,x)}
- const bucket=Math.floor(now/5000)*5000;let b=x.buckets.get(bucket);if(!b){b={total:0,buy:0};x.buckets.set(bucket,b)}b.total+=v;if(d.m===false)b.buy+=v;
- for(const key of x.buckets.keys())if(key<now-140000)x.buckets.delete(key);
- if(now-x.first<120000||now-x.lastAlarm<120000)return;
- let recent=0,buy=0,prior=0,priorBuy=0;
- for(const [t,z] of x.buckets){if(t>=now-15000){recent+=z.total;buy+=z.buy}else if(t>=now-135000){prior+=z.total;priorBuy+=z.buy}}
- if(buy<config.min||recent<=0||buy/recent<config.ratio||prior/8>=config.min||buy<config.factor*Math.max(priorBuy/8,1))return;
- x.lastAlarm=now;
- const alert={symbol:d.s,price,time:now,buyUsdt:Math.round(buy),buyRatio:Math.round(100*buy/recent),acceleration:Number((buy/Math.max(priorBuy/8,1)).toFixed(1))};
- alarms.unshift(alert);if(alarms.length>150)alarms.pop();if(listener)Promise.resolve(listener(alert)).catch(e=>console.error("quiet push",e.message));
+ const now=Date.now(),price=Number(d.p),qty=Number(d.q),value=price*qty;
+ if(!d.s||!(value>0)||!(price>0))return;
+ let s=states.get(d.s);
+ if(!s){s={first:now,buckets:new Map(),lastAlarm:0};states.set(d.s,s)}
+ const t=Math.floor(now/5000)*5000;
+ let b=s.buckets.get(t);if(!b){b={total:0,buy:0,firstPrice:price,lastPrice:price,high:price,low:price};s.buckets.set(t,b)}
+ b.total+=value;if(d.m===false)b.buy+=value;
+ b.lastPrice=price;b.high=Math.max(b.high,price);b.low=Math.min(b.low,price);
+ for(const key of s.buckets.keys())if(key<now-140000)s.buckets.delete(key);
+ if(now-s.first<RULES.warmupSeconds*1000||now-s.lastAlarm<RULES.cooldownSeconds*1000)return;
+ const entries=[...s.buckets.entries()].sort((a,b)=>a[0]-b[0]);
+ const recent=entries.filter(([t])=>t>=now-15000);
+ const baseline=entries.filter(([t])=>t>=now-120000&&t<now-15000);
+ const oneMinute=entries.filter(([t])=>t>=now-60000);
+ if(recent.length<2||baseline.length<12||oneMinute.length<7)return;
+ const sum=(a,key)=>a.reduce((v,[,b])=>v+b[key],0);
+ const buy=sum(recent,"buy"),total=sum(recent,"total"),baselineBuy=sum(baseline,"buy");
+ const acceleration=buy/Math.max(baselineBuy/7,1),buyRatio=buy/Math.max(total,1);
+ const p15=recent[0][1].firstPrice,p60=oneMinute[0][1].firstPrice;
+ const price15sPct=(price/p15-1)*100,price60sPct=(price/p60-1)*100;
+ const low=Math.min(...recent.map(([,b])=>b.low)),high=Math.max(...recent.map(([,b])=>b.high));
+ const spreadProxyPct=(high-low)/price*100; // intrawindow range, NOT order-book bid/ask spread
+ if(buy<RULES.minBuyUsdt||buyRatio<RULES.minBuyRatio||acceleration<RULES.minAcceleration||
+ price15sPct<RULES.minPrice15sPct||price60sPct<RULES.minPrice60sPct||
+ price60sPct>RULES.maxPrice60sPct||spreadProxyPct>RULES.maxSpreadProxyPct)return;
+ s.lastAlarm=now;
+ const score=Math.min(100,Math.round(25+Math.min(acceleration,8)*4+buyRatio*20+
+ Math.min(price15sPct,1.5)*12+Math.min(price60sPct,2)*5));
+ const alert={symbol:d.s,price,time:now,buyUsdt:Math.round(buy),buyRatio:Math.round(buyRatio*100),
+ acceleration:num(acceleration,1),price15sPct:num(price15sPct),price60sPct:num(price60sPct),
+ score,signal:"YÜKSELİŞ BAŞLANGICI ADAYI"};
+ alarms.unshift(alert);if(alarms.length>150)alarms.pop();
+ if(listener)Promise.resolve(listener(alert)).catch(e=>console.error("quiet push",e.message));
 }
-let listener=null;export function onQuietAlert(fn){listener=fn}
+export function onQuietAlert(fn){listener=fn}
 function connect(symbols){
  const streams=symbols.map(s=>s.toLowerCase()+"@aggTrade").join("/");
  const ws=new WebSocket("wss://data-stream.binance.vision/stream?streams="+streams);sockets.add(ws);
- ws.on("open",()=>connections++);
+ let opened=false;
+ ws.on("open",()=>{opened=true;connections++});
  ws.on("message",raw=>{try{onTrade(JSON.parse(raw).data)}catch{}});
  ws.on("error",e=>{lastError=e.message});
- ws.on("close",()=>{sockets.delete(ws);connections=Math.max(0,connections-1);for(const sym of symbols)states.delete(sym);setTimeout(()=>connect(symbols),5000).unref()});
+ ws.on("close",()=>{sockets.delete(ws);if(opened)connections=Math.max(0,connections-1);
+ for(const sym of symbols)states.delete(sym);
+ setTimeout(()=>connect(symbols),5000).unref()});
 }
-export function quietSnapshot(){return {running:started>0,started,universe,connectedStreams:connections,tracked:states.size,ready:[...states.values()].filter(x=>Date.now()-x.first>=120000).length,lastError,config,alarms:alarms.slice(0,80)}}
+export function quietSnapshot(){return {running:started>0,started,universe,connectedStreams:connections,tracked:states.size,
+ ready:[...states.values()].filter(x=>Date.now()-x.first>=120000).length,lastError,config:RULES,alarms:alarms.slice(0,80)}}
 export async function startQuietRadar(){
  if(started)return;started=Date.now();
  try{
