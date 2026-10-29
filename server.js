@@ -5495,9 +5495,71 @@ function analyze(symbol,candles) {
 
 let mediumWatchCache={updatedAt:0,scanned:0,rows:[]};
 
-const dailySignalHistory=[];
-const dailySignalSeen=new Set();
+// Set DAILY_SIGNAL_STORE to a persistent mounted disk path on Render.
+const dailySignalStore=process.env.DAILY_SIGNAL_STORE||"./daily-signal-history.json";
+let dailySignalHistory=[];
+try{
+  const saved=JSON.parse(fs.readFileSync(dailySignalStore,"utf8"));
+  if(Array.isArray(saved))dailySignalHistory=saved.filter(x=>x&&typeof x.id==="string").slice(-500);
+}catch(e){if(e.code!=="ENOENT")console.warn("Sinyal geçmişi okunamadı:",e.message);}
+const dailySignalSeen=new Set(dailySignalHistory.map(x=>x.id));
 const dailyConfirmationPending=new Set();
+function saveDailySignals(){
+  try{
+    const tmp=dailySignalStore+".tmp";
+    fs.writeFileSync(tmp,JSON.stringify(dailySignalHistory));
+    fs.renameSync(tmp,dailySignalStore);
+  }catch(e){console.warn("Sinyal geçmişi yazılamadı:",e.message);}
+}
+async function dailySignalTicker(record){
+  const symbol=record.marketSymbol,source=record.providerKey;
+  if(!symbol||!source)return null;
+  if(source==="binanceglobal"){
+    const j=await getExternalJSON("https://data-api.binance.vision/api/v3/ticker/24hr?symbol="+encodeURIComponent(symbol),"BINANCE GLOBAL");
+    return {price:Number(j.lastPrice),high:Number(j.highPrice),low:Number(j.lowPrice)};
+  }
+  if(source==="okxtr"||source==="okxglobal"){
+    const host=source==="okxtr"?"https://tr.okx.com":"https://eea.okx.com";
+    const j=await getExternalJSON(host+"/api/v5/market/ticker?instId="+encodeURIComponent(symbol),"OKX");
+    const x=j.data?.[0];
+    return {price:Number(x?.last),high:Number(x?.high24h),low:Number(x?.low24h)};
+  }
+  return null;
+}
+let dailyTrackingBusy=false;
+async function updateDailySignalPerformance(){
+  if(dailyTrackingBusy)return;
+  dailyTrackingBusy=true;
+  try{
+    const now=Date.now();
+    const active=dailySignalHistory.filter(x=>now-x.detectedAt<=24*3600000&&x.status==="TEYİTLİ");
+    for(const rec of active.slice(-35)){
+      try{
+        const quote=await dailySignalTicker(rec);
+        if(!quote||!(quote.price>0))continue;
+        // 24h rolling high/low includes pre-signal prices: do not use for target success.
+        rec.lastPrice=quote.price;
+        rec.lastCheckedAt=Date.now();
+        rec.observedMax=Math.max(rec.observedMax||rec.entry,quote.price);
+        rec.observedMin=Math.min(rec.observedMin||rec.entry,quote.price);
+        rec.hit5=rec.observedMax>=rec.entry*1.05;
+        rec.hit10=rec.observedMax>=rec.entry*1.10;
+        rec.maxGainPct=Number(((rec.observedMax/rec.entry-1)*100).toFixed(2));
+        rec.maxDrawdownPct=Number(((rec.observedMin/rec.entry-1)*100).toFixed(2));
+        if(now-rec.detectedAt>=3600000&&!rec.price1h)rec.price1h=quote.price;
+        if(now-rec.detectedAt>=4*3600000&&!rec.price4h)rec.price4h=quote.price;
+      }catch(e){console.warn("Sinyal performansı:",rec.symbol,e.message);}
+    }
+    for(const rec of dailySignalHistory){
+      if(now-rec.detectedAt>24*3600000&&rec.status==="TEYİTLİ"){
+        rec.status="24 SAAT TAMAMLANDI";
+        rec.completedAt=now;
+      }
+    }
+    saveDailySignals();
+  }finally{dailyTrackingBusy=false;}
+}
+setInterval(()=>updateDailySignalPerformance().catch(e=>console.warn("Performans:",e.message)),5*60*1000);
 async function scanMarket() {
   if (scanning) return;
   scanning = true;
@@ -5632,8 +5694,10 @@ async function scanMarket() {
               dailySignalSeen.add(key);
               dailySignalHistory.push({id:key,exchange:provider.name,symbol:row.symbol,
                 entry:second,detectedAt:Date.now(),score:row.score,status:"TEYİTLİ",
+                providerKey:provider.key,marketSymbol:symbol,
                 maxPrice:second,minPrice:second,hit5:false,hit10:false});
               if(dailySignalHistory.length>500)dailySignalHistory.shift();
+              saveDailySignals();
             }
             market.sort((a,b)=>Number(b.confirmed)-Number(a.confirmed)||b.score-a.score);
             publish();
@@ -7061,8 +7125,12 @@ app.get("/api/decision-plans",(req,res)=>{
 
 app.get("/api/daily-confirmations/history",(req,res)=>{
   res.set("Cache-Control","no-store");
-  res.json({total:dailySignalHistory.length,rows:dailySignalHistory.slice(-100),
-    notice:"Sinyal geçmişi yalnızca sunucu belleğinde tutulur; yeniden başlatmada kaybolur. Hedef başarı oranı henüz hesaplanmaz."});
+  const completed=dailySignalHistory.filter(x=>x.status==="24 SAAT TAMAMLANDI"&&Number.isFinite(x.maxGainPct));
+  res.json({total:dailySignalHistory.length,completed:completed.length,
+    observedHit5:completed.filter(x=>x.hit5).length,
+    observedHit10:completed.filter(x=>x.hit10).length,
+    rows:dailySignalHistory.slice(-100),
+    notice:"Sonuçlar 5 dakikalık örneklemelerle izlenir; ara zirveler kaçabilir. Render üzerinde kalıcılık için DAILY_SIGNAL_STORE kalıcı diske ayarlanmalıdır."});
 });
 app.get(
   "/api/daily-confirmations",
