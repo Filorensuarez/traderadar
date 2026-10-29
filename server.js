@@ -5575,6 +5575,39 @@ async function scanMarket() {
       return closedDaily(j);
     },normalize:s=>s.replace(/USDT$/,"/USDT")}
   ];
+  // İkinci katman: adaylarda son kapanmış 1 dakikalık mumlarla anlık teyit.
+  // API yoksa doğrulanmış gibi gösterme.
+  const intradayPending=new Map();
+  async function intradayCheck(provider,symbol) {
+    let raw;
+    if(provider.key==="binanceglobal"){
+      raw=await getExternalJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=90","BINANCE GLOBAL");
+      if(!Array.isArray(raw))throw Error("Dakikalık mumlar alınamadı");
+      raw=raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],quote:+x[7],buy:+x[10]}));
+    } else if(provider.key==="okxtr"||provider.key==="okxglobal"){
+      const host=provider.key==="okxtr"?"https://tr.okx.com":"https://eea.okx.com";
+      const j=await getExternalJSON(host+"/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar=1m&limit=90",provider.name);
+      if(j.code!=="0"||!Array.isArray(j.data))throw Error("Dakikalık mumlar alınamadı");
+      raw=j.data.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],quote:+x[7],buy:NaN}));
+    } else return {status:"ANLIK VERİ DOĞRULANMADI",verified:false};
+    const closed=raw.filter(x=>x.time+60000<=Date.now()&&x.close>0&&x.quote>=0).sort((a,b)=>a.time-b.time);
+    if(closed.length<65||Date.now()-closed.at(-1).time>180000)return {status:"ANLIK VERİ EKSİK",verified:false};
+    const last=closed.at(-1),prior=closed.slice(-35,-5),recent=closed.slice(-5);
+    const avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:0;
+    const volumeRatio=avg(recent.map(x=>x.quote))/Math.max(avg(prior.map(x=>x.quote)),1e-9);
+    const momentum5=(last.close/closed.at(-6).close-1)*100;
+    const momentum15=(last.close/closed.at(-16).close-1)*100;
+    const ema20m=ema(closed.map(x=>x.close),20);
+    const resistance15=Math.max(...closed.slice(-21,-1).map(x=>x.high));
+    const takerAvailable=provider.key==="binanceglobal";
+    const takerRatio=takerAvailable?recent.reduce((s,x)=>s+x.buy,0)/Math.max(recent.reduce((s,x)=>s+x.quote,0),1e-9):null;
+    const pass=volumeRatio>=1.5&&momentum5>=0.2&&momentum15>=0.4&&last.close>ema20m&&last.close>resistance15*0.997&&
+      (takerRatio===null||takerRatio>=0.55);
+    return {status:pass?"ANLIK HACİM/FİYAT TEYİDİ":"ANLIK TEYİT YOK",verified:pass,
+      volumeRatio:Number(volumeRatio.toFixed(2)),momentum5:Number(momentum5.toFixed(2)),
+      momentum15:Number(momentum15.toFixed(2)),takerRatio:takerRatio===null?null:Number((takerRatio*100).toFixed(1)),
+      note:takerRatio===null?"Borsada agresif alış verisi sağlanmadı.":"Binance taker alış oranı ölçüldü."};
+  }
   const results = {};
   const counts = {};
   const publish = () => {
@@ -5611,6 +5644,19 @@ async function scanMarket() {
             result.source = p.name;
             result.currency = p.currency || "TRY";
             result.detectedAt = Date.now();
+            try {
+              result.intraday=await intradayCheck(p,symbol);
+            } catch(e) {
+              result.intraday={status:"ANLIK VERİ HATASI",verified:false,note:String(e.message).slice(0,100)};
+            }
+            // Günlük teyit tek başına gerçek zamanlı alım sinyali değildir.
+            result.dailyConfirmed=result.confirmed;
+            if(result.confirmed&&!result.intraday.verified){
+              result.confirmed=false;
+              result.candidate=true;
+              result.reasons.push("Günlük kırılım var, anlık teyit bekleniyor");
+            }
+            if(result.confirmed)result.reasons.push("Günlük ve dakikalık teyit birlikte");
             return result;
           }));
           for (const response of responses) {
