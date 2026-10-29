@@ -23,6 +23,14 @@ import { recordSignals, getSignalStatistics } from "./signal-stats.js";
 
 
 const app = express();
+// TradeRadar GitHub Pages cross-origin API access (including POST and preflight).
+app.use("/api", (req,res,next)=>{
+  res.set("Access-Control-Allow-Origin","https://filorensuarez.github.io");
+  res.set("Access-Control-Allow-Methods","GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers","Content-Type");
+  if(req.method==="OPTIONS")return res.sendStatus(204);
+  next();
+});
 // Binance TR public market-data proxy for the GitHub Pages frontend.
 // Only fixed public endpoints are permitted; no keys or user-provided URLs.
 const trCache=new Map();
