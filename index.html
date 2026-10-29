@@ -418,7 +418,7 @@
  <label for="quietRatio">Son 15 sn minimum alış oranı (%)</label> <input class="x-field" id="quietRatio" type="number" min="50" max="100" step="1" value="70" disabled title="Sunucu eşiği: %70" style="max-width:110px">
  <label for="quietMinUsdt">Son 15 sn minimum alış hacmi (USDT)</label> <input class="x-field" id="quietMinUsdt" type="number" min="10" step="10" value="500" disabled title="Sunucu eşiği: 500 USDT" style="max-width:130px">
  <p class="description">Düşük hacim filtresi: önceki 2 dakikadaki 15 saniyelik dilim başına toplam hacim, son 15 saniyedeki minimum alış hacminin altında olmalı. 2 dakikalık verinin tamamı birikmeden sinyal verilmez. Alarm eşikleri değiştirilebilir.</p>
- <button id="quietStart" class="refresh-button" type="button">Canlı İzlemeyi Başlat</button>
+ <p><label for="quietServerUrl">Ücretsiz sunucu adresi (HTTPS)</label> <input id="quietServerUrl" type="url" placeholder="https://sunucunuz.example" style="width:min(100%,360px)"> <button id="quietServerSave" class="refresh-button" type="button">Sunucuyu Kaydet</button></p><button id="quietStart" class="refresh-button" type="button">Canlı İzlemeyi Başlat</button>
  <button id="quietStop" class="refresh-button" type="button">Ekran Yenilemeyi Durdur</button> <button id="quietPush" class="refresh-button" type="button">Telefon Bildirimlerini Aç</button>
  <p id="quietStatus" aria-live="polite">Hazır.</p>
  <p id="quietStats" class="updated-line">İzlenen: 0 • Hazır: 0 • Alarm: 0</p>
