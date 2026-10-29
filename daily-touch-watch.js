@@ -1,7 +1,7 @@
 import {dailyContact} from "./daily-touch-model.js";
 import {eligibleDailyTouchMarkets} from "./daily-touch-markets.js";
 const BASE="https://data-api.binance.vision",REPEAT_MS=60*1000;
-const CONFIRM={minVolumeRatio:1.7,minClosePosition:0.65,maxUpperWickRatio:0.4,minTakerBuyRatio:0.58,maxSpreadPct:0.35,minQuoteVolume24h:1000000,minFollowThroughPct:0.15,minConfirmationMs:30000,maxConfirmationMs:180000,maxChasePct:8};
+const CONFIRM={minScore:85,minVolumeRatio:1.7,minClosePosition:0.65,maxUpperWickRatio:0.4,minTakerBuyRatio:0.58,maxSpreadPct:0.35,minQuoteVolume24h:1000000,minFollowThroughPct:0.15,minConfirmationMs:30000,maxConfirmationMs:180000,maxChasePct:8};
 const pending=new Map(),confirmed=new Map(),history=[];
 const ema=(values,period)=>{if(values.length<period)return NaN;const k=2/(period+1);let v=average(values.slice(0,period));for(const p of values.slice(period))v+=(p-v)*k;return v};
 const average=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:0;
@@ -80,6 +80,8 @@ export async function scanDailyTouch(){
   catch(e){if(e.cancelled)throw e;console.warn("Temas Araması: spot market kataloğu alınamadı; ticker listesi kullanılıyor:",e.message);}
   const all=eligibleDailyTouchMarkets(ticker,info);
   const tickerBySymbol=new Map(ticker.map(t=>[t.symbol,t]));
+  const books=await json(BASE+"/api/v3/ticker/bookTicker");
+  const bookBySymbol=new Map(books.map(t=>[t.symbol,t]));
   state.eligible=all.length;state.remaining=all.length;
   // No slice, max-count, daily-volume threshold, or rotation: every active spot pair.
   for(const market of all){
@@ -101,16 +103,18 @@ export async function scanDailyTouch(){
     const resistance=Math.max(...closed.slice(-22,-2).map(x=>x.high));
     const takerRatio=recent.reduce((s,x)=>s+x.takerBuyQuote,0)/Math.max(recent.reduce((s,x)=>s+x.quoteVolume,0),1);
     const t=tickerBySymbol.get(market.symbol)||{};
-    const bid=Number(t.bidPrice),ask=Number(t.askPrice);
+    const book=bookBySymbol.get(market.symbol)||{};
+    const bid=Number(book.bidPrice),ask=Number(book.askPrice);
     const spreadPct=bid>0&&ask>=bid?(ask-bid)/ask*100:Infinity;
     const dayVolume=Number(t.quoteVolume);
     const chasePct=(last.close/Math.min(...closed.slice(-15).map(x=>x.low))-1)*100;
+    const dailyRangePct=(Number(t.highPrice)/Math.max(Number(t.lowPrice),1e-12)-1)*100;
     const pass=result.gainPct>=targetPct&&closed.length>=90&&last.close>prev.close&&last.close>last.open&&
       volumeRatio>=CONFIRM.minVolumeRatio&&closePosition>=CONFIRM.minClosePosition&&
       upperWickRatio<=CONFIRM.maxUpperWickRatio&&last.close>ema20&&ema20>ema50&&
       last.close>resistance&&takerRatio>=CONFIRM.minTakerBuyRatio&&
       spreadPct<=CONFIRM.maxSpreadPct&&dayVolume>=CONFIRM.minQuoteVolume24h&&
-      chasePct<=CONFIRM.maxChasePct;
+      chasePct<=CONFIRM.maxChasePct&&dailyRangePct>=5;
     if(!pass){pending.delete(market.symbol);continue;}
     const now=Date.now(),first=pending.get(market.symbol);
     if(!first){pending.set(market.symbol,{time:now,price:last.close});continue;}
@@ -122,11 +126,14 @@ export async function scanDailyTouch(){
     if(confirmed.has(market.symbol))continue;
     const score=Math.min(100,Math.round(50+Math.min(volumeRatio,4)*5+Math.min(takerRatio,0.9)*20+
       Math.min(followThroughPct,1)*10+Math.min(result.gainPct,6)));
+    if(score<CONFIRM.minScore)continue;
     const hit={...result,exchange:"BINANCE",market:market.symbol,
       symbol:market.symbol.replace(/(USDT|TRY)$/,"/$1"),gapPct:result.gainPct,
       volumeRatio:Number(volumeRatio.toFixed(2)),takerBuyRatio:Number((takerRatio*100).toFixed(1)),
       spreadPct:Number(spreadPct.toFixed(3)),followThroughPct:Number(followThroughPct.toFixed(2)),
-      ema20,ema50,resistance,score,confirmedAt:now,thresholdPct:targetPct};
+      ema20,ema50,resistance,score,confirmedAt:now,thresholdPct:targetPct,
+      target5:Number((last.close*1.05).toPrecision(9)),target10:Number((last.close*1.10).toPrecision(9)),
+      stopExample:Number((last.close*0.98).toPrecision(9)),dailyRangePct:Number(dailyRangePct.toFixed(2))};
     confirmed.set(market.symbol,{time:now,hit});
     history.push({market:market.symbol,entry:last.close,time:now,complete:false});
     if(history.length>500)history.shift();
