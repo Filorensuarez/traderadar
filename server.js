@@ -5635,7 +5635,9 @@ async function scanMarket() {
                 maxPrice:second,minPrice:second,hit5:false,hit10:false});
               if(dailySignalHistory.length>500)dailySignalHistory.shift();
             }
+            market.sort((a,b)=>Number(b.confirmed)-Number(a.confirmed)||b.score-a.score);
             publish();
+            cache.scanning=scanning;
           }catch(e){console.warn("Asenkron teyit:",id,e.message);}
           finally{dailyConfirmationPending.delete(id);}
         },31000);
@@ -5646,19 +5648,6 @@ async function scanMarket() {
         takerRatio:takerRatio===null?null:Number((takerRatio*100).toFixed(1)),
         note:"30 saniye sonra ikinci fiyat kontrolü arka planda yapılır."};
     }
-    if(false){
-      try{
-        if(provider.key==="binanceglobal"){
-          const check=await getExternalJSON("https://data-api.binance.vision/api/v3/ticker/price?symbol="+encodeURIComponent(symbol),"BINANCE GLOBAL");
-          secondPrice=Number(check.price);
-        }else{
-          const host=provider.key==="okxtr"?"https://tr.okx.com":"https://eea.okx.com";
-          const check=await getExternalJSON(host+"/api/v5/market/ticker?instId="+encodeURIComponent(symbol),provider.name);
-          secondPrice=Number(check.data?.[0]?.last);
-        }
-        followThrough=Number.isFinite(secondPrice)&&secondPrice>=last.close*1.0015;
-      }catch(e){console.warn("Günlük ikinci teyit:",provider.name,symbol,e.message);}
-    }
     return {status:pass?(followThrough?"İKİNCİ TEYİT TAMAM":"İKİNCİ TEYİT BEKLENİYOR"):"ANLIK TEYİT YOK",verified:pass&&followThrough,
       firstPrice:last.close,secondPrice,followThrough,
       volumeRatio:Number(volumeRatio.toFixed(2)),momentum5:Number(momentum5.toFixed(2)),
@@ -5668,7 +5657,7 @@ async function scanMarket() {
   const results = {};
   const counts = {};
   const publish = () => {
-    const out={ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanning:true,scanned:providers.reduce((n,p)=>n+(counts[p.key].processed||0),0),rows:results.okxtr.slice(0,30),error:counts.okxtr.error};
+    const out={ok:providers.some(p=>!counts[p.key].error),source:"MULTI",updatedAt:Date.now(),scanning:scanning,scanned:providers.reduce((n,p)=>n+(counts[p.key].processed||0),0),rows:results.okxtr.slice(0,30),error:counts.okxtr.error};
     for(const p of providers)out[p.key]={ok:!counts[p.key].error,error:counts[p.key].error,scanned:counts[p.key].processed||0,total:counts[p.key].symbols.length,confirmed:results[p.key].filter(x=>x.confirmed).length,candidates:results[p.key].filter(x=>x.candidate).length,rows:results[p.key].slice(0,30)};
     cache=out;
   };
