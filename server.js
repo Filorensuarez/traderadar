@@ -5532,8 +5532,8 @@ async function updateDailySignalPerformance(){
   dailyTrackingBusy=true;
   try{
     const now=Date.now();
-    const active=dailySignalHistory.filter(x=>now-x.detectedAt<=24*3600000&&x.status==="TEYİTLİ");
-    for(const rec of active.slice(-35)){
+    const active=dailySignalHistory.filter(x=>now-x.detectedAt<=24*3600000+10*60000&&x.status==="TEYİTLİ");
+    for(const rec of active.slice(-100)){
       try{
         const quote=await dailySignalTicker(rec);
         if(!quote||!(quote.price>0))continue;
@@ -5548,10 +5548,11 @@ async function updateDailySignalPerformance(){
         rec.maxDrawdownPct=Number(((rec.observedMin/rec.entry-1)*100).toFixed(2));
         if(now-rec.detectedAt>=3600000&&!rec.price1h)rec.price1h=quote.price;
         if(now-rec.detectedAt>=4*3600000&&!rec.price4h)rec.price4h=quote.price;
+        if(now-rec.detectedAt>=24*3600000&&!rec.price24h)rec.price24h=quote.price;
       }catch(e){console.warn("Sinyal performansı:",rec.symbol,e.message);}
     }
     for(const rec of dailySignalHistory){
-      if(now-rec.detectedAt>24*3600000&&rec.status==="TEYİTLİ"){
+      if(now-rec.detectedAt>=24*3600000&&rec.status==="TEYİTLİ"&&rec.price24h){
         rec.status="24 SAAT TAMAMLANDI";
         rec.completedAt=now;
       }
@@ -7171,6 +7172,35 @@ app.get("/api/decision-plans",(req,res)=>{
    GÜNLÜK TEYİT API
 ========================= */
 
+// Basit ileriye dönük 24 saatlik tarihsel kontrol: her aday yalnızca geçmiş mumlarla seçilir.
+app.get("/api/daily-confirmations/backtest",async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  const symbol=String(req.query.symbol||"BTCUSDT").toUpperCase();
+  if(!/^[A-Z0-9]{3,20}USDT$/.test(symbol))return res.status(400).json({error:"USDT paritesi gerekli"});
+  try{
+    const raw=await getExternalJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1d&limit=350","BINANCE GLOBAL");
+    if(!Array.isArray(raw)||raw.length<225)return res.status(422).json({error:"Yeterli tarihsel mum yok"});
+    const rows=raw.filter(x=>Number(x[6])<Date.now()).map(x=>({
+      time:Number(x[0]),open:Number(x[1]),high:Number(x[2]),low:Number(x[3]),close:Number(x[4]),volume:Number(x[5])
+    }));
+    const signals=[];
+    for(let i=205;i<rows.length-1;i++){
+      const signal=analyze(symbol.replace(/USDT$/,"/USDT"),rows.slice(0,i+1));
+      if(!signal)continue;
+      const next=rows[i+1];
+      const entry=rows[i].close;
+      signals.push({date:new Date(rows[i].time).toISOString().slice(0,10),
+        score:signal.score,type:signal.confirmed?"GÜNLÜK TEYİT":"GÜNLÜK ADAY",
+        entry,nextHigh:next.high,nextLow:next.low,
+        nextDayHighPct:Number(((next.high/entry-1)*100).toFixed(2)),
+        nextDayLowPct:Number(((next.low/entry-1)*100).toFixed(2)),
+        hit5:next.high>=entry*1.05,hit10:next.high>=entry*1.10});
+    }
+    res.json({symbol,signals:signals.slice(-100),count:signals.length,
+      hit5:signals.filter(x=>x.hit5).length,hit10:signals.filter(x=>x.hit10).length,
+      notice:"Bu test yalnızca günlük teknik adayları ve sonraki günlük mumun tepe/dibini karşılaştırır. Dakikalık, ikinci teyit, emir defteri ve haber filtreleri geçmişe uygulanmamıştır; canlı başarı oranı değildir."});
+  }catch(e){res.status(502).json({error:"Geçmiş veri alınamadı",detail:String(e.message).slice(0,160)});}
+});
 app.get("/api/daily-confirmations/history",(req,res)=>{
   res.set("Cache-Control","no-store");
   const completed=dailySignalHistory.filter(x=>x.status==="24 SAAT TAMAMLANDI"&&Number.isFinite(x.maxGainPct));
