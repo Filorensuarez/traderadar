@@ -9,12 +9,12 @@ async function refresh(){
  const d=await r.json();if(thresholdInput&&document.activeElement!==thresholdInput&&Number.isFinite(d.thresholdPct))thresholdInput.value=String(d.thresholdPct);
  status.textContent="Hedef: %"+fmt(d.thresholdPct??2,2)+" | Durum: "+d.status+" | Taranan: "+d.checked+" / "+d.eligible+" | Kalan: "+d.remaining+" | Sinyal: "+d.rows.length+" | Hata: "+d.failed;
  scanButton.disabled=!!d.running;stopButton.disabled=!d.running;cards.replaceChildren();
- if(!d.rows.length){const p=document.createElement("p");p.textContent="Henüz belirlenen yükseliş oranını sağlayan coin bulunmadı.";cards.append(p);}
+ if(!d.rows.length){const p=document.createElement("p");p.textContent="Henüz tüm trend, hacim, alıcı baskısı, likidite ve ikinci teyit koşullarını sağlayan coin yok.";cards.append(p);}
  for(const x of d.rows){
  if(initialLoad)seen.add(x.market+":"+x.day);else if(typeof Notification!=="undefined")notify(x);
  const card=document.createElement("article");card.className="coin-card";
- const h=document.createElement("h3");h.textContent=x.symbol+" • %"+fmt(x.thresholdPct??d.thresholdPct??2,2)+" MOMENTUM";card.append(h);
- for(const line of ["Son 10 mum ortalaması: "+fmt(x.recent,8),"Önceki 30 mum ortalaması: "+fmt(x.baseline,8),"Fark: %"+fmt(x.gainPct,2)+" | Hacim teyidi: "+fmt(x.volumeRatio,2)+"x | Son fiyat: "+fmt(x.close,8),"Son kapalı mum: "+new Date(x.day).toLocaleString("tr-TR")]){const p=document.createElement("p");p.textContent=line;card.append(p);}
+ const h=document.createElement("h3");h.textContent=x.symbol+" • ÇOKLU TEYİT • "+fmt(x.score,0)+"/100";card.append(h);
+ for(const line of ["Son 10 mum ortalaması: "+fmt(x.recent,8),"Önceki 30 mum ortalaması: "+fmt(x.baseline,8),"Fark: %"+fmt(x.gainPct,2)+" | Hacim teyidi: "+fmt(x.volumeRatio,2)+"x | Son fiyat: "+fmt(x.close,8),"Alıcı oranı: %"+fmt(x.takerBuyRatio,1)+" | Spread: %"+fmt(x.spreadPct,3)+" | İkinci teyit: +%"+fmt(x.followThroughPct,2),"Son kapalı mum: "+new Date(x.day).toLocaleString("tr-TR")]){const p=document.createElement("p");p.textContent=line;card.append(p);}
  const link=document.createElement("a");link.textContent="Binance grafiğini aç ↗";link.href="https://www.binance.com/tr/trade/"+encodeURIComponent(x.market.replace(/(USDT|TRY)$/,"_$1"));link.target="_blank";link.rel="noopener noreferrer";card.append(link);cards.append(card);
  }
  initialLoad=false;
