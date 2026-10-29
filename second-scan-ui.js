@@ -5,8 +5,8 @@ async function refresh(){
  try{
   const r=await fetch(API+"/api/second-scan",{cache:"no-store",signal:AbortSignal.timeout(15000)});
   if(!r.ok)throw Error("HTTP "+r.status);
-  const d=await r.json();button.disabled=d.running||busy;
-  status.textContent=(d.running?"Taranıyor":"Tarama tamamlandı")+" • Kontrol: "+d.checked+"/"+d.total+" • Eşleşme: "+d.rows.length+" • Veri hatası: "+d.errors+(d.error?" • "+d.error:"");
+  const d=await r.json();button.disabled=d.running||busy||(d.blockedUntil>Date.now());
+  status.textContent=(d.running?"Taranıyor":d.blockedUntil>Date.now()?"Binance istek sınırı nedeniyle duraklatıldı":d.completed?"Tarama tamamlandı":"Kısmi tarama")+" • Kontrol: "+d.checked+"/"+d.total+" • Eşleşme: "+d.rows.length+" • Veri hatası: "+d.errors+(d.blockedUntil>Date.now()?" • Yeniden deneme: "+Math.ceil((d.blockedUntil-Date.now())/60000)+" dk sonra":"")+(d.error?" • "+d.error:"");
   cards.replaceChildren();
   if(!d.rows.length){const p=document.createElement("p");p.textContent=d.running?"Koşulları sağlayan coinler aranıyor.":"Şu anda iki koşulu birlikte sağlayan coin yok.";cards.append(p);}
   for(const x of d.rows){const card=document.createElement("div");card.className="info-box";const h=document.createElement("h3");h.textContent=x.symbol.replace("USDT","/USDT");const p=document.createElement("p");p.textContent="Fiyat farkı: +%"+x.pricePct+"";card.append(h,p);cards.append(card);}
