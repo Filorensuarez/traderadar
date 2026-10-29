@@ -5421,534 +5421,73 @@ function updateMinuteRadarState(
    COİN ANALİZİ
 ========================= */
 
-function analyze(
-  symbol,
-  candles
-) {
-
-  if (
-    !Array.isArray(candles) ||
-    candles.length < 205
-  ) {
-    return null;
-  }
-
-  const closes =
-    candles.map(
-      candle =>
-        candle.close
-    );
-
-  const volumes =
-    candles.map(
-      candle =>
-        candle.volume
-    );
-
-  const current =
-    candles.at(-1);
-
-  const previous =
-    candles.at(-2);
-
-  const price =
-    current.close;
-
-  const ema20 =
-    ema(closes, 20);
-
-  const ema50 =
-    ema(closes, 50);
-
-  const ema200 =
-    ema(closes, 200);
-
-  const RSI =
-    rsi(closes);
-
-  const MACD =
-    calculateMACD(closes);
-
-  const ATR =
-    atr(candles);
-
-  const BB =
-    bollinger(closes);
-
-
-  /* =========================
-     HACİM
-  ========================= */
-
-  const previousVolumes =
-    volumes.slice(
-      -21,
-      -1
-    );
-
-  const avgVolume =
-    average(
-      previousVolumes
-    );
-
-  const volumeRatio =
-    avgVolume > 0
-      ?
-        current.volume /
-        avgVolume
-      :
-        0;
-
-
-  /* =========================
-     DİRENÇ
-  ========================= */
-
-  const previous20 =
-    candles.slice(
-      -21,
-      -1
-    );
-
-  const resistance =
-    Math.max(
-      ...previous20.map(
-        candle =>
-          candle.high
-      )
-    );
-
-  const support =
-    Math.min(
-      ...previous20.map(
-        candle =>
-          candle.low
-      )
-    );
-
-  const resistanceDistance =
-    (
-      (
-        price -
-        resistance
-      ) /
-      resistance
-    ) *
-    100;
-
-
-  /* =========================
-     ATR %
-  ========================= */
-
-  const atrPct =
-    ATR && price
-      ?
-        (
-          ATR /
-          price
-        ) *
-        100
-      :
-        0;
-
-
-  /* =========================
-     3 GÜNLÜK HAREKET
-  ========================= */
-
-  const price3DaysAgo =
-    closes.at(-4);
-
-  const change3 =
-    (
-      (
-        price -
-        price3DaysAgo
-      ) /
-      price3DaysAgo
-    ) *
-    100;
-
-
-  /* =========================
-     PUANLAMA
-  ========================= */
-
-  let score = 0;
-
-  const reasons = [];
-
-  function add(
-    condition,
-    points,
-    text
-  ) {
-
-    if (!condition) {
-      return;
-    }
-
-    score += points;
-
-    reasons.push(text);
-  }
-
-
-  /* TREND */
-
-  add(
-    price > ema20,
-    8,
-    "Fiyat EMA20 üzerinde"
-  );
-
-  add(
-    ema20 > ema50,
-    12,
-    "EMA20 EMA50 üzerinde"
-  );
-
-  add(
-    price > ema50,
-    8,
-    "Fiyat EMA50 üzerinde"
-  );
-
-  add(
-    price > ema200,
-    8,
-    "Fiyat EMA200 üzerinde"
-  );
-
-
-  /* RSI */
-
-  add(
-    RSI >= 52 &&
-    RSI <= 68,
-    14,
-    "RSI yükselişi destekliyor"
-  );
-
-
-  /* MACD */
-
-  add(
-    MACD.bullish,
-    14,
-    "MACD pozitif"
-  );
-
-
-  /* HACİM */
-
-  add(
-    volumeRatio >= 1.30,
-    14,
-    "Hacim ortalamanın üzerinde"
-  );
-
-
-  /* DİRENÇ */
-
-  add(
-    resistanceDistance >=
-      -1.5 &&
-    resistanceDistance <=
-      2,
-    10,
-    "20 günlük dirence yakın"
-  );
-
-
-  /* BOLLINGER */
-
-  add(
-    BB &&
-    price >
-      BB.middle,
-    6,
-    "Bollinger orta bandı üzerinde"
-  );
-
-
-  /* MUM */
-
-  add(
-    current.close >
-      current.open &&
-    current.close >
-      previous.close,
-    6,
-    "Son günlük mum pozitif"
-  );
-
-
-  /* =========================
-     W/TRY TİPİ KIRILIM KONTROLÜ
-     Günlük mumlardan hesaplanır.
-     15 dakikalık verilerle karıştırılmaz.
-  ========================= */
-
-  const ema7Daily = ema(closes, 7);
-  const ema25Daily = ema(closes, 25);
-  const ema7PrevDaily = ema(closes.slice(0, -3), 7);
-  const ema25PrevDaily = ema(closes.slice(0, -3), 25);
-  const emaSeparation =
-    ema25Daily > 0 ? (ema7Daily / ema25Daily - 1) * 100 : 0;
-  const emaSeparationBefore =
-    ema25PrevDaily > 0 ? (ema7PrevDaily / ema25PrevDaily - 1) * 100 : 0;
-  const emaOpening = emaSeparation > emaSeparationBefore;
-
-  const baseWindow = candles.slice(-16, -5);
-  const baseHigh = Math.max(...baseWindow.map(c => c.high));
-  const baseLow = Math.min(...baseWindow.map(c => c.low));
-  const baseRangePct = baseLow > 0
-    ? (baseHigh / baseLow - 1) * 100 : 0;
-  const compressedBefore = baseRangePct > 0 && baseRangePct <= 12;
-
-  const recentVolumeAvg = average(volumes.slice(-3));
-  const earlierVolumeAvg = average(volumes.slice(-23, -3));
-  const sustainedVolumeRatio = earlierVolumeAvg > 0
-    ? recentVolumeAvg / earlierVolumeAvg : 0;
-
-  const last5 = candles.slice(-5);
-  const positiveCandles = last5.filter(c => c.close > c.open).length;
-  const breakoutFromBase = baseHigh > 0 && price > baseHigh;
-  const dailyBreakoutSetup =
-    compressedBefore &&
-    breakoutFromBase &&
-    ema7Daily > ema25Daily &&
-    emaOpening &&
-    sustainedVolumeRatio >= 1.4 &&
-    positiveCandles >= 3;
-
-  if (dailyBreakoutSetup) {
-    score += 8;
-    reasons.push("W tipi: sıkışma sonrası hacimli EMA7/25 kırılımı");
-  }
-
-  /* =========================
-     RİSK CEZALARI
-  ========================= */
-
-  if (
-    change3 > 15
-  ) {
-
-    score -= 10;
-
-    reasons.push(
-      "Son 3 günlük hareket fazla uzamış"
-    );
-  }
-
-
-  if (
-    RSI > 75
-  ) {
-
-    score -= 10;
-
-    reasons.push(
-      "RSI aşırı alım bölgesinde"
-    );
-  }
-
-
-  score =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        score
-      )
-    );
-
-
-  /* =========================
-     TREND DURUMU
-  ========================= */
-
-  const trend =
-    (
-      price > ema20 &&
-      ema20 > ema50 &&
-      price > ema200
-    )
-      ?
-        "bullish"
-      :
-        "neutral";
-
-
-  /* =========================
-     ZORUNLU YÜKSELİŞ TEYİDİ
-  ========================= */
-
-  const extended =
-  (
-    change3 >= 12 ||
-    RSI >= 74
-  );
-
-
-const confirmed =
-  (
-    !extended &&
-    Number.isFinite(atrPct) && atrPct > 0 && atrPct <= 12 &&
-    Number.isFinite(resistanceDistance) &&
-    resistanceDistance >= -4 && resistanceDistance <= 8 &&
-
-    price > ema20 &&
-
-    price > ema50 &&
-price > ema200 &&
-    RSI >= 50 &&
-
-    RSI < 74 &&
-
-    MACD.bullish &&
-
-    volumeRatio >= 1.15 &&
-
-    score >= 75
-  );
-
-
-const candidate =
-  (
-    !extended &&
-    !confirmed &&
-
-    price > ema20 &&
-
-    RSI >= 47 &&
-    RSI < 70 &&
-
-    (
-      MACD.bullish ||
-      MACD.histogram > 0
-    ) &&
-
-    volumeRatio >= 0.90 &&
-
-    score >= 55
-  );
-
-
-let signalType =
-  "IZLEME";
-
-
-if (candidate) {
-  signalType =
-    "YÜKSELİŞ ADAYI";
-}
-
-
-if (confirmed) {
-  signalType =
-    "YÜKSELİŞ TEYİDİ";
-}
-
-
-if (extended) {
-  signalType =
-    "HAREKET İLERLEMİŞ";
-}
-
-
-  return {
-
-    symbol:
-      symbol.replace(
-        "-USDT",
-        "/USDT"
-      ),
-
-    price,
-
-    score,
-
-    trend,
-
-    rsi:
-      RSI,
-
-    ema20,
-
-    ema50,
-
-    ema200,
-
-    macd:
-      MACD.value,
-
-    macdSignal:
-      MACD.signal,
-
-    macdHistogram:
-      MACD.histogram,
-
-    macdBullish:
-      MACD.bullish,
-
-    volumeRatio,
-
-    atr:
-      ATR,
-
-    atrPct,
-
-    support,
-
-    resistance,
-    // Long-horizon daily resistance: previous 180 completed daily candles.
-    longTrendResistance: (() => {
-      const history=candles.slice(-181,-1).map(x=>Number(x.high)).filter(x=>Number.isFinite(x)&&x>0);
-      if(history.length<120)return null;
-      const level=Math.max(...history);
-      return level>price?level:null;
-    })(),
-
-    resistanceDistance,
-
-    bollingerMiddle:
-      BB?.middle ??
-      null,
-
-    bollingerUpper:
-      BB?.upper ??
-      null,
-
-    bollingerLower:
-      BB?.lower ??
-      null,
-
-    change3,
-
-    dailyBreakoutSetup,
-    compressedBefore,
-    baseRangePct,
-    sustainedVolumeRatio,
-    ema7Daily,
-    ema25Daily,
-    emaOpening,
-
-    confirmed,
-
-candidate,
-
-extended,
-
-signalType,
-
-reasons
+function analyze(symbol,candles) {
+  // Yeni günlük teyit: dip tabanı, hacim genişlemesi, trend, direnç ve aşırı uzama.
+  // Yalnızca kapanmış günlük mumlar kullanılır. Gün içi agresif alıcı oranı bu veriden çıkarılamaz.
+  if(!Array.isArray(candles)||candles.length<205)return null;
+  const c=candles.slice().sort((a,b)=>a.time-b.time);
+  const closes=c.map(x=>x.close),volumes=c.map(x=>x.volume);
+  const current=c.at(-1),previous=c.at(-2),price=current.close;
+  if(!(price>0))return null;
+  const ema7=ema(closes,7),ema20=ema(closes,20),ema25=ema(closes,25),ema50=ema(closes,50),ema99=ema(closes,99),ema200=ema(closes,200);
+  const RSI=rsi(closes),MACD=calculateMACD(closes),ATR=atr(c),BB=bollinger(closes);
+  const avgVolume=average(volumes.slice(-21,-1));
+  const volumeRatio=avgVolume>0?current.volume/avgVolume:0;
+  const prior20=c.slice(-21,-1),resistance=Math.max(...prior20.map(x=>x.high));
+  const support=Math.min(...prior20.map(x=>x.low));
+  const atrPct=ATR&&price>0?ATR/price*100:0;
+  const candleRange=current.high-current.low;
+  const closePosition=candleRange>0?(price-current.low)/candleRange:0;
+  const upperWickRatio=candleRange>0?(current.high-Math.max(current.open,price))/candleRange:1;
+  const priorRange=c.slice(-61,-1);
+  const baseLow=Math.min(...priorRange.map(x=>x.low));
+  const baseHigh=Math.max(...priorRange.map(x=>x.high));
+  const baseWidthPct=(baseHigh/baseLow-1)*100;
+  const prior5=c.slice(-6,-1),prior5Avg=average(prior5.map(x=>x.volume));
+  const volumeAcceleration=avgVolume>0?prior5Avg/avgVolume:0;
+  const change7Pct=(price/closes.at(-8)-1)*100;
+  const change30Pct=(price/closes.at(-31)-1)*100;
+  const peakDistancePct=(price/Math.max(...c.slice(-31,-1).map(x=>x.high))-1)*100;
+  const emaSlope=ema(closes.slice(0,-3),20);
+  const emaTurning=ema20>emaSlope;
+  const trend=price>ema20&&ema20>ema50&&ema50>ema200;
+  const shortTrend=ema7>ema25&&ema25>ema99;
+  const breakout=price>resistance*1.003;
+  const breakoutNear=price>=resistance*0.97&&price<=resistance*1.003;
+  const bullishCandle=price>current.open&&price>previous.close&&closePosition>=0.68&&upperWickRatio<=0.3;
+  const noExhaustion=change7Pct<25&&change30Pct<70&&peakDistancePct<15&&
+    (atrPct>0?price/ema20-1<Math.max(0.10,atrPct/100*2.5):price/ema20-1<0.12);
+  const baseSetup=baseWidthPct<=40&&change30Pct<35;
+  const liquidity=avgVolume>0&&current.volume>0;
+  const reasons=[];
+  if(emaTurning)reasons.push("EMA20 yukarı dönüyor");
+  if(shortTrend)reasons.push("EMA7 > EMA25 > EMA99");
+  if(trend)reasons.push("EMA20/50/200 yükseliş dizilimi");
+  if(volumeRatio>=2)reasons.push("Günlük hacim en az 2 kat");
+  if(breakout)reasons.push("20 günlük direnç üzerinde kapanış");
+  if(bullishCandle)reasons.push("Güçlü mum kapanışı");
+  if(baseSetup)reasons.push("Taban/sıkışma yapısı");
+  if(!noExhaustion)reasons.push("Aşırı uzama riski");
+  const score=Math.min(100,Math.max(0,Math.round(
+    (emaTurning?10:0)+(shortTrend?15:0)+(trend?10:0)+
+    (volumeRatio>=3?20:volumeRatio>=2?15:volumeRatio>=1.5?8:0)+
+    (breakout?20:breakoutNear?10:0)+(bullishCandle?10:0)+
+    (baseSetup?10:0)+(noExhaustion?5:0)
+  )));
+  const confirmed=score>=75&&breakout&&bullishCandle&&volumeRatio>=2&&
+    (shortTrend||trend)&&noExhaustion&&liquidity;
+  const candidate=!confirmed&&score>=55&&breakoutNear&&emaTurning&&
+    volumeRatio>=1.5&&noExhaustion&&liquidity;
+  if(!confirmed&&!candidate)return null;
+  return {symbol,price,score,confirmed,candidate,reasons,
+    trend:trend?"bullish":"neutral",ema7,ema20,ema25,ema50,ema99,ema200,
+    rsi:RSI,macdBullish:!!(MACD&&MACD.histogram>0),volumeRatio,
+    volumeAcceleration,atrPct,resistance,support,closePosition,upperWickRatio,
+    breakout,breakoutNear,baseSetup,change7Pct,change30Pct,
+    stage:confirmed?"KIRILIM TEYİDİ":"ERKEN YÜKSELİŞ ADAYI",
+    riskNote:"Günlük mum verisi; agresif alış ve anlık ikinci teyit ölçülmedi. Kesin yükseliş garantisi yoktur."
   };
 }
-
 
 /* =========================
    PİYASA TARAMASI
