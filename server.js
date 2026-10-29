@@ -5578,6 +5578,8 @@ async function scanMarket() {
   // İkinci katman: adaylarda son kapanmış 1 dakikalık mumlarla anlık teyit.
   // API yoksa doğrulanmış gibi gösterme.
   const intradayPending=new Map();
+  const dailySignalHistory=[];
+  const dailySignalSeen=new Set();
   async function intradayCheck(provider,symbol) {
     let raw;
     if(provider.key==="binanceglobal"){
@@ -5603,7 +5605,29 @@ async function scanMarket() {
     const takerRatio=takerAvailable?recent.reduce((s,x)=>s+x.buy,0)/Math.max(recent.reduce((s,x)=>s+x.quote,0),1e-9):null;
     const pass=volumeRatio>=1.5&&momentum5>=0.2&&momentum15>=0.4&&last.close>ema20m&&last.close>resistance15*0.997&&
       (takerRatio===null||takerRatio>=0.55);
-    return {status:pass?"ANLIK HACİM/FİYAT TEYİDİ":"ANLIK TEYİT YOK",verified:pass,
+    // İkinci teyit: ilk veri geçerliyse 30 saniye sonra yeni kapanmış mumla fiyat korunmalı.
+    let followThrough=false,secondPrice=null;
+    if(pass){
+      await new Promise(resolve=>setTimeout(resolve,31000));
+      try{
+        const check=provider.key==="binanceglobal"
+          ?await getExternalJSON("https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=3","BINANCE GLOBAL")
+          :await getExternalJSON((provider.key==="okxtr"?"https://tr.okx.com":"https://eea.okx.com")+
+            "/api/v5/market/candles?instId="+encodeURIComponent(symbol)+"&bar=1m&limit=3",provider.name);
+        const rows=provider.key==="binanceglobal"?check:check.data;
+        if(Array.isArray(rows)){
+          const completed=rows.map(x=>({time:+x[0],close:+x[4]}))
+            .filter(x=>x.time+60000<=Date.now()&&x.close>0).sort((a,b)=>a.time-b.time);
+          const newest=completed.at(-1);
+          if(newest&&newest.time>last.time){
+            secondPrice=newest.close;
+            followThrough=secondPrice>=last.close*1.0015;
+          }
+        }
+      }catch(e){console.warn("Günlük ikinci teyit:",provider.name,symbol,e.message);}
+    }
+    return {status:pass?(followThrough?"İKİNCİ TEYİT TAMAM":"İKİNCİ TEYİT BEKLENİYOR"):"ANLIK TEYİT YOK",verified:pass&&followThrough,
+      firstPrice:last.close,secondPrice,followThrough,
       volumeRatio:Number(volumeRatio.toFixed(2)),momentum5:Number(momentum5.toFixed(2)),
       momentum15:Number(momentum15.toFixed(2)),takerRatio:takerRatio===null?null:Number((takerRatio*100).toFixed(1)),
       note:takerRatio===null?"Borsada agresif alış verisi sağlanmadı.":"Binance taker alış oranı ölçüldü."};
@@ -5656,7 +5680,17 @@ async function scanMarket() {
               result.candidate=true;
               result.reasons.push("Günlük kırılım var, anlık teyit bekleniyor");
             }
-            if(result.confirmed)result.reasons.push("Günlük ve dakikalık teyit birlikte");
+            if(result.confirmed){
+              result.reasons.push("Günlük, dakikalık ve ikinci fiyat teyidi birlikte");
+              const id=p.key+":"+symbol+":"+new Date().toISOString().slice(0,10);
+              if(!dailySignalSeen.has(id)){
+                dailySignalSeen.add(id);
+                dailySignalHistory.push({id,exchange:p.name,symbol:result.symbol,entry:result.price,
+                  detectedAt:Date.now(),score:result.score,volumeRatio:result.volumeRatio,
+                  intraday:result.intraday,status:"TEYİTLİ"});
+                if(dailySignalHistory.length>500)dailySignalHistory.shift();
+              }
+            }
             return result;
           }));
           for (const response of responses) {
