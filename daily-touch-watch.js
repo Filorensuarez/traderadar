@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import {liveTouchSnapshot,setLiveTouchSymbols} from "./daily-touch-live.js";
 import {dailyContact} from "./daily-touch-model.js";
 import {eligibleDailyTouchMarkets} from "./daily-touch-markets.js";
@@ -8,13 +10,19 @@ const pending=new Map(),confirmed=new Map(),history=[];
 const earlyHistory=[];
 const earlyCandidates=new Map();
 const preparationCandidates=new Map();
+const STORE=process.env.TOUCH_DATA_FILE||path.join(process.cwd(),"data","daily-touch-history.json");
+function saveHistory(){try{fs.mkdirSync(path.dirname(STORE),{recursive:true});const tmp=STORE+".tmp";fs.writeFileSync(tmp,JSON.stringify({history,earlyHistory}));fs.renameSync(tmp,STORE);}catch(e){console.warn("Temas kayıt:",e.message);}}
+try{const data=JSON.parse(fs.readFileSync(STORE,"utf8"));history.push(...(data.history||[]).slice(-500));earlyHistory.push(...(data.earlyHistory||[]).slice(-500));}catch(e){if(e.code!=="ENOENT")console.warn("Temas geçmişi:",e.message);}
+function weekly(rows){const start=Date.now()-7*86400000;const sample=rows.filter(x=>x.time>=start);const complete=sample.filter(x=>x.complete&&Number.isFinite(x.after60mPct));const wins=complete.filter(x=>x.after60mPct>0).length;return {sampleSize:sample.length,completed:complete.length,wins,winRatePct:complete.length?Number((100*wins/complete.length).toFixed(1)):null,avg60mPct:complete.length?Number((complete.reduce((a,x)=>a+x.after60mPct,0)/complete.length).toFixed(2)):null};}
 const PREP_TTL=10*60000;
 const ema=(values,period)=>{if(values.length<period)return NaN;const k=2/(period+1);let v=average(values.slice(0,period));for(const p of values.slice(period))v+=(p-v)*k;return v};
 const average=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:0;
 function recordOutcomes(symbol,price,time,high=price,low=price){
+ let changed=false;
  for(const item of earlyHistory)if(item.market===symbol&&!item.complete){
   const elapsed=time-item.candleTime;
   if(elapsed<0)continue;
+  changed=true;
   item.maxGainPct=Math.max(item.maxGainPct??-Infinity,(high/item.entry-1)*100);
   item.maxDrawdownPct=Math.min(item.maxDrawdownPct??Infinity,(low/item.entry-1)*100);
   for(const [minutes,key] of [[5,"after5mPct"],[15,"after15mPct"],[30,"after30mPct"],[60,"after60mPct"]]){
@@ -25,6 +33,7 @@ function recordOutcomes(symbol,price,time,high=price,low=price){
  for(const item of history)if(item.market===symbol&&!item.complete){
   const elapsed=time-item.candleTime;
   if(elapsed<0)continue;
+  changed=true;
   item.maxGainPct=Math.max(item.maxGainPct??-Infinity,(high/item.entry-1)*100);
   item.maxDrawdownPct=Math.min(item.maxDrawdownPct??Infinity,(low/item.entry-1)*100);
   if(elapsed>=300000&&!item.after5m)item.after5mPct=Number(((price/item.entry-1)*100).toFixed(2)),item.after5m=true;
@@ -32,8 +41,9 @@ function recordOutcomes(symbol,price,time,high=price,low=price){
   if(elapsed>=1800000&&!item.after30m)item.after30mPct=Number(((price/item.entry-1)*100).toFixed(2)),item.after30m=true;
   if(elapsed>=3600000&&!item.after60m)item.after60mPct=Number(((price/item.entry-1)*100).toFixed(2)),item.after60m=true,item.complete=true;
  }
+ if(changed)saveHistory();
 }
-export function dailyTouchPerformance(){return {sampleSize:history.length,completed:history.filter(x=>x.complete).length,rows:history.slice(-100),earlySampleSize:earlyHistory.length,earlyCompleted:earlyHistory.filter(x=>x.complete).length,earlyRows:earlyHistory.slice(-100)}}
+export function dailyTouchPerformance(){return {weekly:{early:weekly(earlyHistory),confirmed:weekly(history)},sampleSize:history.length,completed:history.filter(x=>x.complete).length,rows:history.slice(-100),earlySampleSize:earlyHistory.length,earlyCompleted:earlyHistory.filter(x=>x.complete).length,earlyRows:earlyHistory.slice(-100)}}
 
 let targetPct=2;
 export function setDailyTouchThreshold(value){const n=Number(value);if(!Number.isFinite(n)||n<0.1||n>50)throw Error("Yükseliş oranı %0,1 ile %50 arasında olmalı");targetPct=n;state.thresholdPct=n;return n;}
@@ -43,7 +53,7 @@ async function throttle(){const now=Date.now();const wait=Math.max(0,nextRequest
 const state={
   running:false,status:"idle",thresholdPct:2,startedAt:0,updatedAt:0,checked:0,eligible:0,
   failed:0,remaining:0,rows:[],earlyRows:[],preparationRows:[],error:null,waitUntil:0,
-  notice:"Momentum, EMA20/50, direnç, hacim, taker alış oranı, spread ve ikinci zamanlı teyit gerekir. Sonuç istatistikleri sunucu yeniden başlarsa sıfırlanır; kesin yükseliş garantisi yoktur."
+  notice:"Momentum, EMA20/50, direnç, hacim, taker alış oranı, spread ve ikinci zamanlı teyit gerekir. Sonuçlar TOUCH_DATA_FILE dosyasına yazılır; kalıcı disk yoksa yeniden dağıtımda silinebilir. Kesin yükseliş garantisi yoktur."
 };
 let stopRequested=false;
 const snooze=async(ms)=>{let remaining=ms;while(remaining>0&&!stopRequested){
@@ -192,6 +202,7 @@ export async function scanDailyTouch(){
        earlyCandidates.set(market.symbol,{time:Date.now(),hit:early});
        earlyHistory.push({market:market.symbol,entry:last.close,time:Date.now(),candleTime:last.time,complete:false,maxGainPct:0,maxDrawdownPct:0,after5mPct:null,after15mPct:null,after30mPct:null,after60mPct:null});
        if(earlyHistory.length>500)earlyHistory.shift();
+       saveHistory();
       }
       state.earlyRows=[...earlyCandidates.values()].map(x=>x.hit).filter(x=>!confirmed.has(x.market)).sort((a,b)=>b.score-a.score);
     }
@@ -218,6 +229,7 @@ export async function scanDailyTouch(){
     preparationCandidates.delete(market.symbol);
     history.push({market:market.symbol,entry:last.close,time:now,candleTime:last.time,complete:false,maxGainPct:0,maxDrawdownPct:0});
     if(history.length>500)history.shift();
+    saveHistory();
     matches.push(hit);publish(matches);
     state.earlyRows=state.earlyRows.filter(x=>x.market!==market.symbol);
 
