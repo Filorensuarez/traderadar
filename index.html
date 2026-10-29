@@ -412,16 +412,16 @@
 </section>
 <section id="quietVolume" hidden>
  <h2>Sessiz Hacim — Hızlı Yükseliş Başlangıcı</h2>
- <p class="description">Binance Spot USDT işlemleri canlı izlenir. Fiyat henüz yükselmeye başlarken 15 saniyelik fiyat ivmesi, 60 saniyelik yön, agresif alış oranı ve önceki 105 saniyeye göre alış hacmi hızlanması birlikte aranır. Yalnızca tüm koşulları karşılayan adaylar gösterilir. Bu, gelecekte hızlı yükseliş garantisi değildir.</p>
+ <p class="description">Binance Spot USDT işlemleri canlı izlenir. Fiyat henüz yükselmeye başlarken güçlü ilk hareketten sonra en az 30 saniye beklenir ve ikinci bir fiyat yükselişi teyit edilir. Küçük ve kısa süreli hareketler tek başına sinyal oluşturmaz. Bu, gelecekte hızlı yükseliş garantisi değildir.</p>
  <div class="info-box">
- <p><strong>Tarama formülü:</strong> 15 sn fiyat artışı ≥ %0,25; 60 sn artışı %0,40–%4,00; son 15 sn agresif alış oranı ≥ %65; alış hacmi ≥ 750 USDT; önceki 105 sn dilim ortalamasına göre alış ivmesi ≥ 3 kat. Son 15 sn fiyat aralığı ≤ %1,5. İlk 120 saniye veri toplanır.</p>
+ <p><strong>Tarama formülü:</strong> 15 sn fiyat artışı ≥ %0,35; 60 sn fiyat artışı %1,2–%3,5; agresif alış oranı ≥ %78; 15 sn alış hacmi ≥ 5.000 USDT; alış ivmesi ≥ 5 kat. İlk adaydan en az 30 sn sonra fiyatın ilave ≥ %0,7 yükselmesi gerekir. Aynı coine 30 dk, genel sinyallere en az 90 sn ara verilir. İlk 120 sn veri toplanır.</p>
  <button id="quietStart" class="refresh-button" type="button">Canlı İzlemeyi Başlat</button>
  <button id="quietStop" class="refresh-button" type="button">Ekran Yenilemeyi Durdur</button>
  <button id="quietPush" class="refresh-button" type="button">Telefon Bildirimlerini Aç</button>
  <p id="quietStatus" aria-live="polite">Hazır.</p>
  <p id="quietStats" class="updated-line">İzlenen: 0 • Hazır: 0 • Alarm: 0</p>
  </div><div id="quietCards" class="coin-grid"></div>
- <p class="description">Puan, teknik filtrelerin ağırlıklı göstergesidir; başarı olasılığı değildir. Sunucu uykuya geçerse canlı takip kesilir. Emir verilmez, kazanç garantisi yoktur.</p>
+ <p class="description">Puan, teknik filtrelerin ağırlıklı göstergesidir; %5–%10 yükseliş olasılığı veya başarı garantisi değildir. Sunucu uykuya geçerse canlı takip kesilir. Emir verilmez, kazanç garantisi yoktur.</p>
 </section>
 <section id="momentum" hidden>
  <h2>Patlama — Yükseliş ve Risk Planı</h2>
@@ -460,7 +460,7 @@
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
   <script type="module" src="./patlama-ui.js?v=dip-1"></script>
-  <script defer src="./quiet-volume-ui.js?v=breakout-1"></script>
+  <script defer src="./quiet-volume-ui.js?v=confirm-2"></script>
 
   <script defer src="./tab-navigation-fix.js"></script>
   <script defer src="./install-app.js?v=2"></script>
