@@ -1,13 +1,14 @@
 import {dailyContact} from "./daily-touch-model.js";
 import {eligibleDailyTouchMarkets} from "./daily-touch-markets.js";
 const BASE="https://data-api.binance.vision",REPEAT_MS=60*1000;
+const CONFIRM={minVolumeRatio:1.7,minClosePosition:0.65,maxUpperWickRatio:0.4};
 let targetPct=2;
 export function setDailyTouchThreshold(value){const n=Number(value);if(!Number.isFinite(n)||n<0.1||n>50)throw Error("Yükseliş oranı %0,1 ile %50 arasında olmalı");targetPct=n;state.thresholdPct=n;return n;}
 const MIN_REQUEST_GAP=160;
 const state={
   running:false,status:"idle",thresholdPct:2,startedAt:0,updatedAt:0,checked:0,eligible:0,
   failed:0,remaining:0,rows:[],error:null,waitUntil:0,
-  notice:"Son 10 tamamlanmış 1 dakikalık mumun ortalama kapanışı, hemen öncesindeki 30 tamamlanmış 1 dakikalık mumun ortalamasından en az %2 yüksekse bildirilir. EMA ve hacim filtresi yoktur."
+  notice:"10/30 momentumuna ek olarak hacim artışı, yükselen son kapanış ve üst fitil filtresi zorunludur. Teyit kesin yükseliş garantisi değildir."
 };
 let stopRequested=false;
 const snooze=async(ms)=>{let remaining=ms;while(remaining>0&&!stopRequested){
@@ -71,7 +72,21 @@ export async function scanDailyTouch(){
     if(!Array.isArray(raw))throw Error("1 dakikalık OHLC verisi geçersiz");
     const candles=raw.map(x=>({time:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]}));
     const result=dailyContact(candles);
-    result.match=Number.isFinite(result.gainPct)&&result.gainPct>=targetPct;
+    // Filter incomplete/weak momentum; do not publish a raw 10/30 crossover.
+    const closed=candles.filter(x=>x.time+60000<=Date.now()).sort((a,b)=>a.time-b.time);
+    const last=closed.at(-1),prev=closed.at(-2);
+    const base=closed.slice(-35,-5),recent=closed.slice(-5);
+    const avg=a=>a.length?a.reduce((s,x)=>s+x.volume,0)/a.length:0;
+    const volumeRatio=avg(base)>0?avg(recent)/avg(base):0;
+    const range=last?last.high-last.low:0;
+    const closePosition=range>0?(last.close-last.low)/range:0;
+    const upperWickRatio=range>0?(last.high-Math.max(last.open,last.close))/range:1;
+    result.volumeRatio=Number(volumeRatio.toFixed(2));
+    result.closePosition=Number(closePosition.toFixed(2));
+    result.match=Number.isFinite(result.gainPct)&&result.gainPct>=targetPct&&
+      closed.length>=40&&last&&prev&&last.close>prev.close&&last.close>last.open&&
+      volumeRatio>=CONFIRM.minVolumeRatio&&closePosition>=CONFIRM.minClosePosition&&
+      upperWickRatio<=CONFIRM.maxUpperWickRatio;
     result.thresholdPct=targetPct;
     if(result.match){
       const gapPct=result.gainPct;
