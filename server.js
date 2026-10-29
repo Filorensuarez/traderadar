@@ -5499,7 +5499,11 @@ let mediumWatchCache={updatedAt:0,scanned:0,rows:[]};
 // Set DAILY_SIGNAL_STORE to a persistent mounted disk path on Render.
 // Render: mount a persistent disk and set DAILY_SIGNAL_STORE=/var/data/daily-signal-history.json.
 const dailySignalStore=process.env.DAILY_SIGNAL_STORE||"./daily-signal-history.json";
+// An environment variable alone does not prove a Render persistent disk is mounted.
 const dailyStorePersistent=Boolean(process.env.DAILY_SIGNAL_STORE);
+let dailyStoreLastSaveOk=false;
+let dailyStoreLastSaveAt=null;
+let dailyStoreLastError=null;
 let dailySignalHistory=[];
 try{
   const saved=JSON.parse(fs.readFileSync(dailySignalStore,"utf8"));
@@ -5513,7 +5517,8 @@ function saveDailySignals(){
     const tmp=dailySignalStore+".tmp";
     fs.writeFileSync(tmp,JSON.stringify(dailySignalHistory));
     fs.renameSync(tmp,dailySignalStore);
-  }catch(e){console.warn("Sinyal geçmişi yazılamadı:",e.message);}
+    dailyStoreLastSaveOk=true;dailyStoreLastSaveAt=Date.now();dailyStoreLastError=null;
+  }catch(e){dailyStoreLastSaveOk=false;dailyStoreLastError=String(e.message).slice(0,180);console.warn("Sinyal geçmişi yazılamadı:",e.message);}
 }
 async function dailySignalTicker(record){
   const symbol=record.marketSymbol,source=record.providerKey;
@@ -7239,6 +7244,7 @@ app.get("/api/daily-confirmations/health",(req,res)=>{
     scanned:cache.scanned||0,historyCount:dailySignalHistory.length,
     pendingSecondChecks:dailyConfirmationPending.size,
     historyStoreConfigured:dailyStorePersistent,historyStoreWritable:storeWritable,
+    historyLastSaveOk:dailyStoreLastSaveOk,historyLastSaveAt:dailyStoreLastSaveAt,historyLastSaveError:dailyStoreLastError,
     historyStoreError:storeError,
     note:"Kalıcı disk bağlılığı bu API ile doğrulanamaz; Render yapılandırması ayrıca kontrol edilmelidir."});
 });
@@ -7268,7 +7274,7 @@ app.get("/api/daily-confirmations/weekly-performance",(req,res)=>{
     completed24h:mature24h.length,completed7d:fullyObserved.length,unobservedOrStale:stale.length,
     observedHit10RatePct:evaluated.length?Number((hits10/evaluated.length*100).toFixed(1)):null,
     lastSampleAt:rows.reduce((v,x)=>Math.max(v,x.lastCheckedAt||0),0)||null,
-    storageConfigured:dailyStorePersistent,rows:rows.slice(-100).reverse(),
+    storageConfigured:dailyStorePersistent,storageLastSaveOk:dailyStoreLastSaveOk,storageLastSaveAt:dailyStoreLastSaveAt,storageLastSaveError:dailyStoreLastError,rows:rows.slice(-100).reverse(),
     notice:"Yalnızca kesin teyitli sinyaller izlenir. Yaklaşık 5 dakikalık fiyat örneklemesi ara zirveleri kaçırabilir. Bu oranlar gerçekleşmiş işlem kârı veya 7 günlük tamamlanmış başarı oranı değildir. Render kalıcı disk olmadan yeniden başlatmada kayıtlar kaybolabilir."});
 });
 app.get("/api/daily-confirmations/history",(req,res)=>{
