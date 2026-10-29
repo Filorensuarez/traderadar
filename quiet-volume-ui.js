@@ -1,6 +1,7 @@
 (()=>{
 const el=id=>document.getElementById(id);
-const API=location.hostname==="filorensuarez.github.io"?"https://traderadar-v3-production.up.railway.app":"";
+const DEFAULT_API=location.hostname==="filorensuarez.github.io"?"":location.origin;
+const API=(localStorage.getItem("traderadar-api-base")||DEFAULT_API).replace(/\\/$/,"");
 let timer=null,seen=new Set();
 async function refresh(){
 try{const response=await fetch(API+"/api/quiet-volume",{cache:"no-store"});if(!response.ok)throw Error("HTTP "+response.status);const d=await response.json();
@@ -21,6 +22,8 @@ const response=await fetch(API+"/api/push/subscribe",{method:"POST",headers:{"Co
 el("quietStatus").textContent="Telefon push bildirimlerine kaydedildi.";
 }catch(e){el("quietStatus").textContent="Bildirim kurulamadı: "+e.message}
 }
+el("quietServerSave")?.addEventListener("click",()=>{const v=el("quietServerUrl").value.trim().replace(/\\/$/,"");if(!/^https:\\/\\/[^/]+$/i.test(v)){el("quietStatus").textContent="Geçerli HTTPS sunucu adresi girin.";return}localStorage.setItem("traderadar-api-base",v);location.reload()});
+if(el("quietServerUrl"))el("quietServerUrl").value=API;
 el("quietStart")?.addEventListener("click",()=>{refresh();if(!timer)timer=setInterval(refresh,5000)});
 el("quietStop")?.addEventListener("click",()=>{if(timer)clearInterval(timer);timer=null;el("quietStatus").textContent="Ekran yenilemesi durduruldu; sunucu izlemeye devam eder."});
 el("quietPush")?.addEventListener("click",enablePush);refresh();timer=setInterval(refresh,5000);
