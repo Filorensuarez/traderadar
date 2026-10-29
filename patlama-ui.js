@@ -22,7 +22,7 @@ function analyze(rows,symbol,exchange,url){
  return {symbol,exchange,url,p,gain,minuteStart,stage:"PATLAMA TAKİBİ"};
 }
 const markets=[
- {name:"OKX TR",async list(){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/instruments");if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"OKX TR pariteleri alınamadı");return j.data.filter(x=>x.instType==="SPOT"&&x.state==="live").map(x=>({symbol:x.instId.replace("-","/"),id:x.instId,url:"https://tr.okx.com/tr/trade-spot/"+x.instId.toLowerCase()}));},async candles(x){const j=await json("https://traderadar-v3-production.up.railway.app/api/okx-tr/candles?instId="+encodeURIComponent(x.id)+"");if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"OKX TR mum API hatası");return j.data;}}
+ {name:"OKX TR",async list(){const j=await json("https://traderadar-yro7.onrender.com/api/okx-tr/instruments");if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"OKX TR pariteleri alınamadı");return j.data.filter(x=>x.instType==="SPOT"&&x.state==="live").map(x=>({symbol:x.instId.replace("-","/"),id:x.instId,url:"https://tr.okx.com/tr/trade-spot/"+x.instId.toLowerCase()}));},async candles(x){const j=await json("https://traderadar-yro7.onrender.com/api/okx-tr/candles?instId="+encodeURIComponent(x.id)+"");if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"OKX TR mum API hatası");return j.data;}}
 ];
 function render(items,stats){
  cards.replaceChildren();
@@ -45,3 +45,69 @@ let timer=null;
 function startAuto(){if(timer)return;scan();timer=setInterval(()=>{if(!document.hidden)scan();},60000);}
 document.getElementById("momentumButton")?.addEventListener("click",startAuto);
 if(!document.getElementById("momentum")?.hidden)startAuto();
+
+/* Dipten dönüş adayları: 1 saatlik kapanmış mumlar, OKX TR spot. */
+const dipButton=document.getElementById("patlamaDipScan");
+const dipStatus=document.getElementById("patlamaDipStatus");
+const dipCards=document.getElementById("patlamaDipCards");
+let dipRunning=false;
+function dipRsi(closes){
+ if(closes.length<16)return NaN;
+ let gains=0,losses=0;
+ for(let i=closes.length-14;i<closes.length;i++){const d=closes[i]-closes[i-1];gains+=Math.max(0,d);losses+=Math.max(0,-d);}
+ return losses===0?100:100-100/(1+gains/losses);
+}
+function dipAnalyze(raw,x){
+ const now=Date.now();
+ const bars=raw.map(r=>({t:+r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5],confirmed:String(r[8])==="1"}))
+ .filter(r=>r.confirmed&&r.t+3600000<=now&&r.c>0&&r.h>=r.l&&r.v>=0).sort((a,b)=>a.t-b.t);
+ if(bars.length<55)return null;
+ const last=bars.at(-1),prior=bars.slice(-49,-1),range=bars.slice(-49);
+ const low=Math.min(...range.map(b=>b.l)),high=Math.max(...range.map(b=>b.h));
+ const rangePct=(high-low)/low*100;if(rangePct<5)return null;
+ const position=(last.c-low)/(high-low)*100;
+ const closes=bars.map(b=>b.c),rsi=dipRsi(closes);
+ const prevRsi=dipRsi(closes.slice(0,-1));
+ const ema20=closes.slice(-35).reduce((ema,p,i)=>i===0?p:ema+(p-ema)*2/21,closes.at(-35));
+ const avgVolume=prior.slice(-20).reduce((s,b)=>s+b.v,0)/20;
+ const volumeRatio=avgVolume>0?last.v/avgVolume:0;
+ const recentLow=Math.min(...bars.slice(-7,-1).map(b=>b.l));
+ const bounce=(last.c/recentLow-1)*100;
+ const turnUp=last.c>last.o&&last.c>bars.at(-2).c;
+ // Require a real depressed price location and an early upward turn; no guarantee of breakout.
+ if(position>32||rsi>48||rsi<20||!turnUp||bounce<0.3||bounce>9)return null;
+ const score=Math.round(Math.max(0,32-position)*1.2+Math.max(0,48-rsi)*.8+
+ Math.min(volumeRatio,3)*9+(last.c>ema20?12:0)+(rsi>prevRsi?12:0));
+ return {symbol:x.symbol,url:x.url,price:last.c,position,rsi,prevRsi,volumeRatio,bounce,score,aboveEma:last.c>ema20};
+}
+async function scanDip(){
+ if(dipRunning)return;dipRunning=true;dipButton.disabled=true;dipCards.replaceChildren();
+ const hits=[];let checked=0,failed=0,total=0,lastError="";
+ try{
+  dipStatus.textContent="OKX TR spot pariteleri alınıyor...";
+  const symbols=await markets[0].list();total=symbols.length;
+  for(let i=0;i<symbols.length;i+=3){
+   await Promise.all(symbols.slice(i,i+3).map(async x=>{
+    try{
+     const j=await json("https://traderadar-yro7.onrender.com/api/okx-tr/candles?bar=1H&instId="+encodeURIComponent(x.id));
+     if(String(j.code)!=="0"||!Array.isArray(j.data))throw Error(j.msg||"Mum verisi yok");
+     const hit=dipAnalyze(j.data,x);checked++;if(hit)hits.push(hit);
+    }catch(e){failed++;lastError=e.message;}
+   }));
+   dipStatus.textContent="Dip taraması: "+Math.min(i+3,total)+"/"+total+" • Okunan: "+checked+" • Aday: "+hits.length+" • Hata: "+failed;
+   if(i%15===0)await new Promise(resolve=>setTimeout(resolve,300));
+  }
+  hits.sort((a,b)=>b.score-a.score);
+  for(const x of hits){
+   const card=document.createElement("article");card.className="coin-card";
+   const h=document.createElement("h3");h.textContent=x.symbol+" • Dipten dönüş adayı • Puan "+x.score;
+   const p=document.createElement("p");p.textContent="Fiyat: "+x.price+" • 48 saatlik aralıkta konum: %"+x.position.toFixed(1)+" • RSI(14): "+x.rsi.toFixed(1)+" • Son mum hacmi / 20 saat ort.: "+x.volumeRatio.toFixed(2)+"x • Son 6 saat dipten uzaklık: %"+x.bounce.toFixed(2)+(x.aboveEma?" • EMA20 üstü":" • EMA20 altı");
+   const a=document.createElement("a");a.href=x.url;a.target="_blank";a.rel="noopener noreferrer";a.textContent="Grafiği aç";
+   card.append(h,p,a);dipCards.append(card);
+  }
+  if(!hits.length)dipCards.textContent="Koşulları sağlayan dipten dönüş adayı bulunamadı.";
+  dipStatus.textContent="Tamamlandı • "+checked+"/"+total+" parite • "+hits.length+" aday • "+failed+" veri hatası"+(failed?" • Son hata: "+lastError:"");
+ }catch(e){dipStatus.textContent="Dip taraması başarısız: "+e.message;}
+ finally{dipRunning=false;dipButton.disabled=false;}
+}
+dipButton?.addEventListener("click",scanDip);
