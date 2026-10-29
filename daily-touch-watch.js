@@ -1,3 +1,4 @@
+import {liveTouchSnapshot,setLiveTouchSymbols} from "./daily-touch-live.js";
 import {dailyContact} from "./daily-touch-model.js";
 import {eligibleDailyTouchMarkets} from "./daily-touch-markets.js";
 const BASE="https://data-api.binance.vision",REPEAT_MS=60*1000;
@@ -48,7 +49,7 @@ let stopRequested=false;
 const snooze=async(ms)=>{let remaining=ms;while(remaining>0&&!stopRequested){
  const step=Math.min(1000,remaining);await new Promise(done=>setTimeout(done,step));remaining-=step;
 }};
-export const dailyTouchStatus=()=>({...state,rows:[...state.rows]});
+export const dailyTouchStatus=()=>({...state,rows:[...state.rows],live:liveTouchSnapshot()});
 export function stopDailyTouch(){
  stopRequested=true;
  if(state.running)state.status="stopping";
@@ -169,6 +170,7 @@ export async function scanDailyTouch(){
         volumeRatio:Number((recentVolume/Math.max(priorVolume,1)).toFixed(2))};
       preparationCandidates.set(market.symbol,{time:Date.now(),hit});
       state.preparationRows=[...preparationCandidates.values()].map(x=>x.hit).sort((a,b)=>b.score-a.score);
+      setLiveTouchSymbols([...preparationCandidates.keys(),...earlyCandidates.keys()]);
     }
     const earlyPass=closed.length>=110&&result.gainPct>=targetPct&&
       earlyTrend&&recovered&&fiveRisePct>=0.5&&fiveRisePct<=7&&
@@ -235,6 +237,7 @@ export async function scanDailyTouch(){
   publish([...confirmed.values()].map(x=>({...x.hit,stage:"confirmed"})));
   for(const [key,value] of earlyCandidates)if(Date.now()-value.time>15*60000)earlyCandidates.delete(key);
   state.earlyRows=[...earlyCandidates.values()].map(x=>x.hit).filter(x=>!confirmed.has(x.market)).sort((a,b)=>b.score-a.score);
+  setLiveTouchSymbols([...preparationCandidates.keys(),...earlyCandidates.keys()]);
   state.updatedAt=Date.now();
   state.status=stopRequested?"stopped":"completed";
   console.log("Temas Araması: "+state.checked+"/"+state.eligible+" incelendi; "+

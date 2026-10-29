@@ -10,7 +10,13 @@ async function refresh(){
  status.textContent="Durum: "+({running:"Taranıyor",completed:"Tarama tamamlandı",stopped:"Durduruldu","rate-limited":"Veri sağlayıcı bekleniyor",error:"Hata",idle:"Hazır"}[d.status]||d.status)+" | İncelenen: "+d.checked+" / "+d.eligible+" | Hazırlık: "+(d.preparationRows||[]).length+" | Erken aday: "+(d.earlyRows||[]).length+" | Teyitli aday: "+d.rows.length+" | Veri hatası: "+d.failed;
  scanButton.disabled=!!d.running;stopButton.disabled=!d.running;cards.replaceChildren();
  const early=d.earlyRows||[],preparation=d.preparationRows||[];
+ const live=d.live?.rows||[];
  if(!d.rows.length&&!early.length&&!preparation.length){const p=document.createElement("p");p.textContent="Henüz tüm trend, hacim, alıcı baskısı, likidite ve ikinci teyit koşullarını sağlayan coin yok.";cards.append(p);}
+ for(const x of live.filter(x=>x.warning)){
+ const card=document.createElement("article");card.className="coin-card";
+ const h=document.createElement("h3");h.textContent=x.market+" • 10 SANİYELİK ALIŞ İVMESİ (izleme)";card.append(h);
+ const p=document.createElement("p");p.textContent="Alış payı: %"+fmt(x.buyRatio*100,1)+" | İlk 5 kademe alış dengesi: %"+fmt(x.imbalance*100,1)+" | 10 sn işlem hacmi: "+fmt(x.quoteVolume10s,0)+" | Fiyat hareketi: %"+fmt(x.movePct,2);card.append(p);cards.append(card);
+ }
  for(const x of preparation){
  const key=x.market+":"+x.day;
  if(initialLoad)seenPrep.add(key);
