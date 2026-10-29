@@ -2,7 +2,7 @@ import WebSocket from "ws";
 
 // Lightweight, bounded live monitor for symbols already shortlisted by candle analysis.
 const live=new Map();
-let socket=null,selected=[],lastConnect=0;
+let socket=null,selected=[],lastConnect=0,retryTimer=null,failures=0,disabledUntil=0;
 const MAX_SYMBOLS=12,WINDOW_MS=10000;
 const trim=(a,t)=>{while(a.length&&a[0].t<t-WINDOW_MS)a.shift();};
 export function liveTouchSnapshot(){
@@ -26,14 +26,24 @@ export function liveTouchSnapshot(){
 export function setLiveTouchSymbols(markets=[]){
  const next=[...new Set(markets.filter(x=>/^[A-Z0-9]{2,20}(USDT|TRY)$/.test(x)))].slice(0,MAX_SYMBOLS);
  if(next.join(",")===selected.join(",")&&socket)return;
+ if(retryTimer){clearTimeout(retryTimer);retryTimer=null;}
  selected=next;
  const previous=socket;socket=null;
- if(previous){previous.removeAllListeners();previous.terminate();}
+ if(previous){
+  // Never remove the error listener before terminating a CONNECTING socket.
+  // ws emits an asynchronous error in this state; without a listener it crashes Node.
+  previous.removeAllListeners("message");
+  previous.removeAllListeners("close");
+  previous.on("error",e=>console.warn("Eski temas bağlantısı:",e.message));
+  try{previous.terminate();}catch(e){console.warn("Temas bağlantısı kapatma:",e.message);}
+ }
  for(const key of live.keys())if(!selected.includes(key))live.delete(key);
  if(!selected.length)return;
+ if(Date.now()<disabledUntil)return;
  const streams=selected.flatMap(x=>[x.toLowerCase()+"@aggTrade",x.toLowerCase()+"@depth5@100ms"]).join("/");
  const ws=new WebSocket("wss://stream.binance.com:9443/stream?streams="+streams);
  socket=ws;lastConnect=Date.now();
+ ws.on("open",()=>{failures=0;disabledUntil=0;});
  ws.on("message",raw=>{
   try{
    const msg=JSON.parse(String(raw)),data=msg.data||{},market=String(data.s||String(msg.stream||"").split("@")[0]).toUpperCase();
@@ -49,6 +59,16 @@ export function setLiveTouchSymbols(markets=[]){
    v.updated=Date.now();live.set(market,v);
   }catch{}
  });
- ws.on("error",e=>console.warn("Temas canlı akış:",e.message));
- ws.on("close",()=>{if(socket!==ws)return;socket=null;setTimeout(()=>{if(!socket&&selected.length&&Date.now()-lastConnect>1000)setLiveTouchSymbols([...selected]);},5000);});
+ ws.on("error",e=>{
+  console.warn("Temas canlı akış:",e.message);
+  failures=Math.min(12,failures+1);
+  if(/451|403|429/.test(e.message))disabledUntil=Date.now()+30*60000;
+ });
+ ws.on("close",()=>{
+  if(socket!==ws)return;
+  socket=null;
+  if(!selected.length)return;
+  const wait=Math.max(5000,Math.min(120000,5000*2**Math.min(failures,5)),disabledUntil-Date.now());
+  retryTimer=setTimeout(()=>{retryTimer=null;if(!socket&&selected.length)setLiveTouchSymbols([...selected]);},wait);
+ });
 }
