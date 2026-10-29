@@ -30,9 +30,10 @@ export async function runSecondScan(){
  if(state.running)return secondScanStatus();
  state.running=true;state.checked=0;state.total=0;state.rows=[];state.errors=0;state.error=null;
  try{
-  const tickers=await json(BASE+"/ticker/24hr");
-  const markets=tickers.filter(t=>/^[A-Z0-9]+USDT$/.test(t.symbol)&&Number(t.quoteVolume)>1000000)
-   .sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).slice(0,60);
+  const [exchange,tickers]=await Promise.all([json(BASE+"/exchangeInfo"),json(BASE+"/ticker/24hr")]);
+  const active=new Set(exchange.symbols.filter(x=>x.status==="TRADING"&&x.isSpotTradingAllowed!==false&&x.quoteAsset==="USDT").map(x=>x.symbol));
+  const markets=tickers.filter(t=>active.has(t.symbol))
+   .sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume));
   state.total=markets.length;
   let cursor=0;
   const workers=Array.from({length:3},async()=>{while(cursor<markets.length){
