@@ -6,13 +6,15 @@ import { ProEngine } from '../engine.js';
 import { History } from '../history.js';
 import { analyze } from '../analysis.js';
 import { fixture } from './helpers.js';
+import { existsSync } from 'node:fs';
 
 const history = new History(), engine = new ProEngine(history);
 const server = createApp(engine).listen(0, '127.0.0.1'); await once(server, 'listening');
 let browser;
 const errors = [];
 try {
-  browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : chromium.executablePath());
+  browser = await chromium.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
   const base = `http://127.0.0.1:${server.address().port}`;
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.on('pageerror', e => errors.push(e.message));
