@@ -12,7 +12,7 @@ public final class OkxTrWsProbe {
     private OkxTrWsProbe(){}
     public static String check(){
         OkHttpClient client=new OkHttpClient.Builder().connectTimeout(10,TimeUnit.SECONDS)
-            .readTimeout(10,TimeUnit.SECONDS).build();
+            .readTimeout(10,TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build();
         final CountDownLatch latch=new CountDownLatch(1);
         final AtomicReference<String> outcome=new AtomicReference<>("OKX TR WebSocket yanıt vermedi; tarama kapalı.");
         final String instrument;
@@ -27,6 +27,7 @@ public final class OkxTrWsProbe {
             socket=client.newWebSocket(new Request.Builder().url("wss://ws.okx.com/ws/v5/public").build(),new WebSocketListener(){
                 private boolean acknowledged=false;
                 @Override public void onOpen(WebSocket ws,Response response){
+                    if(response.code()!=101||response.priorResponse()!=null){outcome.set("WebSocket bağlantı yanıtı doğrulanamadı.");latch.countDown();ws.cancel();return;}
                     try{
                         JSONObject arg=new JSONObject().put("channel","trades").put("instId",selected);
                         ws.send(new JSONObject().put("op","subscribe").put("args",new JSONArray().put(arg)).toString());
@@ -65,7 +66,7 @@ public final class OkxTrWsProbe {
                 }
                 @Override public void onClosed(WebSocket ws,int code,String reason){latch.countDown();}
             });
-            latch.await(20,TimeUnit.SECONDS);
+            if(!latch.await(20,TimeUnit.SECONDS))return "OKX TR WebSocket testi zaman aşımına uğradı; tarama kapalı.";
             return outcome.get();
         }catch(Exception e){return "OKX TR WebSocket testi tamamlanamadı; tarama kapalı.";}
         finally{
