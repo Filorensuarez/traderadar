@@ -111,6 +111,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks "$key_file" --ks-key-alias "$ANDROID_KEY_ALIAS" --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD --out android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
       - name: Verify signature, final permissions and packaged UI
         run: |
+          trap 'echo "::error title=APK verification::Failed at verification line $LINENO: $BASH_COMMAND"' ERR
           apk="android/app/build/outputs/apk/$APK_VARIANT/app-$APK_VARIANT.apk"
           test -s "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" | tee artifacts/apk-signature.log

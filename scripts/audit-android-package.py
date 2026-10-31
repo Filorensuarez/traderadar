@@ -5,6 +5,7 @@ import pathlib
 import xml.etree.ElementTree as ET
 import zipfile
 import hashlib
+import os
 
 ANDROID = '{http://schemas.android.com/apk/res/android}'
 ALLOWED = {
@@ -77,4 +78,8 @@ if __name__ == '__main__':
                 report['issues'].append('Packaged asset differs from reviewed source: ' + asset)
     pathlib.Path(args.output).write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        for issue in report['issues']:
+            safe = issue.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+            print('::error title=APK package policy::' + safe)
     raise SystemExit(1 if report['issues'] else 0)
