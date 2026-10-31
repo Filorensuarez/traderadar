@@ -58,43 +58,25 @@ public final class ProActivity extends Activity {
     private void startScan(){try{startForegroundService(new Intent(this,ScanService.class).setAction(ScanService.START));state.setText("Tarama başlatma isteği gönderildi; bağlantı doğrulanmazsa çalışmaz");}catch(RuntimeException e){state.setText("Android hizmeti başlatamadı. Uygulama açıkken tekrar deneyin.");}}
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] grants){super.onRequestPermissionsResult(code,permissions,grants);if(code==NOTIFICATIONS&&grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)startScan();else state.setText("Kalıcı bildirim izni verilmedi; tarama başlatılmadı");}
     private void batteryHelp(){new AlertDialog.Builder(this).setTitle("Android çalışma sınırları").setMessage("Tarama yalnız Başlat ile çalışır; Durdur tüm bağlantıları kapatır. Ekran kapalıyken kısmi uyanıklık kilidi pil tüketebilir. Android 15+ dataSync hizmetlerinin süre kotası ve üretici pil kısıtları vardır; kesintisizlik garanti edilmez. Yeniden başlatmada otomatik tarama yoktur. Pil ayarını yalnız ihtiyacınız varsa kendiniz değiştirin.").setPositiveButton("Pil ayarları",(d,w)->{try{startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}catch(ActivityNotFoundException e){state.setText("Bu cihazda pil ayarları açılamadı");}}).setNegativeButton("Kapat",null).show();}
-    private void probeDocumentation(){state.setText("OKX TR spot katalog bağlantısı telefondan kontrol ediliyor; tarama başlamaz...");
+    private void probeDocumentation(){
+        state.setText("OKX TR spot katalog bağlantısı telefondan kontrol ediliyor; tarama başlamaz...");
         new Thread(()->{
-            javax.net.ssl.HttpsURLConnection connection=null;String result;
+            String result;
+            okhttp3.OkHttpClient client=new okhttp3.OkHttpClient.Builder()
+                .connectTimeout(10,java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(10,java.util.concurrent.TimeUnit.SECONDS)
+                .followRedirects(false).followSslRedirects(false).build();
             try{
-                java.net.URL url=new java.net.URL("https://tr.okx.com/api/v5/public/instruments?instType=SPOT");
-                connection=(javax.net.ssl.HttpsURLConnection)url.openConnection();
-                connection.setConnectTimeout(10000);connection.setReadTimeout(10000);
-                connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("Accept","application/json");
-                int code=connection.getResponseCode();
-                if(code!=200){result="OKX TR REST HTTP "+code+". Canlı adaptör kapalı.";}
-                else {
-                    int count=0;java.io.ByteArrayOutputStream json=new java.io.ByteArrayOutputStream();
-                    try(java.io.InputStream input=connection.getInputStream()){
-                        byte[] buffer=new byte[8192];int n;
-                        while((n=input.read(buffer))!=-1){
-                            count+=n;if(count>8*1024*1024)throw new IOException("Yanıt çok büyük");
-                            json.write(buffer,0,n);
-                        }
-                    }
-                    org.json.JSONObject body=new org.json.JSONObject(json.toString("UTF-8"));
-                    org.json.JSONArray data=body.optJSONArray("data");
-                    if(!"0".equals(body.optString("code"))||data==null)result="OKX TR REST yanıt şeması doğrulanamadı; adaptör kapalı.";
-                    else {
-                        int active=0;
-                        for(int i=0;i<data.length();i++){
-                            org.json.JSONObject market=data.optJSONObject(i);
-                            if(market!=null&&"SPOT".equals(market.optString("instType"))&&"live".equals(market.optString("state"))
-                                &&market.optString("instId").matches("[A-Z0-9]{1,24}-[A-Z0-9]{1,12}"))active++;
-                        }
-                        result=active>0?"OKX TR REST erişimi başarılı: "+active+" aktif spot parite. WebSocket henüz doğrulanmadı; tarama kapalı."
-                            :"OKX TR REST yanıtında doğrulanmış aktif spot parite yok; tarama kapalı.";
-                    }
-                }
-            }catch(Exception e){result="OKX TR REST bağlantısı veya yanıtı doğrulanamadı; tarama kapalı.";}
-            finally{if(connection!=null)connection.disconnect();}
-            final String message=result;runOnUiThread(()->{if(!isFinishing())state.setText(message);});
+                java.util.List<String> symbols=OkxTrCatalog.fetch(client);
+                result="OKX TR REST erişimi başarılı: "+symbols.size()+" benzersiz aktif spot parite. WebSocket henüz doğrulanmadı; tarama kapalı.";
+            }catch(Exception e){
+                result="OKX TR REST bağlantısı veya spot katalog yanıtı doğrulanamadı; tarama kapalı.";
+            }finally{
+                client.dispatcher().executorService().shutdown();
+                client.connectionPool().evictAll();
+            }
+            final String message=result;
+            runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())state.setText(message);});
         },"okxtr-rest-probe").start();
     }
     private void probeWebSocket(){
