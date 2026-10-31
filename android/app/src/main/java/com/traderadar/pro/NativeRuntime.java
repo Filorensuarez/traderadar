@@ -64,7 +64,17 @@ final class NativeRuntime implements OfficialSource.Listener {
         }
         minutes.put(s,copy);
     }
-    public synchronized void book(String s,NativeScanModel.Book b){if(running&&markets.containsKey(s)&&feeds.containsKey(s)&&feeds.get(s).continuousSince>=0&&b!=null&&b.time<=System.currentTimeMillis()&&System.currentTimeMillis()-b.time<=config.staleMs)books.put(s,b);}
+    public synchronized void book(String s,NativeScanModel.Book b){
+        NativeScanModel.Window feed=feeds.get(s);
+        long now=System.currentTimeMillis();
+        if(!running||!markets.containsKey(s)||feed==null||feed.continuousSince<0||b==null
+            ||b.time>now||now-b.time>config.staleMs
+            ||!Double.isFinite(b.bid)||!Double.isFinite(b.ask)||!Double.isFinite(b.depthQuote)
+            ||b.bid<=0||b.ask<=b.bid||b.depthQuote<=0){rejected++;return;}
+        NativeScanModel.Book prior=books.get(s);
+        if(prior!=null&&b.time<prior.time){rejected++;return;}
+        books.put(s,b);
+    }
     public synchronized void error(String safeMessage){status="Veri bağlantısı başarısız; kaynak desteğini ve erişimi kontrol edin";for(String s:new ArrayList<>(feeds.keySet()))disconnected(s);}
     synchronized void tick(long now,Alert alert){
         if(!running)return;long began=System.nanoTime(),end=Math.floorDiv(now,1000)*1000;
