@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -41,13 +43,14 @@ final class OkxTrCatalog {
         JSONArray rows=catalog.optJSONArray("data");
         if(rows==null)throw new IOException("Catalog data missing");
         List<String> symbols=new ArrayList<>();
+        Set<String> seen=new HashSet<>();
         for(int i=0;i<rows.length();i++){
             JSONObject row=rows.optJSONObject(i);
             if(row==null||!"SPOT".equals(row.optString("instType"))
                 ||!"live".equals(row.optString("state")))continue;
             String id=row.optString("instId");
             if(!id.matches("[A-Z0-9]{1,24}-[A-Z0-9]{1,12}"))continue;
-            if(!symbols.contains(id))symbols.add(id);
+            if(seen.add(id))symbols.add(id);
         }
         if(symbols.isEmpty())throw new IOException("No active spot instruments");
         Collections.sort(symbols);
