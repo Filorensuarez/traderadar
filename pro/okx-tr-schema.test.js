@@ -28,3 +28,11 @@ test('parse read-only order book with valid spread',()=>{
   assert.equal(parseOkxTrBook(book,ts).bid,99);
   assert.throws(()=>parseOkxTrBook({code:'0',data:[{ts:String(ts),bids:[['102','2']],asks:[['101','3']]}]},ts));
 });
+
+test('reject stale and future OKX TR order book snapshots',()=>{
+  const now=1760000400000;
+  const row=ts=>({code:'0',data:[{ts:String(ts),bids:[['99','2']],asks:[['101','3']]}]});
+  assert.equal(parseOkxTrBook(row(now-2000),now).time,now-2000);
+  assert.throws(()=>parseOkxTrBook(row(now-6000),now));
+  assert.throws(()=>parseOkxTrBook(row(now+2000),now));
+});
