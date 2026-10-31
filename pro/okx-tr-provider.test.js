@@ -47,7 +47,7 @@ test('read-only REST minute and book endpoints use OKX TR only',async()=>{
 });
 
 test('retired socket close cannot disconnect a replacement feed',()=>{
-  const { EventEmitter }=requireSocketEvents();
+  const EventEmitter=MockEmitter;
   const sockets=[];
   const provider=new OkxTrProvider({verified:true,socketFactory:()=>{
     const socket=new EventEmitter();
@@ -70,7 +70,6 @@ test('retired socket close cannot disconnect a replacement feed',()=>{
   assert.notEqual(provider.feeds.get(market.symbol).continuousSince,null);
   provider.stop();
 });
-function requireSocketEvents(){return {EventEmitter:MockEmitter};}
 class MockEmitter{
   constructor(){this.handlers=new Map();}
   on(event,callback){this.handlers.set(event,callback);return this;}
