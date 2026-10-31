@@ -33,6 +33,9 @@ export class ProEngine {
     const start = performance.now(); let evaluated = 0, unavailable = 0;
     const depthCandidates = [];
     for (const symbol of this.minuteCache.keys()) if (!this.provider.markets.has(symbol)) this.minuteCache.delete(symbol);
+    for (const symbol of this.feedIdentity.keys()) if (!this.provider.markets.has(symbol)) {
+      this.feedIdentity.delete(symbol);this.books.delete(symbol);this.processed.delete(symbol);
+    }
     for (const symbol of this.results.keys()) if (!this.provider.markets.has(symbol)) { this.results.delete(symbol); this.processed.delete(symbol); }
     for (const market of this.provider.markets.values()) {
       const feed = this.provider.feeds.get(market.symbol);
