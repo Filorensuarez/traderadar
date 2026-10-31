@@ -126,3 +126,11 @@ test('resubscription uses a new trade window rather than old seconds',()=>{
   assert.notEqual(provider.feeds.get(market.symbol),first);
   provider.stop();
 });
+
+test('verified adapter still fails closed when initial REST catalog is unavailable',async()=>{
+  const provider=new OkxTrProvider({verified:true,fetchFn:async()=>{throw Error('Offline');}});
+  await provider.start();
+  assert.equal(provider.snapshot().adapterEnabled,false);
+  assert.equal(provider.stopped,true);
+  assert.equal(provider.sockets.size,0);
+});
