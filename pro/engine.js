@@ -73,7 +73,7 @@ export class ProEngine {
       if (!result.ready || result.category === 'KOŞULLAR SAĞLANMIYOR' || now - result.observedAt > this.config.staleMs ||
         this.provider.feeds.get(symbol)?.continuousSince === null) continue;
       const signal = [...this.history.pending.values()].find(x => x.symbol === symbol);
-      rows.push({ ...result, symbol, coin: this.provider.markets.get(symbol)?.base, source: 'BINANCE TR',
+      rows.push({ ...result, symbol, coin: this.provider.markets.get(symbol)?.base, source: this.provider.snapshot().source,
         signalTime: signal?.time ?? result.observedAt, signalPrice: signal?.price ?? result.price,
         historicalPerformance: performance.find(x => x.symbol === symbol && x.targetPct === this.config.targetPct && x.horizonMinutes === this.config.horizonMinutes) ?? null });
     }
@@ -86,14 +86,16 @@ export class ProEngine {
   chart(symbol, now = Date.now()) {
     if (!this.provider.markets.has(symbol)) return null;
     const feed = this.provider.feeds.get(symbol);
-    return { symbol, source: 'BINANCE TR', interval: '1s', bars: feed ? [...feed.bars.values()].filter(x => x.time + 1000 <= now).sort((a, b) => a.time - b.time).slice(-300) : [],
+    return { symbol, source: this.provider.snapshot().source, interval: '1s', bars: feed ? [...feed.bars.values()].filter(x => x.time + 1000 <= now).sort((a, b) => a.time - b.time).slice(-300) : [],
       continuousSince: feed?.continuousSince ?? null, now };
   }
   async start() {
-    if (this.running) return; this.running = true;
+    if (this.running) return;
+    await this.provider.start();
+    if (!this.provider.snapshot().adapterEnabled) return;
+    this.running = true;
     const tick = setInterval(() => this.tick(), 1000), refresh = setInterval(() => void this.refreshMinute(), 350);
     tick.unref(); refresh.unref(); this.intervals.push(tick, refresh);
-    await this.provider.start();
   }
   stop() { this.running = false; this.intervals.forEach(clearInterval); this.intervals = []; this.provider.stop(); }
 }
