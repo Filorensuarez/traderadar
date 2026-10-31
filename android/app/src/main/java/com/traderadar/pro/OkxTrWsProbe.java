@@ -20,8 +20,15 @@ public final class OkxTrWsProbe {
             Request request=new Request.Builder().url("https://tr.okx.com/api/v5/public/instruments?instType=SPOT").build();
             try(Response response=client.newCall(request).execute()){
                 if(!response.isSuccessful()||response.body()==null)return "OKX TR spot kataloğuna erişilemedi; tarama kapalı.";
-                String raw=response.body().string();
-                if(raw.length()>8*1024*1024)return "Katalog yanıtı çok büyük; tarama kapalı.";
+                java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();
+                try(java.io.InputStream stream=response.body().byteStream()){
+                    byte[] buffer=new byte[8192];int n;
+                    while((n=stream.read(buffer))!=-1){
+                        if(bytes.size()+n>8*1024*1024)return "Katalog yanıtı çok büyük; tarama kapalı.";
+                        bytes.write(buffer,0,n);
+                    }
+                }
+                String raw=bytes.toString("UTF-8");
                 JSONObject catalog=new JSONObject(raw);
                 JSONArray rows=catalog.optJSONArray("data");
                 if(!"0".equals(catalog.optString("code"))||rows==null)return "OKX TR spot katalog yanıtı geçersiz.";
