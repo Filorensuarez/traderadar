@@ -42,6 +42,7 @@ final class NativeRuntime implements OfficialSource.Listener {
             if(b==null||b.time<0||b.time%60000!=0||b.time>now-60000
                 ||(previous>=0&&b.time-previous!=60000)
                 ||!Double.isFinite(b.open)||!Double.isFinite(b.high)||!Double.isFinite(b.low)||!Double.isFinite(b.close)
+                ||!Double.isFinite(b.volume)||!Double.isFinite(b.quoteVolume)||b.volume<0||b.quoteVolume<0
                 ||b.open<=0||b.high<=0||b.low<=0||b.close<=0
                 ||b.high<Math.max(b.open,Math.max(b.close,b.low))
                 ||b.low>Math.min(b.open,Math.min(b.close,b.high))){rejected++;return;}
@@ -49,6 +50,18 @@ final class NativeRuntime implements OfficialSource.Listener {
         }
         List<NativeScanModel.Bar> existing=minutes.get(s);
         if(existing!=null&&!existing.isEmpty()&&previous<existing.get(existing.size()-1).time){rejected++;return;}
+        // Never replace an already accepted closed minute with a contradictory OHLCV value.
+        if(existing!=null&&!existing.isEmpty()){
+            Map<Long,NativeScanModel.Bar> previousBars=new HashMap<>();
+            for(NativeScanModel.Bar bar:existing)previousBars.put(bar.time,bar);
+            for(NativeScanModel.Bar bar:copy){
+                NativeScanModel.Bar prior=previousBars.get(bar.time);
+                if(prior!=null&&(prior.open!=bar.open||prior.high!=bar.high||prior.low!=bar.low
+                    ||prior.close!=bar.close||prior.volume!=bar.volume||prior.quoteVolume!=bar.quoteVolume)){
+                    rejected++;return;
+                }
+            }
+        }
         minutes.put(s,copy);
     }
     public synchronized void book(String s,NativeScanModel.Book b){if(running&&markets.containsKey(s)&&feeds.containsKey(s)&&feeds.get(s).continuousSince>=0&&b!=null&&b.time<=System.currentTimeMillis()&&System.currentTimeMillis()-b.time<=config.staleMs)books.put(s,b);}
