@@ -64,7 +64,10 @@ public final class OkxTrWsProbe {
                         if("error".equals(message.optString("event"))){outcome.set("OKX TR aboneliği reddedildi.");latch.countDown();return;}
                         JSONObject arg=message.optJSONObject("arg");
                         if(arg==null||!"trades".equals(arg.optString("channel"))||!selected.equals(arg.optString("instId")))return;
-                        if("subscribe".equals(message.optString("event"))){acknowledged=true;return;}
+                        if("subscribe".equals(message.optString("event"))){
+                            if(acknowledged){outcome.set("Tekrarlanan WebSocket abonelik onayı; tarama kapalı.");latch.countDown();return;}
+                            acknowledged=true;return;
+                        }
                         JSONArray trades=message.optJSONArray("data");
                         if(!acknowledged||trades==null)return;
                         long now=System.currentTimeMillis();
@@ -74,7 +77,7 @@ public final class OkxTrWsProbe {
                             long ts=Long.parseLong(trade.getString("ts"));
                             double px=Double.parseDouble(trade.getString("px"));
                             double sz=Double.parseDouble(trade.getString("sz"));
-                            if(now-ts>=0&&now-ts<=30000&&px>0&&sz>0
+                            if(now-ts>=0&&now-ts<=30000&&Double.isFinite(px)&&Double.isFinite(sz)&&px>0&&sz>0
                                 &&("buy".equals(trade.optString("side"))||"sell".equals(trade.optString("side")))){
                                 outcome.set("OKX TR WebSocket işlemi doğrulandı: "+selected+". Tarama hâlâ kapalı.");
                                 latch.countDown();return;
