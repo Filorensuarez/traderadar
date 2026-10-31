@@ -33,7 +33,24 @@ final class NativeRuntime implements OfficialSource.Listener {
     public synchronized void connected(String s,long time){if(!running||!markets.containsKey(s))return;NativeScanModel.Window previous=feeds.get(s);if(previous!=null)previous.disconnect();NativeScanModel.Window w=new NativeScanModel.Window();feeds.put(s,w);processed.remove(s);books.remove(s);minutes.remove(s);w.connect(time);}
     public synchronized void disconnected(String s){NativeScanModel.Window w=feeds.get(s);if(w!=null)w.disconnect();results.remove(s);books.remove(s);minutes.remove(s);processed.remove(s);for(NativeOutcome r:pending.values())if(r.symbol.equals(s)){r.interrupt();store.save(r);}}
     public synchronized void trade(String s,long id,long time,double price,double quantity,boolean buy){if(!running)return;NativeScanModel.Window w=feeds.get(s);if(w==null||w.continuousSince<0||!w.add(id,time,price,quantity,buy,System.currentTimeMillis())){rejected++;return;}received++;lastMessage=System.currentTimeMillis();lastLatency=lastMessage-time;}
-    public synchronized void minutes(String s,List<NativeScanModel.Bar> bars){if(running&&markets.containsKey(s)&&feeds.containsKey(s)&&feeds.get(s).continuousSince>=0&&bars!=null){List<NativeScanModel.Bar> copy=new ArrayList<>();for(NativeScanModel.Bar b:bars)copy.add(b.copy());minutes.put(s,copy);}}
+    public synchronized void minutes(String s,List<NativeScanModel.Bar> bars){
+        NativeScanModel.Window feed=feeds.get(s);
+        if(!running||!markets.containsKey(s)||feed==null||feed.continuousSince<0||bars==null||bars.size()<30){rejected++;return;}
+        long now=System.currentTimeMillis(),previous=-1;
+        List<NativeScanModel.Bar> copy=new ArrayList<>(bars.size());
+        for(NativeScanModel.Bar b:bars){
+            if(b==null||b.time<0||b.time%60000!=0||b.time>now-60000
+                ||(previous>=0&&b.time-previous!=60000)
+                ||!Double.isFinite(b.open)||!Double.isFinite(b.high)||!Double.isFinite(b.low)||!Double.isFinite(b.close)
+                ||b.open<=0||b.high<=0||b.low<=0||b.close<=0
+                ||b.high<Math.max(b.open,Math.max(b.close,b.low))
+                ||b.low>Math.min(b.open,Math.min(b.close,b.high))){rejected++;return;}
+            previous=b.time;copy.add(b.copy());
+        }
+        List<NativeScanModel.Bar> existing=minutes.get(s);
+        if(existing!=null&&!existing.isEmpty()&&previous<existing.get(existing.size()-1).time){rejected++;return;}
+        minutes.put(s,copy);
+    }
     public synchronized void book(String s,NativeScanModel.Book b){if(running&&markets.containsKey(s)&&feeds.containsKey(s)&&feeds.get(s).continuousSince>=0&&b!=null&&b.time<=System.currentTimeMillis()&&System.currentTimeMillis()-b.time<=config.staleMs)books.put(s,b);}
     public synchronized void error(String safeMessage){status="Veri bağlantısı başarısız; kaynak desteğini ve erişimi kontrol edin";for(String s:new ArrayList<>(feeds.keySet()))disconnected(s);}
     synchronized void tick(long now,Alert alert){
