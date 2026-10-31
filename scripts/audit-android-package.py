@@ -15,6 +15,14 @@ ALLOWED = {
 }
 ASSETS = {'assets/pro/' + name for name in ['index.html', 'app.js', 'style.css', 'config.js', 'android-transport.js']}
 
+def data_sync_type(value):
+    if value == 'dataSync':
+        return True
+    try:
+        return int(value, 0) == 1  # Android ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+    except (ValueError, TypeError):
+        return False
+
 
 def inspect(manifest, names, variant):
     root = ET.fromstring(manifest)
@@ -42,8 +50,10 @@ def inspect(manifest, names, variant):
                     issues.append('Launcher declaration is invalid')
             elif tag == 'service' and name in ['.ScanService', 'com.traderadar.pro.ScanService']:
                 seen.add('scanner')
-                if component.get(ANDROID + 'exported') != 'false' or component.get(ANDROID + 'foregroundServiceType') not in ['dataSync', '1', '0x00000001']:
-                    issues.append('Scan service exposure/type differs from policy')
+                exported = component.get(ANDROID + 'exported')
+                service_type = component.get(ANDROID + 'foregroundServiceType')
+                if exported != 'false' or not data_sync_type(service_type):
+                    issues.append('Scan service exposure/type differs from policy: exported=' + str(exported) + ', type=' + str(service_type))
             else:
                 issues.append('Unreviewed Android component: ' + name)
     if seen != {'launcher', 'scanner'}:

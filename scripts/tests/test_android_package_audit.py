@@ -21,6 +21,14 @@ class ApkPolicyTest(unittest.TestCase):
     def test_current_manifest_policy(self):
         self.assertEqual(self.audit(self.manifest())['issues'], [])
 
+    def test_android_service_flag_renderings(self):
+        for value in ['dataSync', '1', '0x1', '0x00000001']:
+            root = self.manifest()
+            root.find('application/service').set(POLICY.ANDROID + 'foregroundServiceType', value)
+            self.assertEqual(self.audit(root)['issues'], [], value)
+        for value in ['0', '0x3', 'dataSync|location', None]:
+            self.assertFalse(POLICY.data_sync_type(value))
+
     def test_extra_permission_and_exported_component(self):
         root = self.manifest()
         ET.SubElement(root, 'uses-permission', {POLICY.ANDROID + 'name': 'android.permission.READ_SMS'})
