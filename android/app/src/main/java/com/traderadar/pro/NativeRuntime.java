@@ -14,6 +14,7 @@ final class NativeRuntime implements OfficialSource.Listener {
     NativeScanModel.Config config;volatile boolean running;volatile String status=OfficialSource.BLOCKER;
     long received,lastMessage,lastLatency,lastTick;double lastScanMs,p95;int rejected;
     private final Map<String,String> markets=new TreeMap<>();
+    private final Set<String> quarantinedMarkets=new HashSet<>();
     private final Map<String,NativeScanModel.Window> feeds=new HashMap<>();
     private final Map<String,List<NativeScanModel.Bar>> minutes=new HashMap<>();
     private final Map<String,NativeScanModel.Book> books=new HashMap<>();
@@ -27,9 +28,9 @@ final class NativeRuntime implements OfficialSource.Listener {
         for(NativeOutcome r:store.pending())pending.put(r.id,r);
         if(preferences.getBoolean("wasRunning",false)){status="Önceki tarama Android tarafından kesilmiş olabilir. Yeniden Başlat düğmesini kullanın.";preferences.edit().putBoolean("wasRunning",false).apply();}
     }
-    synchronized void started(){markets.clear();feeds.clear();minutes.clear();books.clear();results.clear();processed.clear();received=0;lastMessage=0;lastLatency=0;running=true;status="Kaynak doğrulandı; gerçek veri ve kapalı mumlar bekleniyor";preferences.edit().putBoolean("wasRunning",true).apply();}
+    synchronized void started(){quarantinedMarkets.clear();markets.clear();feeds.clear();minutes.clear();books.clear();results.clear();processed.clear();received=0;lastMessage=0;lastLatency=0;running=true;status="Kaynak doğrulandı; gerçek veri ve kapalı mumlar bekleniyor";preferences.edit().putBoolean("wasRunning",true).apply();}
     synchronized void stopped(String reason){running=false;status=reason;for(NativeScanModel.Window w:feeds.values())w.disconnect();results.clear();books.clear();minutes.clear();processed.clear();for(NativeOutcome r:pending.values()){r.interrupt();store.save(r);}preferences.edit().putBoolean("wasRunning",false).apply();}
-    public synchronized void market(String s,String base){if(!running)return;if(s==null||base==null||!s.matches("[A-Z0-9]{1,24}_[A-Z0-9]{1,12}")||!base.matches("[A-Z0-9]{1,24}")){rejected++;return;}String prior=markets.get(s);if(prior!=null&&!prior.equals(base)){disconnected(s);feeds.remove(s);markets.remove(s);rejected++;status="Parite kimliği çelişkili; parite taramadan çıkarıldı";return;}markets.put(s,base);}
+    public synchronized void market(String s,String base){if(!running)return;if(s!=null&&quarantinedMarkets.contains(s)){rejected++;return;}if(s==null||base==null||!s.matches("[A-Z0-9]{1,24}_[A-Z0-9]{1,12}")||!base.matches("[A-Z0-9]{1,24}")){rejected++;return;}String prior=markets.get(s);if(prior!=null&&!prior.equals(base)){disconnected(s);feeds.remove(s);markets.remove(s);quarantinedMarkets.add(s);rejected++;status="Parite kimliği çelişkili; parite taramadan çıkarıldı";return;}markets.put(s,base);}
     public synchronized void connected(String s,long time){if(!running||!markets.containsKey(s))return;NativeScanModel.Window previous=feeds.get(s);if(previous!=null)previous.disconnect();NativeScanModel.Window w=new NativeScanModel.Window();feeds.put(s,w);processed.remove(s);books.remove(s);minutes.remove(s);w.connect(time);}
     public synchronized void disconnected(String s){NativeScanModel.Window w=feeds.get(s);if(w!=null)w.disconnect();results.remove(s);books.remove(s);minutes.remove(s);processed.remove(s);for(NativeOutcome r:pending.values())if(r.symbol.equals(s)){r.interrupt();store.save(r);}}
     public synchronized void trade(String s,long id,long time,double price,double quantity,boolean buy){if(!running)return;NativeScanModel.Window w=feeds.get(s);if(w==null||w.continuousSince<0||!w.add(id,time,price,quantity,buy,System.currentTimeMillis())){rejected++;return;}received++;lastMessage=System.currentTimeMillis();lastLatency=lastMessage-time;}
