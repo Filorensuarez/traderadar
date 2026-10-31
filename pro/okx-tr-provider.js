@@ -68,7 +68,7 @@ export class OkxTrProvider {
     const socket=this.socketFactory(STREAM);
     this.sockets.add(socket);
     const allowed=new Map(markets.map(m=>[m.wireSymbol,m]));
-    let subscribed=false;
+    const acknowledged=new Set();
     let heartbeat;
     socket.on('open',()=>{
       socket.send(JSON.stringify({op:'subscribe',args:markets.map(m=>({channel:'trades',instId:m.wireSymbol}))}));
@@ -84,11 +84,11 @@ export class OkxTrProvider {
           const market=allowed.get(msg.arg.instId);
           if(!market)throw Error('Unknown subscription');
           const feed=this.feeds.get(market.symbol)??new TradeCandles();
-          feed.connect(this.clock());this.feeds.set(market.symbol,feed);subscribed=true;return;
+          feed.connect(this.clock());this.feeds.set(market.symbol,feed);acknowledged.add(market.wireSymbol);return;
         }
         if(msg.arg?.channel!=='trades'||!Array.isArray(msg.data))return;
         const market=allowed.get(msg.arg.instId);
-        if(!market||!subscribed)throw Error('Unverified trade subscription');
+        if(!market||!acknowledged.has(market.wireSymbol))throw Error('Unverified trade subscription');
         for(const row of msg.data){
           if(row.instId!==market.wireSymbol)throw Error('Instrument mismatch');
           const trade=parseOkxTrTrade(row,this.clock());
