@@ -10,6 +10,7 @@
     "test:pro": "node --test pro/tests/*.test.js",
     "test:pro:ui": "node pro/tests/browser.mjs",
     "test:android:core": "node scripts/test-android-core.mjs",
+    "prepare:android:wrapper": "node scripts/prepare-gradle-wrapper.mjs",
     "backtest:pro": "node pro/backtest.js"
   },
   "dependencies": {

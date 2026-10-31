@@ -38,6 +38,7 @@ public final class ScanService extends Service {
         return START_NOT_STICKY;
     }
     private void signal(String id,String symbol,double price,long time){
+        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
         java.text.SimpleDateFormat formatter=new java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.forLanguageTag("tr-TR"));formatter.setTimeZone(java.util.TimeZone.getTimeZone("Europe/Istanbul"));String clock=formatter.format(new java.util.Date(time));
         Notification n=new Notification.Builder(this,SIGNALS).setSmallIcon(R.drawable.ic_traderadar).setContentTitle("Çoklu Teyit · "+symbol).setContentText("Fiyat: "+price+" · "+clock).setContentIntent(open()).setAutoCancel(true).setOnlyAlertOnce(true).build();notifications.notify(id,302,n);
     }

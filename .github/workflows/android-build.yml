@@ -4,53 +4,123 @@ on:
   push:
     paths:
       - 'android/**'
-      - 'pro/public/**'
-      - 'pro/analysis.js'
-      - 'pro/config.js'
-      - 'pro/candles.js'
-      - 'pro/tests/helpers.js'
-      - 'scripts/test-android-core.mjs'
+      - 'pro/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/android-build.yml'
   pull_request:
     paths:
       - 'android/**'
-      - 'pro/public/**'
-      - 'pro/analysis.js'
-      - 'pro/config.js'
-      - 'pro/candles.js'
-      - 'pro/tests/helpers.js'
-      - 'scripts/test-android-core.mjs'
+      - 'pro/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/android-build.yml'
 permissions:
   contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   debug-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: npm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Configure Android SDK
+      - name: Install locked Node dependencies
+        run: npm ci --ignore-scripts --no-fund --no-audit
+      - name: Compare native calculation and lifecycle gate with existing model
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
-          "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0" || sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-      - name: Compare native strategy with existing JavaScript model
-        run: npm run test:android:core
+          mkdir -p artifacts
+          npm run test:android:core 2>&1 | tee artifacts/native-core.log
+      - name: Run Pro regression tests
+        run: npm run test:pro 2>&1 | tee artifacts/pro-tests.log
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build installable debug APK
+      - name: Generate missing Wrapper and verify official SHA-256
+        id: wrapper
+        run: npm run prepare:android:wrapper
+      - uses: gradle/actions/wrapper-validation@v4
+      - name: Configure Android SDK 35
+        run: |
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          sdk_manager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$sdk_manager" ]]; then
+            echo '::error::Android SDK command-line tools are missing from the runner'
+            exit 1
+          fi
+          echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk_root" >> "$GITHUB_ENV"
+          "$sdk_manager" --install 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build and lint debug APK using Wrapper
         working-directory: android
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
-      - uses: actions/upload-artifact@v4
+        run: ./gradlew --no-daemon --max-workers=2 --console=plain :app:assembleDebug :app:lintDebug --stacktrace 2>&1 | tee ../artifacts/android-build.log
+      - name: Verify debug signature and bundled Pro UI
+        run: |
+          apk='android/app/build/outputs/apk/debug/app-debug.apk'
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk" | tee artifacts/apk-signature.log
+          unzip -Z1 "$apk" > artifacts/apk-files.txt
+          grep -Fx 'assets/pro/index.html' artifacts/apk-files.txt
+          grep -Fx 'assets/pro/app.js' artifacts/apk-files.txt
+          node scripts/write-android-build-info.mjs
+          mkdir -p artifacts/apk
+          cp "$apk" artifacts/apk/app-debug.apk
+          cp artifacts/android-build-info.json artifacts/apk/
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v4
         with:
           name: traderadar-android-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: artifacts/apk/
           if-no-files-found: error
           retention-days: 30
+      - name: Upload verified complete Gradle Wrapper
+        if: ${{ always() && steps.wrapper.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: traderadar-gradle-wrapper-8.9
+          path: |
+            android/gradlew
+            android/gradlew.bat
+            android/gradle/wrapper/gradle-wrapper.jar
+            android/gradle/wrapper/gradle-wrapper.properties
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: traderadar-android-build-diagnostics
+          path: |
+            artifacts/*.log
+            artifacts/*.txt
+            artifacts/android-build-info.json
+            android/app/build/reports/
+            android/app/build/outputs/logs/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Explain artifact and validation scope
+        if: success()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          ## Debug APK
+          Download **traderadar-android-debug-apk** from this run's Artifacts section and extract app-debug.apk.
+          The package is debug-signed. Compilation and JVM/Pro tests do not establish Android device/background operation.
+          Binance TR remains gated until its official endpoints and actual REST/WebSocket data are verified.
+          The verified Wrapper is separately available as **traderadar-gradle-wrapper-8.9**.
+          SUMMARY
