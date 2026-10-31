@@ -97,6 +97,9 @@ export class OkxTrProvider {
         if(msg.event==='subscribe'&&msg.arg?.channel==='trades'){
           const market=allowed.get(msg.arg.instId);
           if(!market){socket.terminate();throw Error('Unknown subscription');}
+          if(acknowledged.has(market.wireSymbol)){
+            socket.terminate();throw Error('Duplicate subscription acknowledgement');
+          }
           const feed=new TradeCandles();
           feed.connect(this.clock());this.feeds.set(market.symbol,feed);acknowledged.add(market.wireSymbol);
           market.streamAvailable=true;market.availability='ISINMA';return;
