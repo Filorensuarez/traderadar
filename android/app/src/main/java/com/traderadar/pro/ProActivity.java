@@ -70,15 +70,15 @@ public final class ProActivity extends Activity {
                 int code=connection.getResponseCode();
                 if(code!=200){result="OKX TR REST HTTP "+code+". Canlı adaptör kapalı.";}
                 else {
-                    int count=0;StringBuilder json=new StringBuilder();
+                    int count=0;java.io.ByteArrayOutputStream json=new java.io.ByteArrayOutputStream();
                     try(java.io.InputStream input=connection.getInputStream()){
                         byte[] buffer=new byte[8192];int n;
                         while((n=input.read(buffer))!=-1){
                             count+=n;if(count>8*1024*1024)throw new IOException("Yanıt çok büyük");
-                            json.append(new String(buffer,0,n,java.nio.charset.StandardCharsets.UTF_8));
+                            json.write(buffer,0,n);
                         }
                     }
-                    org.json.JSONObject body=new org.json.JSONObject(json.toString());
+                    org.json.JSONObject body=new org.json.JSONObject(json.toString("UTF-8"));
                     org.json.JSONArray data=body.optJSONArray("data");
                     if(!"0".equals(body.optString("code"))||data==null)result="OKX TR REST yanıt şeması doğrulanamadı; adaptör kapalı.";
                     else {
