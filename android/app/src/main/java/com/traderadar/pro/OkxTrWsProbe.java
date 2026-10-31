@@ -26,6 +26,7 @@ public final class OkxTrWsProbe {
         try{
             socket=client.newWebSocket(new Request.Builder().url("wss://ws.okx.com/ws/v5/public").build(),new WebSocketListener(){
                 private boolean acknowledged=false;
+                private long lastTradeId=-1;
                 @Override public void onOpen(WebSocket ws,Response response){
                     if(response.code()!=101||response.priorResponse()!=null){outcome.set("WebSocket bağlantı yanıtı doğrulanamadı.");latch.countDown();ws.cancel();return;}
                     try{
@@ -50,9 +51,12 @@ public final class OkxTrWsProbe {
                         for(int i=0;i<trades.length();i++){
                             JSONObject trade=trades.optJSONObject(i);
                             if(trade==null||!selected.equals(trade.optString("instId")))continue;
+                            long tradeId=Long.parseLong(trade.getString("tradeId"));
                             long ts=Long.parseLong(trade.getString("ts"));
                             double px=Double.parseDouble(trade.getString("px"));
                             double sz=Double.parseDouble(trade.getString("sz"));
+                            if(tradeId<=lastTradeId){outcome.set("Tekrarlanan veya sırasız işlem kimliği; tarama kapalı.");latch.countDown();return;}
+                            lastTradeId=tradeId;
                             if(now-ts>=0&&now-ts<=30000&&Double.isFinite(px)&&Double.isFinite(sz)&&px>0&&sz>0
                                 &&("buy".equals(trade.optString("side"))||"sell".equals(trade.optString("side")))){
                                 outcome.set("OKX TR WebSocket işlemi doğrulandı: "+selected+". Tarama hâlâ kapalı.");
