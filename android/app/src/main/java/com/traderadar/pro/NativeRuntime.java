@@ -29,13 +29,13 @@ final class NativeRuntime implements OfficialSource.Listener {
     }
     synchronized void started(){markets.clear();feeds.clear();minutes.clear();books.clear();results.clear();processed.clear();received=0;lastMessage=0;lastLatency=0;running=true;status="Kaynak doğrulandı; gerçek veri ve kapalı mumlar bekleniyor";preferences.edit().putBoolean("wasRunning",true).apply();}
     synchronized void stopped(String reason){running=false;status=reason;for(NativeScanModel.Window w:feeds.values())w.disconnect();results.clear();books.clear();minutes.clear();processed.clear();for(NativeOutcome r:pending.values()){r.interrupt();store.save(r);}preferences.edit().putBoolean("wasRunning",false).apply();}
-    public synchronized void market(String s,String base){if(!s.matches("[A-Z0-9]{1,24}_[A-Z0-9]{1,12}")||!base.matches("[A-Z0-9]{1,24}")){rejected++;return;}markets.put(s,base);}
+    public synchronized void market(String s,String base){if(!running)return;if(s==null||base==null||!s.matches("[A-Z0-9]{1,24}_[A-Z0-9]{1,12}")||!base.matches("[A-Z0-9]{1,24}")){rejected++;return;}markets.put(s,base);}
     public synchronized void connected(String s,long time){if(!running||!markets.containsKey(s))return;NativeScanModel.Window previous=feeds.get(s);if(previous!=null)previous.disconnect();NativeScanModel.Window w=new NativeScanModel.Window();feeds.put(s,w);processed.remove(s);books.remove(s);minutes.remove(s);w.connect(time);}
     public synchronized void disconnected(String s){NativeScanModel.Window w=feeds.get(s);if(w!=null)w.disconnect();results.remove(s);books.remove(s);minutes.remove(s);processed.remove(s);for(NativeOutcome r:pending.values())if(r.symbol.equals(s)){r.interrupt();store.save(r);}}
     public synchronized void trade(String s,long id,long time,double price,double quantity,boolean buy){if(!running)return;NativeScanModel.Window w=feeds.get(s);if(w==null||w.continuousSince<0||!w.add(id,time,price,quantity,buy,System.currentTimeMillis())){rejected++;return;}received++;lastMessage=System.currentTimeMillis();lastLatency=lastMessage-time;}
     public synchronized void minutes(String s,List<NativeScanModel.Bar> bars){
         NativeScanModel.Window feed=feeds.get(s);
-        if(!running||!markets.containsKey(s)||feed==null||feed.continuousSince<0||bars==null||bars.size()<30){rejected++;return;}
+        if(!running||!markets.containsKey(s)||feed==null||feed.continuousSince<0||bars==null||bars.size()<30||bars.size()>1000){rejected++;return;}
         long now=System.currentTimeMillis(),previous=-1;
         List<NativeScanModel.Bar> copy=new ArrayList<>(bars.size());
         for(NativeScanModel.Bar b:bars){
