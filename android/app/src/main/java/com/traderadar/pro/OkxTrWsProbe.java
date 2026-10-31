@@ -17,33 +17,8 @@ public final class OkxTrWsProbe {
         final AtomicReference<String> outcome=new AtomicReference<>("OKX TR WebSocket yanıt vermedi; tarama kapalı.");
         final String instrument;
         try{
-            Request request=new Request.Builder().url("https://tr.okx.com/api/v5/public/instruments?instType=SPOT").build();
-            try(Response response=client.newCall(request).execute()){
-                if(!response.isSuccessful()||response.body()==null)return "OKX TR spot kataloğuna erişilemedi; tarama kapalı.";
-                java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();
-                try(java.io.InputStream stream=response.body().byteStream()){
-                    byte[] buffer=new byte[8192];int n;
-                    while((n=stream.read(buffer))!=-1){
-                        if(bytes.size()+n>8*1024*1024)return "Katalog yanıtı çok büyük; tarama kapalı.";
-                        bytes.write(buffer,0,n);
-                    }
-                }
-                String raw=bytes.toString("UTF-8");
-                JSONObject catalog=new JSONObject(raw);
-                JSONArray rows=catalog.optJSONArray("data");
-                if(!"0".equals(catalog.optString("code"))||rows==null)return "OKX TR spot katalog yanıtı geçersiz.";
-                String found=null;
-                for(int i=0;i<rows.length();i++){
-                    JSONObject row=rows.optJSONObject(i);
-                    if(row!=null&&"SPOT".equals(row.optString("instType"))&&"live".equals(row.optString("state"))
-                        &&row.optString("instId").matches("[A-Z0-9]{1,24}-[A-Z0-9]{1,12}")){
-                        if("BTC-TRY".equals(row.optString("instId"))){found="BTC-TRY";break;}
-                        if(found==null)found=row.optString("instId");
-                    }
-                }
-                if(found==null)return "Aktif spot parite bulunamadı; tarama kapalı.";
-                instrument=found;
-            }
+            java.util.List<String> symbols=OkxTrCatalog.fetch(client);
+            instrument=symbols.contains("BTC-TRY")?"BTC-TRY":symbols.get(0);
         }catch(Exception e){return "OKX TR REST katalog testi başarısız; tarama kapalı.";}
         finally {client.connectionPool().evictAll();}
         final String selected=instrument;
