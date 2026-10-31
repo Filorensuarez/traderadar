@@ -46,9 +46,15 @@ public class CoreTest {
         check(!c.start(null,true),"no official source no scan");Source noWs=new Source(true,false);check(!c.start(noWs,true)&&noWs.closed,"REST alone insufficient");Source noRest=new Source(false,true);check(!c.start(noRest,true)&&noRest.closed,"WS alone insufficient");Source automatic=new Source(true,true);check(!c.start(automatic,false)&&automatic.closed,"no automatic start");
         Source good=new Source(true,true);check(c.start(good,true)&&c.running(),"explicit start");good.listener.trade("A_TRY",1,NOW,100,1,true);check(listener.trades==1,"valid callback");c.stop();check(!c.running()&&good.closed,"stop closes transport");good.listener.trade("A_TRY",2,NOW,999,1,true);check(listener.trades==1,"late callback ignored");check(OfficialSource.createVerifiedSession()==null,"production source remains locked");
     }
+    private static void localUi(){
+        String base="https://appassets.androidplatform.net/pro/";
+        for(String asset:Arrays.asList("index.html","style.css","app.js","config.js","android-transport.js"))check(asset.equals(LocalUiPolicy.asset(base+asset,"GET")),"fixed asset allowed");
+        for(String url:Arrays.asList("https://evil.test/pro/index.html","http://appassets.androidplatform.net/pro/index.html",base+"../index.html",base+"%69ndex.html",base+"server.js",base+"index.html?next=https://evil.test","https://user:pass@appassets.androidplatform.net/pro/index.html","https://appassets.androidplatform.net:8443/pro/index.html","file:///data/data/private","javascript:alert(1)","intent://evil",base+"index.html#settings"))check(LocalUiPolicy.asset(url,"GET")==null,"resource denied: "+url);
+        check(LocalUiPolicy.asset(base+"index.html","POST")==null,"POST denied");check(LocalUiPolicy.navigation(base+"index.html#settings"),"local section works");check(!LocalUiPolicy.navigation(base+"app.js"),"script cannot become main frame");check(!LocalUiPolicy.navigation("https://evil.test/"),"remote navigation denied");
+    }
     public static void main(String[] args)throws Exception{
         try(java.util.stream.Stream<Path> files=Files.list(Path.of(args[0]))){for(Path file:(Iterable<Path>)files.sorted()::iterator)parity(file);}
-        windows();outcomes();lifecycle();
+        windows();outcomes();lifecycle();localUi();
         NativeScanModel.Config c=new NativeScanModel.Config();List<NativeScanModel.Bar> s=new ArrayList<>(),m=new ArrayList<>();for(int i=0;i<300;i++)s.add(new NativeScanModel.Bar(NOW-300000+i*1000,102,10));for(int i=0;i<30;i++)m.add(new NativeScanModel.Bar(NOW-2100000+i*60000,100,600));
         long began=System.nanoTime();for(int i=0;i<1000;i++)check(NativeScanModel.analyze(s,m,null,NOW,c).ready,"load analysis");
         System.out.println("PASS: "+passed+" assertions; 1000 JVM fixture analyses "+((System.nanoTime()-began)/1000000.0)+" ms. Not an Android battery/background test.");

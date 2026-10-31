@@ -1,6 +1,12 @@
 name: Android build
 on:
   workflow_dispatch:
+    inputs:
+      variant:
+        description: 'debug: diagnostics; release: stable signing secrets required'
+        type: choice
+        options: [debug, release]
+        default: debug
   push:
     paths:
       - 'android/**'
@@ -41,6 +47,19 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Select reviewed APK variant
+        id: variant
+        env:
+          REQUESTED_VARIANT: ${{ inputs.variant || 'debug' }}
+        run: |
+          case "$REQUESTED_VARIANT" in
+            debug) suffix=Debug ;;
+            release) suffix=Release ;;
+            *) echo '::error::Unsupported variant'; exit 1 ;;
+          esac
+          echo "APK_VARIANT=$REQUESTED_VARIANT" >> "$GITHUB_ENV"
+          echo "APK_TASK_SUFFIX=$suffix" >> "$GITHUB_ENV"
+          echo "variant=$REQUESTED_VARIANT" >> "$GITHUB_OUTPUT"
       - name: Install locked Node dependencies
         run: npm ci --ignore-scripts --no-fund --no-audit
       - name: Compare native calculation and lifecycle gate with existing model
@@ -67,25 +86,48 @@ jobs:
           echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$sdk_root" >> "$GITHUB_ENV"
           "$sdk_manager" --install 'platforms;android-35' 'build-tools;35.0.0'
-      - name: Build and lint debug APK using Wrapper
+      - name: Check APK policy audit tests
+        run: python -m unittest discover -s scripts/tests -p 'test_*.py'
+      - name: Build, lint and report dependencies using Wrapper
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 --console=plain :app:assembleDebug :app:lintDebug --stacktrace 2>&1 | tee ../artifacts/android-build.log
-      - name: Verify debug signature and bundled Pro UI
+        run: ./gradlew --no-daemon --max-workers=2 --console=plain ":app:assemble${APK_TASK_SUFFIX}" ":app:lint${APK_TASK_SUFFIX}" :app:dependencies --stacktrace 2>&1 | tee ../artifacts/android-build.log
+      - name: Sign release with maintained private key
+        if: ${{ steps.variant.outputs.variant == 'release' && github.event_name == 'workflow_dispatch' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          apk='android/app/build/outputs/apk/debug/app-debug.apk'
+          key_file="$RUNNER_TEMP/traderadar-signing.jks"
+          trap 'rm -f "$key_file"' EXIT
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          for (const name of ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']) {
+            if (!process.env[name]) throw Error('Missing release signing requirement: ' + name + '; configure repository secrets securely');
+          }
+          await writeFile(process.env.RUNNER_TEMP + '/traderadar-signing.jks', Buffer.from(process.env.ANDROID_KEYSTORE_BASE64, 'base64'), { mode: 0o600 });
+          NODE
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks "$key_file" --ks-key-alias "$ANDROID_KEY_ALIAS" --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD --out android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Verify signature, final permissions and packaged UI
+        run: |
+          apk="android/app/build/outputs/apk/$APK_VARIANT/app-$APK_VARIANT.apk"
           test -s "$apk"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk" | tee artifacts/apk-signature.log
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" | tee artifacts/apk-signature.log
           unzip -Z1 "$apk" > artifacts/apk-files.txt
           grep -Fx 'assets/pro/index.html' artifacts/apk-files.txt
           grep -Fx 'assets/pro/app.js' artifacts/apk-files.txt
+          "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest print "$apk" > artifacts/apk-manifest.xml
+          python scripts/audit-android-package.py --manifest artifacts/apk-manifest.xml --apk "$apk" --variant "$APK_VARIANT" --output artifacts/android-package-audit.json
           node scripts/write-android-build-info.mjs
           mkdir -p artifacts/apk
-          cp "$apk" artifacts/apk/app-debug.apk
-          cp artifacts/android-build-info.json artifacts/apk/
-      - name: Upload installable debug APK
+          cp "$apk" "artifacts/apk/app-$APK_VARIANT.apk"
+          cp artifacts/android-build-info.json artifacts/android-package-audit.json artifacts/apk-signature.log artifacts/apk/
+
+      - name: Upload verified signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: traderadar-android-debug-apk
+          name: traderadar-android-${{ steps.variant.outputs.variant }}-apk
           path: artifacts/apk/
           if-no-files-found: error
           retention-days: 30
@@ -110,17 +152,24 @@ jobs:
             artifacts/*.log
             artifacts/*.txt
             artifacts/android-build-info.json
+            artifacts/android-package-audit.json
+            artifacts/apk-manifest.xml
             android/app/build/reports/
             android/app/build/outputs/logs/
           if-no-files-found: ignore
           retention-days: 14
+      - name: Remove private signing file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/traderadar-signing.jks"
       - name: Explain artifact and validation scope
         if: success()
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
-          ## Debug APK
-          Download **traderadar-android-debug-apk** from this run's Artifacts section and extract app-debug.apk.
-          The package is debug-signed. Compilation and JVM/Pro tests do not establish Android device/background operation.
+          ## APK security evidence
+          Download the matching **traderadar-android-debug-apk** or **traderadar-android-release-apk** artifact.
+          Compare android-build-info.json (APK SHA-256/commit), apk-signature.log (public certificate), and android-package-audit.json.
+          Debug builds are diagnostic. A release build requires the maintained private signing key; a signature does not establish Play Protect approval.
+          Compilation, lint and packaging policy checks do not establish Android device/background operation or absence of malware.
           Binance TR remains gated until its official endpoints and actual REST/WebSocket data are verified.
           The verified Wrapper is separately available as **traderadar-gradle-wrapper-8.9**.
           SUMMARY

@@ -1,4 +1,5 @@
 import { API_BASE } from './config.js';
+import { nativeTransport } from './android-transport.js';
 const $ = id => document.getElementById(id);
 const format = (n, digits = 2) => typeof n === 'number' && Number.isFinite(n) ? n.toLocaleString('tr-TR', { maximumFractionDigits: digits }) : 'Veri yok';
 const date = n => n ? new Date(n).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }) : 'Henüz yok';
@@ -11,8 +12,8 @@ const storage = {
 let seen = new Set(storage.get('pro-alarm-ids', []));
 let seeded = false;
 async function api(path, options) {
-  if (globalThis.NativePro) {
-    const result = JSON.parse(globalThis.NativePro.request(path, options?.method || 'GET', options?.body || ''));
+  if (nativeTransport) {
+    const result = await nativeTransport.request(path, options?.method || 'GET', options?.body || '');
     if (result?.error) throw Error(result.error);
     return result;
   }
@@ -76,7 +77,7 @@ function loadForm(config) {
   $('settings-form').elements.volumeFilter.checked = config.volumeFilter;
   $('settings-form').elements.volumeFilter.disabled = !session.canEdit;
   $('settings-form').querySelector('button').disabled = !session.canEdit;
-  $('settings-note').textContent = globalThis.NativePro ? 'Ayarlar bu Android cihazında saklanır; geçmiş sinyaller kendi ayarlarını korur.' : session.canEdit ? 'Ayarlar sunucuda saklanır; geçmiş sinyaller kendi ayarlarını korur.' : 'Salt okunur erişim. Ayarları sunucunun yerel yöneticisi değiştirebilir.';
+  $('settings-note').textContent = nativeTransport ? 'Ayarlar bu Android cihazında saklanır; geçmiş sinyaller kendi ayarlarını korur.' : session.canEdit ? 'Ayarlar sunucuda saklanır; geçmiş sinyaller kendi ayarlarını korur.' : 'Salt okunur erişim. Ayarları sunucunun yerel yöneticisi değiştirebilir.';
 }
 function renderStatus() {
   const s = state.source, fresh = s.connected && s.fresh;
@@ -121,7 +122,7 @@ async function reports() {
 async function notifications() {
   const rows = await api('notifications'); $('notification-history').replaceChildren(...rows.map(r => node('p', `${date(r.time)} · ${r.symbol} · ${r.category}`)));
   for (const r of [...rows].reverse()) {
-    if (!globalThis.NativePro && !seen.has(r.id) && seeded && Date.now() - r.time < 30000 && state?.source.fresh) {
+    if (!nativeTransport && !seen.has(r.id) && seeded && Date.now() - r.time < 30000 && state?.source.fresh) {
       if ($('sound').checked && audio) { const osc = audio.createOscillator(), gain = audio.createGain(); osc.connect(gain); gain.connect(audio.destination); gain.gain.value = 0.08; osc.frequency.value = 740; osc.start(); osc.stop(audio.currentTime + 0.2); }
       if ('Notification' in window && Notification.permission === 'granted') new Notification('TradeRadar Pro · Çoklu teyit', { body: r.symbol, tag: r.id });
     }
@@ -179,7 +180,7 @@ async function refresh() {
   finally { busy = false; }
 }
 try { session = await api('session'); } catch (e) { showError(e); }
-if (globalThis.NativePro) {
+if (nativeTransport) {
   $('sound').parentElement.hidden = true;
   $('enable-notifications').hidden = true;
   $('alarm-note').textContent = 'Bildirimler yerel Android hizmetinden gelir. Ses ve izinler Android bildirim kanalı ayarlarından yönetilir. Eksik dönemler başarı/başarısızlık olarak uydurulmaz.';

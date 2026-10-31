@@ -1,5 +1,7 @@
 # TradeRadar Pro — native Android geliştirme sürümü
 
+Güncel Play Protect kaynak denetimi ve sınırları: [güvenlik raporu](../docs/PLAY_PROTECT_GUVENLIK_RAPORU.md). Genel JavaScript interface, yerel ana-frame'e aktarılan WebMessagePort ile değiştirildi. Eski uzak WebView kabuğu artık `android/legacy/` altındadır ve APK'ya derlenmez. APK'nın temiz olduğu veya Play Protect onayı aldığı iddia edilmez; engellenen binary kimliği ve gerçek yeni build henüz doğrulanmadı.
+
 Son talimat esas alındı: kullanıcı başlatmalı APK ve Android Foreground Service. Windows veya sürekli sunucu bağımlılığı yoktur. Önceki PWA planı son APK talimatıyla değiştirilmiştir.
 
 **Durum:** Yerel motor, panel köprüsü ve hizmet kaynakları yazıldı. APK bu ortamda derlenemedi; Android framework derlemesi, kurulum ve gerçek cihaz testleri doğrulanmadı. Resmî Binance TR sözleşmesi doğrulanamadığından `OfficialSource.createVerifiedSession()` kapalıdır ve `null` döndürür. Başlat henüz canlı taramayı açamaz. Bu sürüm hazır/çalışan canlı APK olarak sunulmaz.

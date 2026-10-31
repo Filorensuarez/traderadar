@@ -26,7 +26,7 @@ try{
     await writeFile(join(fixtures,name+'.tsv'),lines.join('\n'));
   }
   const source='android/app/src/main/java/com/traderadar/pro/';
-  const compile=spawnSync('java',['-m','jdk.compiler/com.sun.tools.javac.Main','-source','17','-target','17','-d',classes,...['NativeScanModel','NativeOutcome','OfficialSource','ScanSessionController'].map(n=>source+n+'.java'),'android/native-tests/CoreTest.java'],{cwd:root,encoding:'utf8'});
+  const compile=spawnSync('java',['-m','jdk.compiler/com.sun.tools.javac.Main','-source','17','-target','17','-d',classes,...['NativeScanModel','NativeOutcome','OfficialSource','ScanSessionController','LocalUiPolicy'].map(n=>source+n+'.java'),'android/native-tests/CoreTest.java'],{cwd:root,encoding:'utf8'});
   if(compile.status!==0){process.stderr.write(compile.stderr||'JDK compiler unavailable\n');process.exitCode=1;}else{
     const run=spawnSync('java',['-cp',classes,'CoreTest',fixtures],{cwd:root,encoding:'utf8'});process.stdout.write(run.stdout);process.stderr.write(run.stderr);if(run.status!==0)process.exitCode=1;
   }

@@ -52,19 +52,29 @@ try {
   await mobile.waitForFunction(() => document.querySelector('#settings-note').textContent.includes('kaydedildi'));
   assert.equal(engine.config.volumeFilter, true);
   await mobile.screenshot({ path: '/tmp/traderadar-pro-mobile.png', fullPage: true });
-  const native = await browser.newPage({ viewport: { width: 393, height: 851 } });
+  const native = await browser.newPage({ viewport: { width: 393, height: 851 }, userAgent: 'Chromium TradeRadarNative/1' });
   native.on('pageerror', e => errors.push(e.message));
   let nativeHttpCalls = 0;
   native.on('request', r => { if (new URL(r.url()).pathname.startsWith('/api/pro/')) nativeHttpCalls++; });
   await native.addInitScript(snapshot => {
-    window.NativePro = { request(path, method, body) {
+    function request(path, method, body) {
       const name = path.split('?')[0];
       if (name === 'session') return JSON.stringify({ canEdit: true, csrf: '' });
       if (name === 'status') return JSON.stringify(snapshot);
       if (name === 'settings' && method === 'PATCH') { Object.assign(snapshot.config, JSON.parse(body)); return JSON.stringify(snapshot.config); }
       if (['history', 'reports', 'notifications'].includes(name)) return '[]';
       return JSON.stringify({ error: 'Fixture route unavailable' });
-    } };
+    }
+    let active;
+    const timer = setInterval(() => {
+      active?.close(); const channel = new MessageChannel(); active = channel.port1;
+      active.onmessage = event => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'ready') { clearInterval(timer); return; }
+        active.postMessage(JSON.stringify({ id: data.id, result: JSON.parse(request(data.path, data.method, data.body)) }));
+      };
+      window.postMessage(JSON.stringify({ type: 'TRADERADAR_NATIVE_PORT', version: 1 }), location.origin, [channel.port2]);
+    }, 100);
   }, engine.snapshot());
   await native.goto(base); await native.waitForSelector('#setting-fields input');
   assert.match(await native.locator('#settings-note').textContent(), /Android cihazında/);
@@ -74,7 +84,7 @@ try {
   await native.waitForFunction(() => document.querySelector('#settings-note').textContent.includes('kaydedildi'));
   assert.equal(engine.config.thresholdPct, 3, 'Native fixture settings must not mutate the web backend');
   assert.deepEqual(errors, []);
-  console.log('PASS: desktop, mobile 393px, filters/chart/settings and NativePro bridge contract fixture without backend HTTP. No browser errors. Not an Android WebView/device test.');
+  console.log('PASS: desktop, mobile 393px, filters/chart/settings and origin-bound message-port contract fixture without backend HTTP. No browser errors. Not an Android WebView/device test.');
 } finally {
   await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); history.close();
 }
