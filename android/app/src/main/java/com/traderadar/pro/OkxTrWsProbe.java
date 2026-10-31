@@ -37,7 +37,8 @@ public final class OkxTrWsProbe {
                 if(found==null)return "Aktif spot parite bulunamadı; tarama kapalı.";
                 instrument=found;
             }
-        }catch(Exception e){client.dispatcher().executorService().shutdown();client.connectionPool().evictAll();return "OKX TR REST katalog testi başarısız; tarama kapalı.";}
+        }catch(Exception e){return "OKX TR REST katalog testi başarısız; tarama kapalı.";}
+        finally {client.connectionPool().evictAll();}
         final String selected=instrument;
         WebSocket socket=null;
         try{
