@@ -50,6 +50,8 @@ final class OkxTrCatalog {
                 ||!"live".equals(row.optString("state")))continue;
             String id=row.optString("instId");
             if(!id.matches("[A-Z0-9]{1,24}-[A-Z0-9]{1,12}"))continue;
+            String[] pair=id.split("-");
+            if(pair[0].equals(pair[1]))continue;
             if(seen.add(id))symbols.add(id);
         }
         if(symbols.isEmpty())throw new IOException("No active spot instruments");
