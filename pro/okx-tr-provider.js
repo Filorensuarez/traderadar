@@ -52,6 +52,7 @@ export class OkxTrProvider {
     const markets = parseOkxTrInstruments(await this.request('/api/v5/public/instruments?instType=SPOT'));
     if (this.stopped) return;
     this.markets = new Map(markets.map(m => [m.symbol,m]));
+    this.state.error=null;
     this.state.catalogAt = this.clock();
     for (const key of this.feeds.keys()) if(!this.markets.has(key))this.feeds.delete(key);
     this.reconnect();
@@ -70,12 +71,16 @@ export class OkxTrProvider {
     const allowed=new Map(markets.map(m=>[m.wireSymbol,m]));
     const acknowledged=new Set();
     let heartbeat;
+    let lastInboundAt=this.clock();
     socket.on('open',()=>{
       socket.send(JSON.stringify({op:'subscribe',args:markets.map(m=>({channel:'trades',instId:m.wireSymbol}))}));
-      heartbeat=setInterval(()=>{if(socket.readyState===WebSocket.OPEN)socket.ping();},30000);
+      heartbeat=setInterval(()=>{if(socket.readyState!==WebSocket.OPEN)return;
+        if(this.clock()-lastInboundAt>90000){socket.terminate();return;}
+        socket.ping();},30000);
       heartbeat.unref?.();
     });
     socket.on('message',raw=>{
+      lastInboundAt=this.clock();
       try {
         if(String(raw)==='pong')return;
         const msg=JSON.parse(String(raw));
@@ -99,7 +104,7 @@ export class OkxTrProvider {
         }
       }catch(error){this.state.rejected++;this.state.error=safe(error);}
     });
-    socket.on('error',error=>{this.state.errors++;this.state.error=safe(error);});
+    socket.on('error',error=>{this.state.errors++;this.state.error=safe(error);socket.terminate();});
     socket.on('close',()=>{
       clearInterval(heartbeat);this.sockets.delete(socket);
       for(const market of markets)this.feeds.get(market.symbol)?.disconnect();
