@@ -31,7 +31,7 @@ public final class ProActivity extends Activity {
         Button stop=new Button(this);stop.setText("Durdur");stop.setOnClickListener(v->{stopService(new Intent(this,ScanService.class));runtime.stopped("Tarama kullanıcı tarafından durduruldu");state.setText("Tarama tamamen durduruldu");});controls.addView(stop,new LinearLayout.LayoutParams(0,dp(48),1));
         Button help=new Button(this);help.setText("Pil / izin");help.setOnClickListener(v->batteryHelp());controls.addView(help,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(controls);
         state=new TextView(this);state.setTextColor(Color.rgb(239,199,120));state.setPadding(dp(12),dp(4),dp(12),dp(8));state.setText(runtime.status);root.addView(state);
-        LinearLayout diagnostic=new LinearLayout(this);Button test=new Button(this);test.setText("Telefonda OKX TR REST bağlantısını test et");test.setOnClickListener(v->probeDocumentation());diagnostic.addView(test,new LinearLayout.LayoutParams(-1,dp(48)));root.addView(diagnostic);
+        LinearLayout diagnostic=new LinearLayout(this);Button test=new Button(this);test.setText("Telefonda OKX TR REST bağlantısını test et");test.setOnClickListener(v->probeDocumentation());diagnostic.addView(test,new LinearLayout.LayoutParams(0,dp(48),1));Button wsTest=new Button(this);wsTest.setText("WS testi");wsTest.setOnClickListener(v->probeWebSocket());diagnostic.addView(wsTest,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(diagnostic);
         bridgeThread=new HandlerThread("local-ui-messages");bridgeThread.start();bridgeHandler=new Handler(bridgeThread.getLooper());
         WebView.setWebContentsDebuggingEnabled(false);browser=new WebView(this);browser.setBackgroundColor(Color.rgb(11,18,32));WebSettings s=browser.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(false);s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setAllowFileAccessFromFileURLs(false);s.setAllowUniversalAccessFromFileURLs(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);s.setSupportMultipleWindows(false);s.setJavaScriptCanOpenWindowsAutomatically(false);s.setSafeBrowsingEnabled(true);s.setUserAgentString(s.getUserAgentString()+" TradeRadarNative/1");
         CookieManager.getInstance().setAcceptCookie(false);CookieManager.getInstance().setAcceptThirdPartyCookies(browser,false);
@@ -96,6 +96,19 @@ public final class ProActivity extends Activity {
             finally{if(connection!=null)connection.disconnect();}
             final String message=result;runOnUiThread(()->{if(!isFinishing())state.setText(message);});
         },"okxtr-rest-probe").start();
+    }
+    private void probeWebSocket(){
+        state.setText("OKX TR WebSocket bağlantısı test ediliyor; tarama başlamaz...");
+        new Thread(()->{
+            String result;
+            try{
+                result=OkxTrWsProbe.check();
+            }catch(Exception e){
+                result="WebSocket testi başarısız; tarama kapalı.";
+            }
+            final String message=result;
+            runOnUiThread(()->{if(!isFinishing())state.setText(message);});
+        },"okxtr-ws-probe").start();
     }
     @Override protected void onResume(){super.onResume();if(state!=null)state.setText(runtime.status);}
     private void closeBridge(){bridgeGeneration++;bridgeReady=false;uiHandler.removeCallbacks(bridgeRetry);WebMessagePort old=nativePort;nativePort=null;if(old!=null)old.close();}
