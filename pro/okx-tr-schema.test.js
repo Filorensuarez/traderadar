@@ -36,3 +36,10 @@ test('reject stale and future OKX TR order book snapshots',()=>{
   assert.throws(()=>parseOkxTrBook(row(now-6000),now));
   assert.throws(()=>parseOkxTrBook(row(now+2000),now));
 });
+
+test('reject zero depth and numeric overflow in OKX TR order book',()=>{
+  const now=1760000400000;
+  const book=(bidSize,askSize)=>({code:'0',data:[{ts:String(now),bids:[['99',bidSize]],asks:[['101',askSize]]}]});
+  assert.throws(()=>parseOkxTrBook(book('0','0'),now),/depth/);
+  assert.throws(()=>parseOkxTrBook(book('1e308','1e308'),now),/overflow/);
+});
