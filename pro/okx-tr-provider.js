@@ -16,6 +16,7 @@ export class OkxTrProvider {
     Object.assign(this, { fetchFn, socketFactory, clock, onTrade, verified });
     this.markets = new Map(); this.feeds = new Map(); this.sockets = new Set();
     this.stopped = true; this.timers = new Set(); this.abort = new AbortController();
+    this.generation = 0;
     this.queue = Promise.resolve(); this.nextRequest = 0;
     this.state = { source: 'OKX TR', adapterEnabled: false, sourceVerification: 'LIVE DEVICE VERIFICATION REQUIRED',
       documentationUrl: 'https://tr.okx.com/docs-v5/en/', connected: false,
@@ -58,6 +59,7 @@ export class OkxTrProvider {
     this.reconnect();
   }
   reconnect() {
+    ++this.generation;
     for(const socket of this.sockets){socket.retired=true;socket.terminate();}
     this.sockets.clear();
     for(const feed of this.feeds.values())feed.disconnect();
@@ -67,6 +69,7 @@ export class OkxTrProvider {
   }
   connectBatch(markets, attempt) {
     if(this.stopped||!markets.length)return;
+    const generation=this.generation;
     const socket=this.socketFactory(STREAM);
     this.sockets.add(socket);
     const allowed=new Map(markets.map(m=>[m.wireSymbol,m]));
@@ -74,6 +77,7 @@ export class OkxTrProvider {
     let heartbeat;
     let lastInboundAt=this.clock();
     socket.on('open',()=>{
+      if(this.stopped||generation!==this.generation){socket.terminate();return;}
       socket.send(JSON.stringify({op:'subscribe',args:markets.map(m=>({channel:'trades',instId:m.wireSymbol}))}));
       heartbeat=setInterval(()=>{if(socket.readyState!==WebSocket.OPEN)return;
         if(this.clock()-lastInboundAt>90000){socket.terminate();return;}
@@ -81,6 +85,7 @@ export class OkxTrProvider {
       heartbeat.unref?.();
     });
     socket.on('message',raw=>{
+      if(this.stopped||generation!==this.generation)return;
       lastInboundAt=this.clock();
       try {
         if(String(raw)==='pong')return;
@@ -109,8 +114,8 @@ export class OkxTrProvider {
     socket.on('error',error=>{this.state.errors++;this.state.error=safe(error);socket.terminate();});
     socket.on('close',()=>{
       clearInterval(heartbeat);this.sockets.delete(socket);
+      if(this.stopped||socket.retired||generation!==this.generation)return;
       for(const market of markets){this.feeds.get(market.symbol)?.disconnect();market.streamAvailable=false;market.availability='WebSocket bağlantısı kesildi';}
-      if(this.stopped||socket.retired)return;
       const delay=Math.min(300000,5000*2**Math.min(attempt,6));
       const timer=setTimeout(()=>{this.timers.delete(timer);this.connectBatch(markets.filter(m=>this.markets.has(m.symbol)),attempt+1);},delay);
       timer.unref?.();this.timers.add(timer);
@@ -144,6 +149,7 @@ export class OkxTrProvider {
   }
   stop() {
     this.stopped=true;this.state.adapterEnabled=false;this.abort.abort();
+    ++this.generation;
     for(const timer of this.timers)clearTimeout(timer);this.timers.clear();
     for(const feed of this.feeds.values())feed.disconnect();
     for(const market of this.markets.values())market.streamAvailable=false;
