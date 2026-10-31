@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { BinanceTrProvider, discoverMarkets, parseTrade, safeError } from '../provider.js';
+import { BinanceTrProvider, discoverMarkets, parseTrade, parseBook, safeError } from '../provider.js';
 import { NOW } from './helpers.js';
 
 const catalog = n => ({ code: 0, data: { list: Array.from({ length: n }, (_, i) => ({ symbol: `COIN${i}_TRY`, quoteAsset: 'TRY', baseAsset: `COIN${i}`, status: 'TRADING', spotTradingEnable: true, type: 1 })) } });
@@ -36,4 +36,10 @@ test('merkezi istek önbelleği eşzamanlı indirmeyi birleştirir; 429 tekrar d
 });
 test('hata kayıtları proxy parolalarını ve ham uzak yanıtı ifşa etmez', () => {
   assert(!safeError(Error('https://user:secret@proxy/?token=abc')).includes('secret'));
+});
+test('emir defteri spread ve iki yönlü derinliği doğrular; bulunmayan likidite sıfırla taklit edilmez', () => {
+  const body = { code: 0, data: { bids: [['99', '2']], asks: [['101', '3']] } };
+  assert.equal(parseBook(body, NOW).depthQuote, 198); assert.equal(parseBook(body, NOW).bid, 99);
+  assert.throws(() => parseBook({ code: 0, data: { bids: [], asks: [] } }, NOW));
+  assert.throws(() => parseBook({ code: 0, data: { bids: [['102', '2']], asks: [['101', '1']] } }, NOW));
 });

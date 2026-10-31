@@ -36,6 +36,19 @@ export function parseTrade(event, now) {
       event.T > now + 1000 || event.T < now - 30000) throw Error('İşlem gecikmiş veya geçersiz');
   return { id: event.t, time: event.T, price, quantity, buy: !event.m };
 }
+export function parseBook(body, time) {
+  if (body?.code !== 0 || !Array.isArray(body.data?.bids) || !Array.isArray(body.data?.asks) ||
+    !body.data.bids.length || !body.data.asks.length) throw Error('Emir defteri şeması doğrulanamadı');
+  const side = levels => levels.slice(0, 5).map(row => {
+    const price = Number(row[0]), quantity = Number(row[1]);
+    if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(quantity) || quantity < 0) throw Error('Emir defteri şeması doğrulanamadı');
+    return { price, value: price * quantity };
+  });
+  const bids = side(body.data.bids).sort((a, b) => b.price - a.price), asks = side(body.data.asks).sort((a, b) => a.price - b.price);
+  if (asks[0].price < bids[0].price) throw Error('Emir defteri şeması doğrulanamadı');
+  return { time, bid: bids[0].price, ask: asks[0].price,
+    depthQuote: Math.min(bids.reduce((n, x) => n + x.value, 0), asks.reduce((n, x) => n + x.value, 0)) };
+}
 export class BinanceTrProvider {
   constructor({ fetchFn = fetch, socketFactory = (url, options) => new WebSocket(url, options), clock = Date.now, onTrade = () => {} } = {}) {
     Object.assign(this, { fetchFn, socketFactory, clock, onTrade });
@@ -137,6 +150,13 @@ export class BinanceTrProvider {
     if (body?.code !== 0 || !Array.isArray(body.data)) throw Error('Binance TR dakika şeması doğrulanamadı');
     return body.data.map(x => ({ time: Number(x[0]), open: Number(x[1]), high: Number(x[2]), low: Number(x[3]),
       close: Number(x[4]), volume: Number(x[5]), quoteVolume: Number(x[7]) }));
+  }
+  async book(market) {
+    const base = market.type === 1 ? 'https://api.binance.me' : 'https://cloudme-tr.2meta.app';
+    const started = this.clock();
+    const body = await this.request(`${base}/api/v1/depth?symbol=${encodeURIComponent(market.wireSymbol)}&limit=5`, 2000);
+    // Use request start, not response receipt, so network delay cannot make an old snapshot fresh.
+    return parseBook(body, started);
   }
   snapshot() {
     const now = this.clock();

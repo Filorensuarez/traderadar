@@ -8,6 +8,7 @@
     "test:ultimate": "node ultimate/self-test.js",
     "start:pro": "node pro/server.js",
     "test:pro": "node --test pro/tests/*.test.js",
+    "test:pro:ui": "node pro/tests/browser.mjs",
     "backtest:pro": "node pro/backtest.js"
   },
   "dependencies": {

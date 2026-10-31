@@ -1,8 +1,9 @@
 // Never carry a close forward into a second in which no trade was observed.
 // Disconnects invalidate continuity even if later trades fill the same second.
 export class TradeCandles {
-  constructor({ retentionMs = 40 * 60000 } = {}) {
+  constructor({ retentionMs = 6 * 60000, maxTradeIds = 100000 } = {}) {
     this.retentionMs = retentionMs;
+    this.maxTradeIds = maxTradeIds;
     this.bars = new Map();
     this.ids = new Map();
     this.lastTradeAt = 0;
@@ -18,6 +19,12 @@ export class TradeCandles {
       !Number.isFinite(price) || price <= 0 || !Number.isFinite(quantity) || quantity <= 0 ||
       typeof buy !== 'boolean') { this.rejected++; return false; }
     if (this.ids.has(String(id))) return false;
+    if (this.ids.size >= this.maxTradeIds) {
+      this.prune(now);
+      if (this.ids.size >= this.maxTradeIds) {
+        this.rejected++; this.capacityExceeded = true; this.disconnect(); return false;
+      }
+    }
     this.ids.set(String(id), time);
     const key = Math.floor(time / 1000) * 1000;
     const bar = this.bars.get(key) || { time: key, open: price, high: price, low: price, close: price,

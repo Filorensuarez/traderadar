@@ -13,6 +13,7 @@ import {startOkxFlow,okxFlowSnapshot,okxFirstReactionSnapshot} from "./okx-flow.
 import {startFlowRadar,flowSnapshot,firstReactionSnapshot} from "./flow-radar.js";
 
 import express from "express";
+import {legacyStatic} from "./pro/legacy-static.js";
 import webpush from "web-push";
 import fs from "fs";
 import path from "path";
@@ -176,7 +177,7 @@ app.use(
 );
 
 app.use(
-  express.static(".")
+  legacyStatic(process.cwd())
 );
 
 

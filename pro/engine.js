@@ -6,7 +6,7 @@ import { BinanceTrProvider, safeError } from './provider.js';
 export class ProEngine {
   constructor(history, provider = new BinanceTrProvider()) {
     this.history = history; this.provider = provider; this.config = settings(history.loadSettings());
-    this.minuteCache = new Map(); this.results = new Map(); this.processed = new Map(); this.cursor = 0;
+    this.minuteCache = new Map(); this.books = new Map(); this.results = new Map(); this.processed = new Map(); this.cursor = 0;
     this.metrics = { scans: 0, evaluated: 0, unavailable: 0, lastScanMs: null, p95ScanMs: null, lastScanAt: null, minuteError: null };
     this.durations = []; this.intervals = []; this.running = false; this.refreshing = false;
   }
@@ -28,7 +28,7 @@ export class ProEngine {
     for (const symbol of this.results.keys()) if (!this.provider.markets.has(symbol)) { this.results.delete(symbol); this.processed.delete(symbol); }
     for (const market of this.provider.markets.values()) {
       const feed = this.provider.feeds.get(market.symbol);
-      if (!feed) { this.results.set(market.symbol, { ready: false, reason: market.availability, category: 'KOŞULLAR SAĞLANMIYOR' }); unavailable++; continue; }
+      if (!feed) { this.results.set(market.symbol, { ready: false, reason: market.availability, category: 'KOŞULLAR SAĞLANMIYOR' }); this.history.liveStatus(market.symbol, null); unavailable++; continue; }
       const end = Math.floor(now / 1000) * 1000;
       const previous = this.processed.get(market.symbol) ?? end;
       // Replay only closed observed seconds since last tick; never substitute the latest price for a missed checkpoint.
@@ -37,9 +37,22 @@ export class ProEngine {
       }
       this.processed.set(market.symbol, end);
       const window = feed.seconds(now);
-      const result = window.ready ? analyze({ seconds: window.bars, minutes: this.minuteCache.get(market.symbol)?.bars ?? [], now, config: this.config }) :
+      const result = window.ready ? analyze({ seconds: window.bars, minutes: this.minuteCache.get(market.symbol)?.bars ?? [], book: this.books.get(market.symbol) ?? null, now, config: this.config }) :
         { ready: false, reason: window.reason, category: 'KOŞULLAR SAĞLANMIYOR' };
       this.results.set(market.symbol, result);
+      // Only fetch depth for qualifying candidates, not for every market every second.
+      // Shared provider queue enforces the same REST cooldown across both request types.
+      if (this.running && result.ready && result.category !== 'KOŞULLAR SAĞLANMIYOR' &&
+          now - (this.books.get(market.symbol)?.time ?? 0) >= 3000 && !this.bookPending?.has(market.symbol)) {
+        this.bookPending ||= new Set();
+        // One outstanding depth request at a time bounds the queue under large candidate sets.
+        if (this.bookPending.size === 0) {
+          this.bookPending.add(market.symbol);
+          void this.provider.book(market).then(book => this.books.set(market.symbol, book))
+            .catch(e => { this.metrics.bookError = safeError(e); })
+            .finally(() => this.bookPending.delete(market.symbol));
+        }
+      }
       this.history.liveStatus(market.symbol, result);
       if (result.ready) evaluated++; else unavailable++;
       if (result.ready && result.category !== 'KOŞULLAR SAĞLANMIYOR') {
