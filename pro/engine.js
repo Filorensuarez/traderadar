@@ -92,7 +92,7 @@ export class ProEngine {
   async start() {
     if (this.running) return;
     await this.provider.start();
-    if (!this.provider.snapshot().adapterEnabled) return;
+    if (this.provider.snapshot().adapterEnabled === false) return;
     this.running = true;
     const tick = setInterval(() => this.tick(), 1000), refresh = setInterval(() => void this.refreshMinute(), 350);
     tick.unref(); refresh.unref(); this.intervals.push(tick, refresh);
