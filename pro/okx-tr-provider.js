@@ -93,19 +93,19 @@ export class OkxTrProvider {
       try {
         if(String(raw)==='pong')return;
         const msg=JSON.parse(String(raw));
-        if(msg.event==='error')throw Error('OKX TR subscription rejected');
+        if(msg.event==='error'){socket.terminate();throw Error('OKX TR subscription rejected');}
         if(msg.event==='subscribe'&&msg.arg?.channel==='trades'){
           const market=allowed.get(msg.arg.instId);
-          if(!market)throw Error('Unknown subscription');
+          if(!market){socket.terminate();throw Error('Unknown subscription');}
           const feed=this.feeds.get(market.symbol)??new TradeCandles();
           feed.connect(this.clock());this.feeds.set(market.symbol,feed);acknowledged.add(market.wireSymbol);
           market.streamAvailable=true;market.availability='ISINMA';return;
         }
         if(msg.arg?.channel!=='trades'||!Array.isArray(msg.data))return;
         const market=allowed.get(msg.arg.instId);
-        if(!market||!acknowledged.has(market.wireSymbol))throw Error('Unverified trade subscription');
+        if(!market||!acknowledged.has(market.wireSymbol)){socket.terminate();throw Error('Unverified trade subscription');}
         for(const row of msg.data){
-          if(row.instId!==market.wireSymbol)throw Error('Instrument mismatch');
+          if(row.instId!==market.wireSymbol){socket.terminate();throw Error('Instrument mismatch');}
           const trade=parseOkxTrTrade(row,this.clock());
           const feed=this.feeds.get(market.symbol);
           if(feed?.add(trade,this.clock())){
