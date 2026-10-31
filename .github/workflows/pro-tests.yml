@@ -1,0 +1,25 @@
+name: TradeRadar Pro checks
+on:
+  workflow_dispatch:
+  push:
+    paths: ['pro/**', 'server.js', 'package.json', 'package-lock.json', '.github/workflows/pro-tests.yml']
+  pull_request:
+    paths: ['pro/**', 'server.js', 'package.json', 'package-lock.json', '.github/workflows/pro-tests.yml']
+permissions:
+  contents: read
+jobs:
+  pro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run test:pro
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:pro:ui
+      - run: npm run test:ultimate
+      - run: npm audit --omit=dev

@@ -45,6 +45,7 @@ test('gerçek yerel WebSocket handshake ve trade aktarımı; internet kaynağıy
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 }); await once(server, 'listening');
   const url = `ws://127.0.0.1:${server.address().port}`;
   const provider = new BinanceTrProvider({
+    verified: true,
     fetchFn: async () => new Response(JSON.stringify({ code: 0, data: { list: [{ symbol: 'BTC_TRY', baseAsset: 'BTC', quoteAsset: 'TRY', type: 1, status: 'TRADING', spotTradingEnable: true }] } })),
     socketFactory: () => new WebSocket(url),
   });

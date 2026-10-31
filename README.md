@@ -17,6 +17,12 @@ TradeRadar halka açık borsa verilerinden teknik sinyaller üretir; otomatik em
 
 ## Kurulum
 
+### TradeRadar Pro
+
+Mevcut stratejilerden ayrı analiz ve izleme paneli: `npm ci --ignore-scripts` ardından `npm run start:pro`.
+Kurulum, hesaplama sözleşmesi, testler, canlı bağlantı sınırlamaları ve yayınlama adımları [pro/README.md](pro/README.md) dosyasındadır.
+Binance TR canlı bağlantısı henüz doğrulanmadı; üretime hazır veya 7/24 çalışan bir sistem iddiası yoktur.
+
 Node.js 22+ ile npm install ve npm start komutlarını kullanın. Yerelde http://localhost:3000 adresini açın.
 Web sürümü PWA olarak ana ekrana kurulabilir. Android APK geliştirme projesi android/ klasöründedir.
 

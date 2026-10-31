@@ -51,11 +51,12 @@ export function parseBook(body, time) {
     depthQuote: Math.min(bids.reduce((n, x) => n + x.value, 0), asks.reduce((n, x) => n + x.value, 0)) };
 }
 export class BinanceTrProvider {
-  constructor({ fetchFn = fetch, socketFactory = (url, options) => new WebSocket(url, options), clock = Date.now, onTrade = () => {} } = {}) {
-    Object.assign(this, { fetchFn, socketFactory, clock, onTrade });
+  constructor({ fetchFn = fetch, socketFactory = (url, options) => new WebSocket(url, options), clock = Date.now, onTrade = () => {}, verified = false } = {}) {
+    Object.assign(this, { fetchFn, socketFactory, clock, onTrade, verified });
     this.markets = new Map(); this.feeds = new Map(); this.sockets = new Set();
     this.timers = new Set(); this.cache = new Map(); this.inflight = new Map();
-    this.state = { source: SOURCE, sourceVerification: 'GÜNCEL RESMÎ DESTEK DOĞRULANMADI', connected: false,
+    this.state = { source: SOURCE, documentationUrl: 'https://www.binance.tr/apidocs/',
+      sourceVerification: 'GÜNCEL RESMÎ DESTEK DOĞRULANMADI', adapterEnabled: false, connected: false,
       lastMessageAt: null, catalogAt: null, error: null, requests: 0, errors: 0, rejected: 0,
       waitUntil: 0, receivedTrades: 0, lastLatencyMs: null };
     this.stopped = true; this.queue = Promise.resolve(); this.nextRequest = 0;
@@ -169,12 +170,22 @@ export class BinanceTrProvider {
       errorRate: this.state.requests ? this.state.errors / this.state.requests : null };
   }
   async start() {
+    // Fail closed: schema-valid messages alone do not prove an official source.
+    // Production must stay disabled until the supplied official document can be
+    // read and the actual host/path/status/stream contract verified. `verified`
+    // is injected only by transport fixtures in the current tests, not by env/UI.
+    if (!this.verified) {
+      this.state.error = 'Resmî REST/WebSocket sözleşmesi doğrulanana kadar canlı adaptör kapalı';
+      return;
+    }
     if (!this.stopped) return; this.stopped = false; this.abort = new AbortController();
+    this.state.adapterEnabled = true;
     const cycle = async () => { try { await this.refresh(); } catch (e) { this.state.error = safeError(e); }
       if (!this.stopped) this.delay(cycle, Math.max(60000, this.state.waitUntil - this.clock(), this.markets.size ? 900000 : 60000)); };
     await cycle();
   }
   stop() {
+    this.state.adapterEnabled = false;
     this.stopped = true; for (const t of this.timers) clearTimeout(t); this.timers.clear();
     this.abort.abort();
     for (const feed of this.feeds.values()) feed.disconnect();

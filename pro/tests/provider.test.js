@@ -18,7 +18,7 @@ test('gerçek trade şeması ve zaman damgası doğrulanır; alış yönü uydur
 });
 test('WebSocket abonelikleri bütün evreni kapsar; tekrar bağlantı ısınmayı sıfırlar', async () => {
   const sockets = [];
-  const p = new BinanceTrProvider({ fetchFn: async () => new Response(JSON.stringify(catalog(161))), clock: () => NOW,
+  const p = new BinanceTrProvider({ verified: true, fetchFn: async () => new Response(JSON.stringify(catalog(161))), clock: () => NOW,
     socketFactory: url => { const s = new EventEmitter(); s.url = url; s.readyState = 1; s.terminate = () => s.emit('close'); s.ping = () => s.emit('pong'); sockets.push(s); return s; } });
   await p.start(); assert.equal(sockets.length, 3); assert.equal(p.markets.size, 161);
   for (const s of sockets) s.emit('open');
@@ -42,4 +42,10 @@ test('emir defteri spread ve iki yönlü derinliği doğrular; bulunmayan likidi
   assert.equal(parseBook(body, NOW).depthQuote, 198); assert.equal(parseBook(body, NOW).bid, 99);
   assert.throws(() => parseBook({ code: 0, data: { bids: [], asks: [] } }, NOW));
   assert.throws(() => parseBook({ code: 0, data: { bids: [['102', '2']], asks: [['101', '1']] } }, NOW));
+});
+test('resmî sözleşme doğrulanmadan üretim adaptörü istek veya sahte sinyal üretmez', async () => {
+  let calls = 0;
+  const p = new BinanceTrProvider({ fetchFn: async () => { calls++; throw Error('must not fetch'); } });
+  await p.start(); assert.equal(calls, 0); assert.equal(p.snapshot().adapterEnabled, false);
+  assert.equal(p.snapshot().receivedTrades, 0); assert.match(p.snapshot().error, /doğrulanana kadar/); p.stop();
 });
