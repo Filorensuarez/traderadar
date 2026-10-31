@@ -5,8 +5,8 @@ import java.util.List;
 
 /** No endpoints may be guessed or enabled by a user-supplied URL/boolean. */
 public final class OfficialSource {
-    public static final String DOCUMENTATION="https://www.binance.tr/apidocs/";
-    public static final String BLOCKER="Resmî Binance TR REST/WebSocket sözleşmesi doğrulanamadı. Canlı adaptör kapalı; sinyal üretilmez.";
+    public static final String DOCUMENTATION="https://tr.okx.com/docs-v5/en/";
+    public static final String BLOCKER="OKX TR REST/WebSocket bağlantısı Android cihazında doğrulanmadı. Canlı adaptör kapalı; sinyal üretilmez.";
     private OfficialSource(){}
     public interface Session extends Closeable {
         boolean restVerified(); boolean websocketVerified();
@@ -22,7 +22,7 @@ public final class OfficialSource {
         void error(String safeMessage);
     }
     // Implement only after an accessible official document AND device REST/WS
-    // observations establish the contract. No Binance Global fallback is present.
+    // observations establish the contract. No OKX Global fallback is present.
     public static Session createVerifiedSession(){return null;}
     public static boolean isConfigured(){return false;}
 }
