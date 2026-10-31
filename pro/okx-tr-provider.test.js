@@ -106,3 +106,23 @@ test('rejected OKX TR websocket subscription terminates socket',()=>{
   assert.equal(provider.markets.get('BTC_TRY').streamAvailable,false);
   provider.stop();
 });
+
+test('resubscription uses a new trade window rather than old seconds',()=>{
+  const sockets=[];
+  const provider=new OkxTrProvider({verified:true,socketFactory:()=>{
+    const socket=new MockEmitter();socket.readyState=1;socket.send=()=>{};socket.terminate=()=>{};
+    sockets.push(socket);return socket;
+  }});
+  provider.stopped=false;
+  const market={symbol:'BTC_TRY',wireSymbol:'BTC-TRY',streamAvailable:false};
+  provider.markets.set(market.symbol,market);
+  provider.reconnect();
+  sockets[0].emit('open');
+  sockets[0].emit('message',JSON.stringify({event:'subscribe',arg:{channel:'trades',instId:'BTC-TRY'}}));
+  const first=provider.feeds.get(market.symbol);
+  provider.reconnect();
+  sockets[1].emit('open');
+  sockets[1].emit('message',JSON.stringify({event:'subscribe',arg:{channel:'trades',instId:'BTC-TRY'}}));
+  assert.notEqual(provider.feeds.get(market.symbol),first);
+  provider.stop();
+});
