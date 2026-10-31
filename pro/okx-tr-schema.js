@@ -58,8 +58,8 @@ export function parseOkxTrBook(body, requestedAt) {
   });
   const bids=levels(book.bids).sort((a,b)=>b.price-a.price);
   const asks=levels(book.asks).sort((a,b)=>a.price-b.price);
-  if (bids[0].price >= asks[0].price || Number(book.ts) > Date.now()+1000)
+  if (!Number.isSafeInteger(requestedAt) || Number(book.ts) > requestedAt+1000 || requestedAt-Number(book.ts)>5000 || bids[0].price >= asks[0].price)
     throw Error('OKX TR crossed or future order book');
-  return { time: Math.min(requestedAt, Number(book.ts)), bid: bids[0].price,
+  return { time: Number(book.ts), bid: bids[0].price,
     ask: asks[0].price, depthQuote: Math.min(bids.reduce((s,x)=>s+x.value,0),asks.reduce((s,x)=>s+x.value,0)) };
 }
