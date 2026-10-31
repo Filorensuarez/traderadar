@@ -45,3 +45,34 @@ test('read-only REST minute and book endpoints use OKX TR only',async()=>{
   assert.ok(seen.every(url=>url.startsWith('https://tr.okx.com/api/v5/market/')));
   provider.stop();
 });
+
+test('retired socket close cannot disconnect a replacement feed',()=>{
+  const { EventEmitter }=requireSocketEvents();
+  const sockets=[];
+  const provider=new OkxTrProvider({verified:true,socketFactory:()=>{
+    const socket=new EventEmitter();
+    socket.readyState=1;socket.send=()=>{};socket.terminate=()=>{};
+    sockets.push(socket);return socket;
+  }});
+  provider.stopped=false;
+  const market={symbol:'BTC_TRY',wireSymbol:'BTC-TRY',streamAvailable:false};
+  provider.markets.set(market.symbol,market);
+  provider.reconnect();
+  sockets[0].emit('open');
+  sockets[0].emit('message',JSON.stringify({event:'subscribe',arg:{channel:'trades',instId:'BTC-TRY'}}));
+  assert.equal(market.streamAvailable,true);
+  provider.reconnect();
+  sockets[1].emit('open');
+  sockets[1].emit('message',JSON.stringify({event:'subscribe',arg:{channel:'trades',instId:'BTC-TRY'}}));
+  assert.equal(market.streamAvailable,true);
+  sockets[0].emit('close');
+  assert.equal(market.streamAvailable,true);
+  assert.notEqual(provider.feeds.get(market.symbol).continuousSince,null);
+  provider.stop();
+});
+function requireSocketEvents(){return {EventEmitter:MockEmitter};}
+class MockEmitter{
+  constructor(){this.handlers=new Map();}
+  on(event,callback){this.handlers.set(event,callback);return this;}
+  emit(event,...args){this.handlers.get(event)?.(...args);}
+}
