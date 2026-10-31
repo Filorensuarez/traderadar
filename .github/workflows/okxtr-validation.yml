@@ -5,6 +5,8 @@ on:
     paths:
       - 'pro/okx-tr-schema.js'
       - 'pro/okx-tr-schema.test.js'
+      - 'pro/okx-tr-provider.js'
+      - 'pro/okx-tr-provider.test.js'
       - 'scripts/check-okxtr*.mjs'
       - '.github/workflows/okxtr-validation.yml'
   pull_request:
@@ -25,7 +27,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-fund --no-audit
-      - run: node --test pro/okx-tr-schema.test.js
+      - run: node --test pro/okx-tr-schema.test.js pro/okx-tr-provider.test.js
       - run: node --check scripts/check-okxtr.mjs
       - run: node --check scripts/check-okxtr-ws.mjs
   # No live connectivity test here: GitHub runners can be geo/proxy restricted.
