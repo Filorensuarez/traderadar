@@ -54,12 +54,16 @@ export function parseOkxTrBook(body, requestedAt) {
   const levels = xs => xs.slice(0,5).map(x => {
     if (!Array.isArray(x) || !positive(x[0]) || !Number.isFinite(Number(x[1])) || Number(x[1]) < 0)
       throw Error('OKX TR order book level invalid');
-    return { price: Number(x[0]), value: Number(x[0])*Number(x[1]) };
+    const value=Number(x[0])*Number(x[1]);
+    if(!Number.isFinite(value))throw Error('OKX TR order book level overflow');
+    return { price: Number(x[0]), value };
   });
   const bids=levels(book.bids).sort((a,b)=>b.price-a.price);
   const asks=levels(book.asks).sort((a,b)=>a.price-b.price);
   if (!Number.isSafeInteger(requestedAt) || Number(book.ts) > requestedAt+1000 || requestedAt-Number(book.ts)>5000 || bids[0].price >= asks[0].price)
     throw Error('OKX TR crossed or future order book');
+  const depthQuote=Math.min(bids.reduce((s,x)=>s+x.value,0),asks.reduce((s,x)=>s+x.value,0));
+  if(!Number.isFinite(depthQuote)||depthQuote<=0)throw Error('OKX TR order book depth invalid');
   return { time: Number(book.ts), bid: bids[0].price,
-    ask: asks[0].price, depthQuote: Math.min(bids.reduce((s,x)=>s+x.value,0),asks.reduce((s,x)=>s+x.value,0)) };
+    ask: asks[0].price, depthQuote };
 }
