@@ -1,0 +1,36 @@
+name: OKX TR adapter validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'pro/okx-tr-schema.js'
+      - 'pro/okx-tr-schema.test.js'
+      - 'pro/okx-tr-provider.js'
+      - 'pro/okx-tr-provider.test.js'
+      - 'pro/okx-tr-engine.test.js'
+      - 'pro/engine.js'
+      - 'scripts/check-okxtr*.mjs'
+      - '.github/workflows/okxtr-validation.yml'
+  pull_request:
+    paths:
+      - 'pro/okx-tr-schema.js'
+      - 'pro/okx-tr-schema.test.js'
+      - 'scripts/check-okxtr*.mjs'
+      - '.github/workflows/okxtr-validation.yml'
+permissions:
+  contents: read
+jobs:
+  parser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund --no-audit
+      - run: node --test pro/okx-tr-schema.test.js pro/okx-tr-provider.test.js pro/okx-tr-engine.test.js
+      - run: node --check scripts/check-okxtr.mjs
+      - run: node --check scripts/check-okxtr-ws.mjs
+  # No live connectivity test here: GitHub runners can be geo/proxy restricted.
+  # Live REST/WS must be validated on the target device or trusted local network.

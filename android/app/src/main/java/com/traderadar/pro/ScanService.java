@@ -22,7 +22,8 @@ public final class ScanService extends Service {
     private Notification notification(){PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,ScanService.class).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         return new Notification.Builder(this,CHANNEL).setSmallIcon(R.drawable.ic_traderadar).setContentTitle("TradeRadar Pro · Tarama aktif").setContentText("Android izin verdiği sürece sürer · Durdur ile tamamen kapatın").setOngoing(true).setContentIntent(open()).addAction(new Notification.Action.Builder(null,"Durdur",stop).build()).build();}
     public int onStartCommand(Intent intent,int flags,int startId){
-        if(intent==null||!START.equals(intent.getAction())){stopReason="Tarama kullanıcı tarafından durduruldu";stopSelf();return START_NOT_STICKY;}
+        if(intent==null||STOP.equals(intent.getAction())){stopReason="Tarama kullanıcı tarafından durduruldu";stopSelf();return START_NOT_STICKY;}
+        if(!START.equals(intent.getAction())){stopReason="Bilinmeyen hizmet komutu reddedildi";stopSelf();return START_NOT_STICKY;}
         if(session.running())return START_NOT_STICKY;
         OfficialSource.Session source=OfficialSource.createVerifiedSession();
         if(source==null){runtime.stopped(OfficialSource.BLOCKER);stopSelf();return START_NOT_STICKY;}
@@ -44,7 +45,7 @@ public final class ScanService extends Service {
     }
     @Override public void onTimeout(int startId,int fgsType){stopReason="Android dataSync süre sınırı doldu. Tarama durdu; yeniden başlatmak için uygulamayı açın.";stopSelf();}
     @Override public void onTaskRemoved(Intent rootIntent){super.onTaskRemoved(rootIntent);/* User-started foreground session may continue, subject to the OS. */}
-    @Override public void onDestroy(){if(runtime!=null)runtime.stopped(stopReason);if(executor!=null){executor.shutdownNow();try{executor.awaitTermination(2,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
+    @Override public void onDestroy(){if(executor!=null){executor.shutdownNow();try{executor.awaitTermination(2,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
         if(session!=null)session.stop();if(wakeLock!=null&&wakeLock.isHeld())wakeLock.release();if(runtime!=null)runtime.stopped(stopReason);stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();}
     public IBinder onBind(Intent intent){return null;}
 }

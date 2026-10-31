@@ -28,10 +28,10 @@ public final class ProActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(11,18,32));
         LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));
         Button start=new Button(this);start.setText("Başlat");start.setOnClickListener(v->requestStart());controls.addView(start,new LinearLayout.LayoutParams(0,dp(48),1));
-        Button stop=new Button(this);stop.setText("Durdur");stop.setOnClickListener(v->{stopService(new Intent(this,ScanService.class));runtime.stopped("Tarama kullanıcı tarafından durduruldu");state.setText("Tarama tamamen durduruldu");});controls.addView(stop,new LinearLayout.LayoutParams(0,dp(48),1));
+        Button stop=new Button(this);stop.setText("Durdur");stop.setOnClickListener(v->{Intent command=new Intent(this,ScanService.class).setAction(ScanService.STOP);try{startService(command);state.setText("Durdurma komutu gönderildi");}catch(RuntimeException e){stopService(new Intent(this,ScanService.class));state.setText("Durdurma istendi; hizmet durumu kontrol edilmeli");}});controls.addView(stop,new LinearLayout.LayoutParams(0,dp(48),1));
         Button help=new Button(this);help.setText("Pil / izin");help.setOnClickListener(v->batteryHelp());controls.addView(help,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(controls);
         state=new TextView(this);state.setTextColor(Color.rgb(239,199,120));state.setPadding(dp(12),dp(4),dp(12),dp(8));state.setText(runtime.status);root.addView(state);
-        LinearLayout diagnostic=new LinearLayout(this);Button test=new Button(this);test.setText("Telefonda resmî belge bağlantısını test et");test.setOnClickListener(v->probeDocumentation());diagnostic.addView(test,new LinearLayout.LayoutParams(-1,dp(48)));root.addView(diagnostic);
+        LinearLayout diagnostic=new LinearLayout(this);Button test=new Button(this);test.setText("Telefonda OKX TR REST bağlantısını test et");test.setOnClickListener(v->probeDocumentation());diagnostic.addView(test,new LinearLayout.LayoutParams(0,dp(48),1));Button wsTest=new Button(this);wsTest.setText("WS testi");wsTest.setOnClickListener(v->probeWebSocket());diagnostic.addView(wsTest,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(diagnostic);
         bridgeThread=new HandlerThread("local-ui-messages");bridgeThread.start();bridgeHandler=new Handler(bridgeThread.getLooper());
         WebView.setWebContentsDebuggingEnabled(false);browser=new WebView(this);browser.setBackgroundColor(Color.rgb(11,18,32));WebSettings s=browser.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(false);s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setAllowFileAccessFromFileURLs(false);s.setAllowUniversalAccessFromFileURLs(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);s.setSupportMultipleWindows(false);s.setJavaScriptCanOpenWindowsAutomatically(false);s.setSafeBrowsingEnabled(true);s.setUserAgentString(s.getUserAgentString()+" TradeRadarNative/1");
         CookieManager.getInstance().setAcceptCookie(false);CookieManager.getInstance().setAcceptThirdPartyCookies(browser,false);
@@ -58,12 +58,40 @@ public final class ProActivity extends Activity {
     private void startScan(){try{startForegroundService(new Intent(this,ScanService.class).setAction(ScanService.START));state.setText("Tarama başlatma isteği gönderildi; bağlantı doğrulanmazsa çalışmaz");}catch(RuntimeException e){state.setText("Android hizmeti başlatamadı. Uygulama açıkken tekrar deneyin.");}}
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] grants){super.onRequestPermissionsResult(code,permissions,grants);if(code==NOTIFICATIONS&&grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)startScan();else state.setText("Kalıcı bildirim izni verilmedi; tarama başlatılmadı");}
     private void batteryHelp(){new AlertDialog.Builder(this).setTitle("Android çalışma sınırları").setMessage("Tarama yalnız Başlat ile çalışır; Durdur tüm bağlantıları kapatır. Ekran kapalıyken kısmi uyanıklık kilidi pil tüketebilir. Android 15+ dataSync hizmetlerinin süre kotası ve üretici pil kısıtları vardır; kesintisizlik garanti edilmez. Yeniden başlatmada otomatik tarama yoktur. Pil ayarını yalnız ihtiyacınız varsa kendiniz değiştirin.").setPositiveButton("Pil ayarları",(d,w)->{try{startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}catch(ActivityNotFoundException e){state.setText("Bu cihazda pil ayarları açılamadı");}}).setNegativeButton("Kapat",null).show();}
-    private void probeDocumentation(){state.setText("Bu Android cihazından resmî belge kontrol ediliyor; veri taraması değil...");new Thread(()->{
-        javax.net.ssl.HttpsURLConnection connection=null;String result;
-        try{connection=(javax.net.ssl.HttpsURLConnection)new java.net.URL(OfficialSource.DOCUMENTATION).openConnection();connection.setConnectTimeout(10000);connection.setReadTimeout(10000);connection.setInstanceFollowRedirects(false);int code=connection.getResponseCode();String cache=connection.getHeaderField("X-Cache");result="Android cihazı: HTTP "+code+(cache==null?"":" · "+cache)+". Bu test REST/WebSocket doğrulaması değildir.";
-        }catch(IOException e){result="Android cihazında bağlantı kurulamadı. Bu sonuç Codex bulut testinden ayrıdır.";}finally{if(connection!=null)connection.disconnect();}
-        final String message=result;runOnUiThread(()->{if(!isFinishing())state.setText(message);});
-    },"official-doc-probe").start();}
+    private void probeDocumentation(){
+        state.setText("OKX TR spot katalog bağlantısı telefondan kontrol ediliyor; tarama başlamaz...");
+        new Thread(()->{
+            String result;
+            okhttp3.OkHttpClient client=new okhttp3.OkHttpClient.Builder()
+                .connectTimeout(10,java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(10,java.util.concurrent.TimeUnit.SECONDS)
+                .followRedirects(false).followSslRedirects(false).build();
+            try{
+                java.util.List<String> symbols=OkxTrCatalog.fetch(client);
+                result="OKX TR REST erişimi başarılı: "+symbols.size()+" benzersiz aktif spot parite. WebSocket henüz doğrulanmadı; tarama kapalı.";
+            }catch(Exception e){
+                result="OKX TR REST bağlantısı veya spot katalog yanıtı doğrulanamadı; tarama kapalı.";
+            }finally{
+                client.dispatcher().executorService().shutdown();
+                client.connectionPool().evictAll();
+            }
+            final String message=result;
+            runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())state.setText(message);});
+        },"okxtr-rest-probe").start();
+    }
+    private void probeWebSocket(){
+        state.setText("OKX TR WebSocket bağlantısı test ediliyor; tarama başlamaz...");
+        new Thread(()->{
+            String result;
+            try{
+                result=OkxTrWsProbe.check();
+            }catch(Exception e){
+                result="WebSocket testi başarısız; tarama kapalı.";
+            }
+            final String message=result;
+            runOnUiThread(()->{if(!isFinishing())state.setText(message);});
+        },"okxtr-ws-probe").start();
+    }
     @Override protected void onResume(){super.onResume();if(state!=null)state.setText(runtime.status);}
     private void closeBridge(){bridgeGeneration++;bridgeReady=false;uiHandler.removeCallbacks(bridgeRetry);WebMessagePort old=nativePort;nativePort=null;if(old!=null)old.close();}
     private void offerBridge(){

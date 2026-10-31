@@ -1,14 +1,16 @@
 import { performance } from 'node:perf_hooks';
 import { analyze } from './analysis.js';
 import { settings } from './config.js';
-import { BinanceTrProvider, safeError } from './provider.js';
+import { safeError } from './provider.js';
+import { OkxTrProvider } from './okx-tr-provider.js';
 
 export class ProEngine {
-  constructor(history, provider = new BinanceTrProvider()) {
+  constructor(history, provider = new OkxTrProvider()) {
     this.history = history; this.provider = provider; this.config = settings(history.loadSettings());
     this.minuteCache = new Map(); this.books = new Map(); this.results = new Map(); this.processed = new Map(); this.cursor = 0;
     this.metrics = { scans: 0, evaluated: 0, unavailable: 0, lastScanMs: null, p95ScanMs: null, lastScanAt: null, minuteError: null };
     this.durations = []; this.intervals = []; this.running = false; this.refreshing = false;
+    this.feedIdentity = new Map(); this.lifecycle = 0;
   }
   update(patch) { const config = settings(patch, this.config); this.history.saveSettings(config); this.config = config; this.results.clear(); return config; }
   async refreshMinute() {
@@ -18,7 +20,12 @@ export class ProEngine {
     const market = markets[this.cursor++ % markets.length];
     if (Date.now() - (this.minuteCache.get(market.symbol)?.at ?? 0) < 30000) return;
     this.refreshing = true;
-    try { const bars = await this.provider.minutes(market); this.minuteCache.set(market.symbol, { bars, at: Date.now() }); this.metrics.minuteError = null; }
+    const generation=this.lifecycle, feed=this.provider.feeds.get(market.symbol);
+    try { const bars = await this.provider.minutes(market);
+      if(this.running&&generation===this.lifecycle&&this.provider.feeds.get(market.symbol)===feed&&feed?.continuousSince!=null){
+        this.minuteCache.set(market.symbol, { bars, at: Date.now() }); this.metrics.minuteError = null;
+      }
+    }
     catch (e) { this.metrics.minuteError = safeError(e); }
     finally { this.refreshing = false; }
   }
@@ -26,9 +33,18 @@ export class ProEngine {
     const start = performance.now(); let evaluated = 0, unavailable = 0;
     const depthCandidates = [];
     for (const symbol of this.minuteCache.keys()) if (!this.provider.markets.has(symbol)) this.minuteCache.delete(symbol);
+    for (const symbol of this.feedIdentity.keys()) if (!this.provider.markets.has(symbol)) {
+      this.feedIdentity.delete(symbol);this.books.delete(symbol);this.processed.delete(symbol);
+    }
     for (const symbol of this.results.keys()) if (!this.provider.markets.has(symbol)) { this.results.delete(symbol); this.processed.delete(symbol); }
     for (const market of this.provider.markets.values()) {
       const feed = this.provider.feeds.get(market.symbol);
+      if(this.feedIdentity.get(market.symbol)!==feed || feed?.continuousSince==null){
+        this.minuteCache.delete(market.symbol);this.books.delete(market.symbol);
+        this.results.delete(market.symbol);this.processed.delete(market.symbol);
+        if(feed?.continuousSince!=null)this.feedIdentity.set(market.symbol,feed);
+        else this.feedIdentity.delete(market.symbol);
+      }
       if (!feed) { this.results.set(market.symbol, { ready: false, reason: market.availability, category: 'KOŞULLAR SAĞLANMIYOR' }); this.history.liveStatus(market.symbol, null); unavailable++; continue; }
       const end = Math.floor(now / 1000) * 1000;
       const previous = this.processed.get(market.symbol) ?? end;
@@ -56,7 +72,12 @@ export class ProEngine {
     if (depthCandidates.length && !this.bookRefreshing) {
       const market = depthCandidates[(this.bookCursor ?? 0) % depthCandidates.length];
       this.bookCursor = (this.bookCursor ?? 0) + 1; this.bookRefreshing = true;
-      void this.provider.book(market).then(book => { this.books.set(market.symbol, book); this.metrics.bookError = null; })
+      const generation=this.lifecycle, feed=this.provider.feeds.get(market.symbol);
+      void this.provider.book(market).then(book => {
+        if(this.running&&generation===this.lifecycle&&feed?.continuousSince!=null&&this.provider.feeds.get(market.symbol)===feed){
+          this.books.set(market.symbol, book); this.metrics.bookError = null;
+        }
+      })
         .catch(e => { this.metrics.bookError = safeError(e); }).finally(() => { this.bookRefreshing = false; });
     }
     this.history.expire(now);
@@ -73,7 +94,7 @@ export class ProEngine {
       if (!result.ready || result.category === 'KOŞULLAR SAĞLANMIYOR' || now - result.observedAt > this.config.staleMs ||
         this.provider.feeds.get(symbol)?.continuousSince === null) continue;
       const signal = [...this.history.pending.values()].find(x => x.symbol === symbol);
-      rows.push({ ...result, symbol, coin: this.provider.markets.get(symbol)?.base, source: 'BINANCE TR',
+      rows.push({ ...result, symbol, coin: this.provider.markets.get(symbol)?.base, source: this.provider.snapshot().source,
         signalTime: signal?.time ?? result.observedAt, signalPrice: signal?.price ?? result.price,
         historicalPerformance: performance.find(x => x.symbol === symbol && x.targetPct === this.config.targetPct && x.horizonMinutes === this.config.horizonMinutes) ?? null });
     }
@@ -86,14 +107,18 @@ export class ProEngine {
   chart(symbol, now = Date.now()) {
     if (!this.provider.markets.has(symbol)) return null;
     const feed = this.provider.feeds.get(symbol);
-    return { symbol, source: 'BINANCE TR', interval: '1s', bars: feed ? [...feed.bars.values()].filter(x => x.time + 1000 <= now).sort((a, b) => a.time - b.time).slice(-300) : [],
+    return { symbol, source: this.provider.snapshot().source, interval: '1s', bars: feed ? [...feed.bars.values()].filter(x => x.time + 1000 <= now).sort((a, b) => a.time - b.time).slice(-300) : [],
       continuousSince: feed?.continuousSince ?? null, now };
   }
   async start() {
-    if (this.running) return; this.running = true;
+    if (this.running) return;
+    await this.provider.start();
+    if (this.provider.snapshot().adapterEnabled === false) return;
+    this.running = true;++this.lifecycle;
     const tick = setInterval(() => this.tick(), 1000), refresh = setInterval(() => void this.refreshMinute(), 350);
     tick.unref(); refresh.unref(); this.intervals.push(tick, refresh);
-    await this.provider.start();
   }
-  stop() { this.running = false; this.intervals.forEach(clearInterval); this.intervals = []; this.provider.stop(); }
+  stop() { this.running = false;++this.lifecycle;this.intervals.forEach(clearInterval);this.intervals = [];
+    this.minuteCache.clear();this.books.clear();this.results.clear();this.processed.clear();this.feedIdentity.clear();
+    this.provider.stop(); }
 }
