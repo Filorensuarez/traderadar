@@ -18,18 +18,20 @@ export class OkxTrProvider {
     this.stopped = true; this.timers = new Set(); this.abort = new AbortController();
     this.generation = 0;
     this.queue = Promise.resolve(); this.nextRequest = 0;
+    this.requestGeneration = 0;
     this.state = { source: 'OKX TR', adapterEnabled: false, sourceVerification: 'LIVE DEVICE VERIFICATION REQUIRED',
       documentationUrl: 'https://tr.okx.com/docs-v5/en/', connected: false,
       catalogAt: null, lastMessageAt: null, receivedTrades: 0, rejected: 0, errors: 0, requests: 0, error: null };
   }
   async request(path) {
+    const generation=this.requestGeneration;
     const job = this.queue.then(async () => {
       const wait = Math.max(0, this.nextRequest - this.clock());
       if (wait) await new Promise((resolve, reject) => {
         const timer = setTimeout(resolve, wait);
         this.abort.signal.addEventListener('abort', () => { clearTimeout(timer); reject(Error('Stopped')); }, { once: true });
       });
-      if (this.stopped) throw Error('Stopped');
+      if (this.stopped || generation!==this.requestGeneration) throw Error('Stopped');
       this.nextRequest = this.clock() + 350;
       this.state.requests++;
       const response = await this.fetchFn(REST + path, { signal: AbortSignal.any([this.abort.signal, AbortSignal.timeout(12000)]),
@@ -44,6 +46,7 @@ export class OkxTrProvider {
         if(size>MAX_RESPONSE){await reader.cancel();throw Error('Response too large');}
         parts.push(Buffer.from(value));
       }
+      if(this.stopped||generation!==this.requestGeneration)throw Error('Stopped');
       return JSON.parse(Buffer.concat(parts).toString('utf8'));
     }).catch(error => {this.state.errors++;this.state.error=safe(error);throw error;});
     this.queue = job.catch(() => {});
@@ -140,7 +143,7 @@ export class OkxTrProvider {
   async start() {
     if(!this.verified){this.state.error='OKX TR device REST/WebSocket verification pending; adapter disabled';return;}
     if(!this.stopped)return;
-    this.stopped=false;this.abort=new AbortController();this.state.adapterEnabled=true;
+    this.stopped=false;this.abort=new AbortController();this.queue=Promise.resolve();this.nextRequest=0;++this.requestGeneration;this.state.adapterEnabled=true;
     try{await this.refresh();}catch(error){this.state.error=safe(error);}
     const refresh=()=>{if(this.stopped)return;this.refresh().catch(error=>{this.state.error=safe(error);}).finally(()=>{
       if(!this.stopped){const timer=setTimeout(()=>{this.timers.delete(timer);refresh();},900000);timer.unref?.();this.timers.add(timer);}
@@ -148,7 +151,7 @@ export class OkxTrProvider {
     const timer=setTimeout(()=>{this.timers.delete(timer);refresh();},900000);timer.unref?.();this.timers.add(timer);
   }
   stop() {
-    this.stopped=true;this.state.adapterEnabled=false;this.abort.abort();
+    this.stopped=true;this.state.adapterEnabled=false;this.abort.abort();++this.requestGeneration;
     ++this.generation;
     for(const timer of this.timers)clearTimeout(timer);this.timers.clear();
     for(const feed of this.feeds.values())feed.disconnect();
