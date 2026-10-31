@@ -17,7 +17,7 @@ export function parseOkxTrInstruments(body) {
     const symbol = base + '_' + quote;
     if (markets.has(symbol)) throw Error('Duplicate OKX TR instrument');
     markets.set(symbol, { symbol, base, quote, wireSymbol: row.instId, type: 1,
-      streamAvailable: true, availability: 'ISINMA' });
+      streamAvailable: false, availability: 'WebSocket abonelik onayı bekleniyor' });
   }
   if (!markets.size) throw Error('No verified live OKX TR spot instruments');
   return [...markets.values()];
