@@ -8,7 +8,10 @@ import { ProEngine } from './engine.js';
 export function createApp(engine, { allowedOrigin = process.env.PRO_FRONTEND_ORIGIN || '' } = {}) {
   const app = express(); app.disable('x-powered-by');
   const csrf = randomBytes(32).toString('hex');
-  const equal = x => typeof x === 'string' && x.length === csrf.length && timingSafeEqual(Buffer.from(x), Buffer.from(csrf));
+  const equal = x => typeof x === 'string' && Buffer.byteLength(x) === Buffer.byteLength(csrf) && timingSafeEqual(Buffer.from(x), Buffer.from(csrf));
+  const isLocalAdmin = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress) &&
+    ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(req.hostname) &&
+    !['forwarded', 'x-forwarded-for', 'x-forwarded-host'].some(header => req.get(header));
   app.use((req, res, next) => {
     res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
       'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' " + (allowedOrigin ? new URL(allowedOrigin).origin : '') + "; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
@@ -26,7 +29,7 @@ export function createApp(engine, { allowedOrigin = process.env.PRO_FRONTEND_ORI
   // Read-only public endpoints never require exchange credentials.
   const updates = new Map();
   app.patch('/api/pro/settings', (req, res) => {
-    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    const local = isLocalAdmin(req);
     const origin = req.get('origin'), sameOrigin = !origin || origin === `${req.protocol}://${req.get('host')}`;
     if (!local || !sameOrigin || !equal(req.get('x-pro-csrf'))) return res.status(403).json({ error: 'Ayar değişikliği yalnız yerel yöneticiye açık' });
     const now = Date.now(), ip = req.socket.remoteAddress;
@@ -35,7 +38,7 @@ export function createApp(engine, { allowedOrigin = process.env.PRO_FRONTEND_ORI
     catch (e) { res.status(400).json({ error: e.message }); }
   });
   app.get('/api/pro/session', (req, res) => {
-    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    const local = isLocalAdmin(req);
     res.json({ canEdit: local, csrf: local ? csrf : null });
   });
   app.get('/api/pro/status', (_req, res) => res.json(engine.snapshot()));
@@ -48,8 +51,10 @@ export function createApp(engine, { allowedOrigin = process.env.PRO_FRONTEND_ORI
   app.get('/api/pro/history', (req, res) => {
     const limit = req.query.limit === undefined ? 100 : Number(req.query.limit);
     const before = req.query.before === undefined ? Number.MAX_SAFE_INTEGER : Number(req.query.before);
-    if (!Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isSafeInteger(before) || before < 0) return res.status(400).json({ error: 'Geçersiz sayfalama' });
-    res.json(engine.history.list(limit, before));
+    const beforeId = req.query.beforeId ?? '';
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isSafeInteger(before) || before < 0 ||
+      typeof beforeId !== 'string' || (beforeId !== '' && !/^[A-Z0-9_]+:\d{1,16}$/.test(beforeId))) return res.status(400).json({ error: 'Geçersiz sayfalama' });
+    res.json(engine.history.list(limit, before, beforeId));
   });
   app.get('/api/pro/reports', (_req, res) => res.json(engine.history.reports()));
   app.get('/api/pro/notifications', (_req, res) => res.json(engine.history.notifications()));

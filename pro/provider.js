@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { TradeCandles } from './candles.js';
+import { setTimeout as delay } from 'node:timers/promises';
 
 export const SOURCE = 'BINANCE TR';
 // These routes exist in the legacy repository. Current official support MUST be
@@ -58,6 +59,7 @@ export class BinanceTrProvider {
       lastMessageAt: null, catalogAt: null, error: null, requests: 0, errors: 0, rejected: 0,
       waitUntil: 0, receivedTrades: 0, lastLatencyMs: null };
     this.stopped = true; this.queue = Promise.resolve(); this.nextRequest = 0;
+    this.abort = new AbortController();
   }
   delay(fn, ms) {
     const t = setTimeout(() => { this.timers.delete(t); if (!this.stopped) fn(); }, ms);
@@ -69,11 +71,11 @@ export class BinanceTrProvider {
     if (this.inflight.has(url)) return this.inflight.get(url);
     const work = this.queue.then(async () => {
       const wait = Math.max(0, this.nextRequest - this.clock(), this.state.waitUntil - this.clock());
-      if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+      if (wait > 0) await delay(wait, undefined, { signal: this.abort.signal });
       if (this.stopped) throw Error('Veri servisi durduruldu');
       this.nextRequest = this.clock() + 300;
       this.state.requests++;
-      const response = await this.fetchFn(url, { signal: AbortSignal.timeout(12000), headers: { Accept: 'application/json' } });
+      const response = await this.fetchFn(url, { signal: AbortSignal.any([AbortSignal.timeout(12000), this.abort.signal]), headers: { Accept: 'application/json' } });
       if ([418, 429].includes(response.status)) {
         const header = response.headers.get('retry-after');
         const seconds = header === null ? NaN : Number(header);
@@ -167,13 +169,14 @@ export class BinanceTrProvider {
       errorRate: this.state.requests ? this.state.errors / this.state.requests : null };
   }
   async start() {
-    if (!this.stopped) return; this.stopped = false;
+    if (!this.stopped) return; this.stopped = false; this.abort = new AbortController();
     const cycle = async () => { try { await this.refresh(); } catch (e) { this.state.error = safeError(e); }
       if (!this.stopped) this.delay(cycle, Math.max(60000, this.state.waitUntil - this.clock(), this.markets.size ? 900000 : 60000)); };
     await cycle();
   }
   stop() {
     this.stopped = true; for (const t of this.timers) clearTimeout(t); this.timers.clear();
+    this.abort.abort();
     for (const feed of this.feeds.values()) feed.disconnect();
     for (const ws of this.sockets) { ws.retired = true; ws.terminate(); } this.sockets.clear();
   }

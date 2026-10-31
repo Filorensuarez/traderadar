@@ -24,6 +24,7 @@ export class ProEngine {
   }
   tick(now = Date.now()) {
     const start = performance.now(); let evaluated = 0, unavailable = 0;
+    const depthCandidates = [];
     for (const symbol of this.minuteCache.keys()) if (!this.provider.markets.has(symbol)) this.minuteCache.delete(symbol);
     for (const symbol of this.results.keys()) if (!this.provider.markets.has(symbol)) { this.results.delete(symbol); this.processed.delete(symbol); }
     for (const market of this.provider.markets.values()) {
@@ -43,22 +44,20 @@ export class ProEngine {
       // Only fetch depth for qualifying candidates, not for every market every second.
       // Shared provider queue enforces the same REST cooldown across both request types.
       if (this.running && result.ready && result.category !== 'KOŞULLAR SAĞLANMIYOR' &&
-          now - (this.books.get(market.symbol)?.time ?? 0) >= 3000 && !this.bookPending?.has(market.symbol)) {
-        this.bookPending ||= new Set();
-        // One outstanding depth request at a time bounds the queue under large candidate sets.
-        if (this.bookPending.size === 0) {
-          this.bookPending.add(market.symbol);
-          void this.provider.book(market).then(book => this.books.set(market.symbol, book))
-            .catch(e => { this.metrics.bookError = safeError(e); })
-            .finally(() => this.bookPending.delete(market.symbol));
-        }
-      }
+          now - (this.books.get(market.symbol)?.time ?? 0) >= 3000) depthCandidates.push(market);
       this.history.liveStatus(market.symbol, result);
       if (result.ready) evaluated++; else unavailable++;
       if (result.ready && result.category !== 'KOŞULLAR SAĞLANMIYOR') {
         const row = this.history.record(market.symbol, result, this.config, end);
         if (result.category === 'ÇOKLU TEYİT') this.history.notify(row.id, market.symbol, result.category, now);
       }
+    }
+    // Round-robin prevents high-ranked candidates from starving later symbols.
+    if (depthCandidates.length && !this.bookRefreshing) {
+      const market = depthCandidates[(this.bookCursor ?? 0) % depthCandidates.length];
+      this.bookCursor = (this.bookCursor ?? 0) + 1; this.bookRefreshing = true;
+      void this.provider.book(market).then(book => { this.books.set(market.symbol, book); this.metrics.bookError = null; })
+        .catch(e => { this.metrics.bookError = safeError(e); }).finally(() => { this.bookRefreshing = false; });
     }
     this.history.expire(now);
     this.history.flush();
@@ -69,13 +68,14 @@ export class ProEngine {
       p95ScanMs: sorted[Math.floor((sorted.length - 1) * 0.95)], lastScanAt: now });
   }
   snapshot(now = Date.now()) {
-    const rows = [];
+    const rows = [], performance = this.history.statistics();
     for (const [symbol, result] of this.results) {
       if (!result.ready || result.category === 'KOŞULLAR SAĞLANMIYOR' || now - result.observedAt > this.config.staleMs ||
         this.provider.feeds.get(symbol)?.continuousSince === null) continue;
       const signal = [...this.history.pending.values()].find(x => x.symbol === symbol);
       rows.push({ ...result, symbol, coin: this.provider.markets.get(symbol)?.base, source: 'BINANCE TR',
-        signalTime: signal?.time ?? result.observedAt, signalPrice: signal?.price ?? result.price });
+        signalTime: signal?.time ?? result.observedAt, signalPrice: signal?.price ?? result.price,
+        historicalPerformance: performance.find(x => x.symbol === symbol && x.targetPct === this.config.targetPct && x.horizonMinutes === this.config.horizonMinutes) ?? null });
     }
     return { now, running: this.running, source: this.provider.snapshot(), metrics: this.metrics,
       memoryBytes: process.memoryUsage().rss, rows, config: this.config,

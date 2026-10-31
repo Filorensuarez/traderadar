@@ -39,3 +39,11 @@ test('başarı örnek yüzdesi olasılık değildir; maliyet eksikliği sıfıra
   const h = new History(); h.record('A_TRY', result, DEFAULTS, NOW);
   assert.equal(h.reports()[0].reliable, false); assert.equal(h.reports()[0].calibratedProbability, null); h.close();
 });
+test('aynı anda oluşan pariteler sayfalamada kaybolmaz; gözlenen başarısızlık ayrı sayılır', () => {
+  const h = new History();
+  for (const s of ['A_TRY', 'B_TRY', 'C_TRY']) h.record(s, result, settings({ horizonMinutes: 1 }), NOW);
+  const first = h.list(1)[0], second = h.list(1, first.time, first.id)[0], third = h.list(1, second.time, second.id)[0];
+  assert.equal(new Set([first.id, second.id, third.id]).size, 3);
+  for (let i = 0; i < 60; i++) h.observe('A_TRY', bar(NOW + i * 1000, 100));
+  const report = h.reports()[0]; assert.equal(report.failed, 1); assert.equal(report.evaluated, 1); assert.equal(report.sampleRatePct, 0); h.close();
+});

@@ -11,6 +11,7 @@ import { NOW, fixture } from './helpers.js';
 import express from 'express';
 import { legacyStatic } from '../legacy-static.js';
 import { readFileSync } from 'node:fs';
+import http from 'node:http';
 
 test('HTTP API, ayar kaydı, CSRF, girdi doğrulaması ve özel dosya güvenliği', async t => {
   const history = new History(), engine = new ProEngine(history);
@@ -24,6 +25,13 @@ test('HTTP API, ayar kaydı, CSRF, girdi doğrulaması ve özel dosya güvenliğ
   assert.equal((await get('/api/pro/chart?symbol=BTC_TRY')).status, 404);
   for (const path of ['/server.js', '/package.json', '/node_modules/express/package.json', '/data/signals.sqlite', '/.env']) assert.equal((await get(path)).status, 404);
   const { csrf } = await (await get('/api/pro/session')).json();
+  const rebound = await new Promise((resolve, reject) => {
+    http.get(base + '/api/pro/session', { headers: { Host: 'evil.test' } }, res => {
+      let body = ''; res.on('data', chunk => { body += chunk; }); res.on('end', () => resolve(JSON.parse(body)));
+    }).on('error', reject);
+  });
+  assert.equal(rebound.canEdit, false);
+  assert.equal((await (await fetch(base + '/api/pro/session', { headers: { 'X-Forwarded-For': '203.0.113.1' } })).json()).canEdit, false);
   const patch = (body, token = csrf, origin = base) => fetch(base + '/api/pro/settings', { method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'X-Pro-CSRF': token, Origin: origin }, body: JSON.stringify(body) });
   assert.equal((await patch({ thresholdPct: 3 }, 'invalid')).status, 403);

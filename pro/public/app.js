@@ -34,6 +34,9 @@ function signalCard(row) {
     ['Kırılım', row.indicators.breakout ? 'Var' : 'Yok'], ['Risk', row.risk], ['Son gözlem', date(row.observedAt)],
   ]) dl.append(node('dt', label), node('dd', value));
   el.append(dl);
+  const past = row.historicalPerformance;
+  el.append(node('p', !past || past.evaluated < state.config.minimumSample ? 'Geçmiş performans: yeterli değerlendirilmiş örnek yok.' :
+    `Geçmiş örnekler: ${past.evaluated} · Brüt hedef başarısı %${format(past.wins / past.evaluated * 100)}. Kazanç olasılığı değildir.`, 'muted'));
   for (const [key, pass] of Object.entries(row.groups)) el.append(node('span', `${pass ? '✓' : '—'} ${labels[key]}`, 'tag'));
   el.append(node('p', 'EMA, RSI ve MACD aynı fiyat grubundadır. Geçmiş performans, geçmiş ve haftalık rapor bölümünde ölçülür.', 'muted'));
   const button = node('button', 'Gerçek fiyat grafiği'); button.addEventListener('click', () => { $('chart-symbol').value = row.symbol; void chart(); $('chart').scrollIntoView({ behavior: 'smooth' }); });
@@ -86,7 +89,7 @@ function renderStatus() {
 }
 async function history(reset = false) {
   if (reset) historyCursor = null;
-  const rows = await api('history?limit=100' + (historyCursor === null ? '' : '&before=' + historyCursor));
+  const rows = await api('history?limit=100' + (historyCursor === null ? '' : '&before=' + historyCursor.time + '&beforeId=' + encodeURIComponent(historyCursor.id)));
   if (reset) $('history-rows').replaceChildren();
   for (const r of rows) {
     const tr = node('tr');
@@ -95,7 +98,7 @@ async function history(reset = false) {
       `%${format(r.maxFavorablePct)} / %${format(r.maxAdversePct)}`, r.timeToTargetMs == null ? 'Henüz yok' : `${format(r.timeToTargetMs / 1000)} sn`, checkpoints || 'Gözlem bekleniyor']) tr.append(node('td', value));
     $('history-rows').append(tr);
   }
-  if (rows.length) historyCursor = rows.at(-1).time;
+  if (rows.length) historyCursor = { time: rows.at(-1).time, id: rows.at(-1).id };
   $('older').disabled = rows.length < 100;
   if (!rows.length && reset) { const tr = node('tr'), td = node('td', 'Henüz gerçek sinyal kaydı yok.'); td.colSpan = 7; tr.append(td); $('history-rows').append(tr); }
 }

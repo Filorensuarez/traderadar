@@ -95,9 +95,17 @@ export class History {
       if (row.liveStatus !== status) { row.liveStatus = status; this.dirty.set(row.id, row); }
     }
   }
-  list(limit = 100, before = Number.MAX_SAFE_INTEGER) {
+  list(limit = 100, before = Number.MAX_SAFE_INTEGER, beforeId = '') {
     this.flush();
-    return this.db.prepare('SELECT body FROM signals WHERE time < ? ORDER BY time DESC,id DESC LIMIT ?').all(before, limit).map(x => JSON.parse(x.body));
+    return this.db.prepare('SELECT body FROM signals WHERE time < ? OR (time=? AND id<?) ORDER BY time DESC,id DESC LIMIT ?').all(before, before, beforeId, limit).map(x => JSON.parse(x.body));
+  }
+  statistics() {
+    this.flush();
+    return this.db.prepare(`SELECT symbol, json_extract(body,'$.config.targetPct') targetPct,
+      json_extract(body,'$.config.horizonMinutes') horizonMinutes, COUNT(*) total,
+      SUM(json_extract(body,'$.outcome')='SUCCESS') wins,
+      SUM(json_extract(body,'$.outcome') IN ('SUCCESS','FAILED')) evaluated
+      FROM signals GROUP BY symbol,targetPct,horizonMinutes`).all();
   }
   notifications() { return this.db.prepare('SELECT * FROM notifications ORDER BY time DESC LIMIT 100').all(); }
   reports() {
