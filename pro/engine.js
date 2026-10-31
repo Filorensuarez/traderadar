@@ -1,10 +1,11 @@
 import { performance } from 'node:perf_hooks';
 import { analyze } from './analysis.js';
 import { settings } from './config.js';
-import { BinanceTrProvider, safeError } from './provider.js';
+import { safeError } from './provider.js';
+import { OkxTrProvider } from './okx-tr-provider.js';
 
 export class ProEngine {
-  constructor(history, provider = new BinanceTrProvider()) {
+  constructor(history, provider = new OkxTrProvider()) {
     this.history = history; this.provider = provider; this.config = settings(history.loadSettings());
     this.minuteCache = new Map(); this.books = new Map(); this.results = new Map(); this.processed = new Map(); this.cursor = 0;
     this.metrics = { scans: 0, evaluated: 0, unavailable: 0, lastScanMs: null, p95ScanMs: null, lastScanAt: null, minuteError: null };
