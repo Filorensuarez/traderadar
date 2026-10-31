@@ -63,7 +63,9 @@ test('tarama motoru 1000 pariteyi kesmeden işler, gecikmeyi ölçer ve bayat si
   for (let i = 0; i < 1000; i++) {
     const symbol = `COIN${i}_TRY`, feed = new TradeCandles(); feed.connect(NOW - 400000);
     for (const c of f.seconds) feed.bars.set(c.time, c);
-    p.markets.set(symbol, { symbol, base: `COIN${i}` }); p.feeds.set(symbol, feed); e.minuteCache.set(symbol, { bars: f.minutes, at: NOW });
+    p.markets.set(symbol, { symbol, base: `COIN${i}` }); p.feeds.set(symbol, feed);
+    // The fixture represents an already connected, warmed-up provider session.
+    e.feedIdentity.set(symbol,feed); e.minuteCache.set(symbol, { bars: f.minutes, at: NOW });
   }
   e.tick(NOW); const status = e.snapshot(NOW);
   assert.equal(status.rows.length, 1000); assert.equal(status.metrics.evaluated, 1000);
