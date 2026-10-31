@@ -93,6 +93,13 @@ class MainActivity : Activity() {
             isAllCaps = false
             setOnClickListener { retry() }
         }
+        val pro = Button(this).apply {
+            text = "Pro"
+            textSize = 12f
+            isAllCaps = false
+            setOnClickListener { startActivity(Intent(this@MainActivity, ProActivity::class.java)) }
+        }
+        header.addView(pro, LinearLayout.LayoutParams(dp(64), dp(44)))
         header.addView(reload, LinearLayout.LayoutParams(dp(88), dp(44)))
         root.addView(header, LinearLayout.LayoutParams(-1, dp(57)))
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {

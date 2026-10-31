@@ -11,6 +11,11 @@ const storage = {
 let seen = new Set(storage.get('pro-alarm-ids', []));
 let seeded = false;
 async function api(path, options) {
+  if (globalThis.NativePro) {
+    const result = JSON.parse(globalThis.NativePro.request(path, options?.method || 'GET', options?.body || ''));
+    if (result?.error) throw Error(result.error);
+    return result;
+  }
   const response = await fetch((API_BASE ? API_BASE.replace(/\/$/, '') + '/api/pro/' : './api/pro/') + path, { ...options, signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw Error(`İstek başarısız: HTTP ${response.status}`);
   return response.json();

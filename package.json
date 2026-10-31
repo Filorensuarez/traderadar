@@ -9,6 +9,7 @@
     "start:pro": "node pro/server.js",
     "test:pro": "node --test pro/tests/*.test.js",
     "test:pro:ui": "node pro/tests/browser.mjs",
+    "test:android:core": "node scripts/test-android-core.mjs",
     "backtest:pro": "node pro/backtest.js"
   },
   "dependencies": {
