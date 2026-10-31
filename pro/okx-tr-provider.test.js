@@ -14,3 +14,34 @@ test('stop is idempotent',()=>{
   provider.stop();provider.stop();
   assert.equal(provider.snapshot().connected,false);
 });
+
+test('reject unverified live startup without any network call',async()=>{
+  let requests=0, sockets=0;
+  const provider=new OkxTrProvider({fetchFn:()=>{requests++;throw Error('Unexpected request');},
+    socketFactory:()=>{sockets++;throw Error('Unexpected socket');}});
+  await provider.start();
+  assert.equal(requests,0);
+  assert.equal(sockets,0);
+  assert.equal(provider.snapshot().adapterEnabled,false);
+});
+test('read-only REST minute and book endpoints use OKX TR only',async()=>{
+  const seen=[];
+  const now=1760000400000;
+  const market={symbol:'BTC_TRY',wireSymbol:'BTC-TRY'};
+  const provider=new OkxTrProvider({verified:true,clock:()=>now,fetchFn:async url=>{
+    seen.push(url);
+    const body=url.includes('/candles?')
+      ? {code:'0',data:[[String(Math.floor((now-120000)/60000)*60000),'10','11','9','10','2','20','20','1']]}
+      : {code:'0',data:[{ts:String(now),bids:[['9','2']],asks:[['11','3']]}]};
+    return {ok:true,body:new ReadableStream({start(controller){
+      controller.enqueue(new TextEncoder().encode(JSON.stringify(body)));controller.close();
+    }})};
+  }});
+  provider.stopped=false;
+  provider.markets.set(market.symbol,market);
+  assert.equal((await provider.minutes(market)).length,1);
+  assert.equal((await provider.book(market)).bid,9);
+  assert.equal(seen.length,2);
+  assert.ok(seen.every(url=>url.startsWith('https://tr.okx.com/api/v5/market/')));
+  provider.stop();
+});
