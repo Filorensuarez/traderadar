@@ -30,7 +30,7 @@ public final class ScanService extends Service {
             if(Build.VERSION.SDK_INT>=29)startForeground(NOTIFICATION,notification(),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);else startForeground(NOTIFICATION,notification());
             runtime.started();if(!session.start(source,true)){runtime.stopped(OfficialSource.BLOCKER);stopSelf();return START_NOT_STICKY;}
             wakeLock=((PowerManager)getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"TradeRadar:UserScan");wakeLock.setReferenceCounted(false);wakeLock.acquire(600000L);
-            executor=Executors.newSingleThreadScheduledExecutor();executor.scheduleAtFixedRate(()->{
+            executor=Executors.newSingleThreadScheduledExecutor();executor.scheduleWithFixedDelay(()->{
                 try{runtime.tick(System.currentTimeMillis(),this::signal);}catch(RuntimeException e){stopReason="Tarama hatası; sinyal üretimi durduruldu";stopSelf();}
             },0,1,TimeUnit.SECONDS);
             executor.scheduleAtFixedRate(()->{if(session.running()&&wakeLock!=null)wakeLock.acquire(600000L);},9,9,TimeUnit.MINUTES);
@@ -38,12 +38,12 @@ public final class ScanService extends Service {
         return START_NOT_STICKY;
     }
     private void signal(String id,String symbol,double price,long time){
-        String clock=new java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.forLanguageTag("tr-TR")).format(new java.util.Date(time));
+        java.text.SimpleDateFormat formatter=new java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.forLanguageTag("tr-TR"));formatter.setTimeZone(java.util.TimeZone.getTimeZone("Europe/Istanbul"));String clock=formatter.format(new java.util.Date(time));
         Notification n=new Notification.Builder(this,SIGNALS).setSmallIcon(R.drawable.ic_traderadar).setContentTitle("Çoklu Teyit · "+symbol).setContentText("Fiyat: "+price+" · "+clock).setContentIntent(open()).setAutoCancel(true).setOnlyAlertOnce(true).build();notifications.notify(id,302,n);
     }
     @Override public void onTimeout(int startId,int fgsType){stopReason="Android dataSync süre sınırı doldu. Tarama durdu; yeniden başlatmak için uygulamayı açın.";stopSelf();}
     @Override public void onTaskRemoved(Intent rootIntent){super.onTaskRemoved(rootIntent);/* User-started foreground session may continue, subject to the OS. */}
-    @Override public void onDestroy(){if(executor!=null){executor.shutdownNow();try{executor.awaitTermination(2,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
+    @Override public void onDestroy(){if(runtime!=null)runtime.stopped(stopReason);if(executor!=null){executor.shutdownNow();try{executor.awaitTermination(2,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
         if(session!=null)session.stop();if(wakeLock!=null&&wakeLock.isHeld())wakeLock.release();if(runtime!=null)runtime.stopped(stopReason);stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();}
     public IBinder onBind(Intent intent){return null;}
 }

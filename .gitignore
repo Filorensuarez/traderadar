@@ -6,3 +6,9 @@ data/
 *.log
 test-results/
 playwright-report/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.jks
+*.keystore

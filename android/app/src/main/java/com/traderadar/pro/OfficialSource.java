@@ -24,4 +24,5 @@ public final class OfficialSource {
     // Implement only after an accessible official document AND device REST/WS
     // observations establish the contract. No Binance Global fallback is present.
     public static Session createVerifiedSession(){return null;}
+    public static boolean isConfigured(){return false;}
 }

@@ -14,16 +14,17 @@
         android:allowBackup="false"
         android:supportsRtl="true">
         <service android:name=".ScanService" android:exported="false" android:foregroundServiceType="dataSync" android:stopWithTask="false" />
-        <activity android:name=".ProActivity" android:exported="false" />
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize">
+        <activity android:name=".ProActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize">
         </activity>
     </application>
 </manifest>

@@ -10,7 +10,7 @@ public final class ScanSessionController {
     public ScanSessionController(OfficialSource.Listener listener){this.listener=listener;}
     public synchronized boolean running(){return active!=null;}
     public synchronized boolean start(OfficialSource.Session source,boolean userInitiated){
-        if(active!=null)return true;
+        if(active!=null){if(source!=active)close(source);return true;}
         if(!userInitiated||source==null||!source.restVerified()||!source.websocketVerified()){close(source);return false;}
         active=source;final long token=++generation;
         try{source.start(new OfficialSource.Listener(){

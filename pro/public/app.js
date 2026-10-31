@@ -76,7 +76,7 @@ function loadForm(config) {
   $('settings-form').elements.volumeFilter.checked = config.volumeFilter;
   $('settings-form').elements.volumeFilter.disabled = !session.canEdit;
   $('settings-form').querySelector('button').disabled = !session.canEdit;
-  $('settings-note').textContent = session.canEdit ? 'Ayarlar sunucuda saklanır; geçmiş sinyaller kendi ayarlarını korur.' : 'Salt okunur erişim. Ayarları sunucunun yerel yöneticisi değiştirebilir.';
+  $('settings-note').textContent = globalThis.NativePro ? 'Ayarlar bu Android cihazında saklanır; geçmiş sinyaller kendi ayarlarını korur.' : session.canEdit ? 'Ayarlar sunucuda saklanır; geçmiş sinyaller kendi ayarlarını korur.' : 'Salt okunur erişim. Ayarları sunucunun yerel yöneticisi değiştirebilir.';
 }
 function renderStatus() {
   const s = state.source, fresh = s.connected && s.fresh;
@@ -99,7 +99,8 @@ async function history(reset = false) {
   for (const r of rows) {
     const tr = node('tr');
     const checkpoints = Object.entries(r.checkpoints).map(([m, c]) => `${m}dk: brüt %${format(c.grossPct)} / net ${c.netPct === null ? 'spread verisi yok' : '%' + format(c.netPct)}${c.coverage ? '' : ' (eksik)'}`).join(' · ');
-    for (const value of [r.symbol, date(r.time), format(r.price, 8), r.outcome + (r.liveStatus ? ' · ' + r.liveStatus : ''),
+    const outcome = ({ SUCCESS: 'BAŞARILI', FAILED: 'BAŞARISIZ', PENDING: 'GÖZLEM BEKLENİYOR', INSUFFICIENT_DATA: 'YETERSİZ VERİ' })[r.outcome] || r.outcome;
+    for (const value of [r.symbol, date(r.time), format(r.price, 8), outcome + (r.liveStatus ? ' · ' + r.liveStatus : ''),
       `%${format(r.maxFavorablePct)} / %${format(r.maxAdversePct)}`, r.timeToTargetMs == null ? 'Henüz yok' : `${format(r.timeToTargetMs / 1000)} sn`, checkpoints || 'Gözlem bekleniyor']) tr.append(node('td', value));
     $('history-rows').append(tr);
   }
@@ -120,7 +121,7 @@ async function reports() {
 async function notifications() {
   const rows = await api('notifications'); $('notification-history').replaceChildren(...rows.map(r => node('p', `${date(r.time)} · ${r.symbol} · ${r.category}`)));
   for (const r of [...rows].reverse()) {
-    if (!seen.has(r.id) && seeded && Date.now() - r.time < 30000 && state?.source.fresh) {
+    if (!globalThis.NativePro && !seen.has(r.id) && seeded && Date.now() - r.time < 30000 && state?.source.fresh) {
       if ($('sound').checked && audio) { const osc = audio.createOscillator(), gain = audio.createGain(); osc.connect(gain); gain.connect(audio.destination); gain.gain.value = 0.08; osc.frequency.value = 740; osc.start(); osc.stop(audio.currentTime + 0.2); }
       if ('Notification' in window && Notification.permission === 'granted') new Notification('TradeRadar Pro · Çoklu teyit', { body: r.symbol, tag: r.id });
     }
@@ -178,4 +179,10 @@ async function refresh() {
   finally { busy = false; }
 }
 try { session = await api('session'); } catch (e) { showError(e); }
+if (globalThis.NativePro) {
+  $('sound').parentElement.hidden = true;
+  $('enable-notifications').hidden = true;
+  $('alarm-note').textContent = 'Bildirimler yerel Android hizmetinden gelir. Ses ve izinler Android bildirim kanalı ayarlarından yönetilir. Eksik dönemler başarı/başarısızlık olarak uydurulmaz.';
+  $('settings').querySelector('p').textContent = 'Bu ayarlar yalnız Pro modülüne aittir ve cihazda saklanır. Tarama üstteki Başlat ile açılır; Durdur ile kapanır. Android hizmeti sınırlayabilir.';
+}
 await refresh(); setInterval(() => void refresh(), 3000);

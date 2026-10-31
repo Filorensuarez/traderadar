@@ -11,7 +11,7 @@ final class NativeRuntime implements OfficialSource.Listener {
     private static NativeRuntime instance;
     static synchronized NativeRuntime get(Context c){if(instance==null)instance=new NativeRuntime(c.getApplicationContext());return instance;}
     final NativeStore store;private final SharedPreferences preferences;
-    NativeScanModel.Config config;boolean running;String status=OfficialSource.BLOCKER;
+    NativeScanModel.Config config;volatile boolean running;volatile String status=OfficialSource.BLOCKER;
     long received,lastMessage,lastLatency,lastTick;double lastScanMs,p95;int rejected;
     private final Map<String,String> markets=new TreeMap<>();
     private final Map<String,NativeScanModel.Window> feeds=new HashMap<>();
@@ -23,7 +23,7 @@ final class NativeRuntime implements OfficialSource.Listener {
     private final List<Double> durations=new ArrayList<>();
     interface Alert {void signal(String id,String symbol,double price,long time);}
     private NativeRuntime(Context c){store=new NativeStore(c);preferences=c.getSharedPreferences("native-pro",Context.MODE_PRIVATE);
-        config=new NativeScanModel.Config();try{config=NativeJson.config(new JSONObject(preferences.getString("config","{}")),config);}catch(JSONException e){status="Ayar kaydı okunamadı; tarama kapalı";}
+        config=new NativeScanModel.Config();try{config=NativeJson.config(new JSONObject(preferences.getString("config","{}")),config);}catch(Exception e){status="Ayar kaydı okunamadı; tarama kapalı";}
         for(NativeOutcome r:store.pending())pending.put(r.id,r);
         if(preferences.getBoolean("wasRunning",false)){status="Önceki tarama Android tarafından kesilmiş olabilir. Yeniden Başlat düğmesini kullanın.";preferences.edit().putBoolean("wasRunning",false).apply();}
     }

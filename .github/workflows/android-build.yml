@@ -4,10 +4,22 @@ on:
   push:
     paths:
       - 'android/**'
+      - 'pro/public/**'
+      - 'pro/analysis.js'
+      - 'pro/config.js'
+      - 'pro/candles.js'
+      - 'pro/tests/helpers.js'
+      - 'scripts/test-android-core.mjs'
       - '.github/workflows/android-build.yml'
   pull_request:
     paths:
       - 'android/**'
+      - 'pro/public/**'
+      - 'pro/analysis.js'
+      - 'pro/config.js'
+      - 'pro/candles.js'
+      - 'pro/tests/helpers.js'
+      - 'scripts/test-android-core.mjs'
       - '.github/workflows/android-build.yml'
 permissions:
   contents: read
@@ -16,6 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -25,6 +40,8 @@ jobs:
           echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
           "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0" || sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Compare native strategy with existing JavaScript model
+        run: npm run test:android:core
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'

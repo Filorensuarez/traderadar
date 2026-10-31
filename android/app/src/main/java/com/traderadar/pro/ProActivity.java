@@ -31,7 +31,7 @@ public final class ProActivity extends Activity {
         state=new TextView(this);state.setTextColor(Color.rgb(239,199,120));state.setPadding(dp(12),dp(4),dp(12),dp(8));state.setText(runtime.status);root.addView(state);
         LinearLayout diagnostic=new LinearLayout(this);Button test=new Button(this);test.setText("Telefonda resmî belge bağlantısını test et");test.setOnClickListener(v->probeDocumentation());diagnostic.addView(test,new LinearLayout.LayoutParams(-1,dp(48)));root.addView(diagnostic);
         browser=new WebView(this);browser.setBackgroundColor(Color.rgb(11,18,32));WebSettings s=browser.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(false);s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);s.setSupportMultipleWindows(false);
-        browser.addJavascriptInterface(new Object(){@JavascriptInterface public String request(String path,String method,String body){return runtime.request(path,method,body);}},"NativePro");
+        browser.addJavascriptInterface(new NativeBridge(),"NativePro");
         browser.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){return true;}
             @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
@@ -44,7 +44,7 @@ public final class ProActivity extends Activity {
     }
     private WebResourceResponse blocked(){return new WebResourceResponse("text/plain","UTF-8",403,"Forbidden",Collections.emptyMap(),new ByteArrayInputStream("Uzak içerik kapalı".getBytes(StandardCharsets.UTF_8)));}
     private void requestStart(){
-        if(OfficialSource.createVerifiedSession()==null){state.setText(OfficialSource.BLOCKER);return;}
+        if(!OfficialSource.isConfigured()){state.setText(OfficialSource.BLOCKER);return;}
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);return;}
         startScan();
     }
@@ -58,5 +58,6 @@ public final class ProActivity extends Activity {
         final String message=result;runOnUiThread(()->{if(!isFinishing())state.setText(message);});
     },"official-doc-probe").start();}
     @Override protected void onResume(){super.onResume();if(state!=null)state.setText(runtime.status);}
+    public final class NativeBridge {@JavascriptInterface public String request(String path,String method,String body){return runtime.request(path,method,body);}}
     @Override protected void onDestroy(){if(browser!=null){browser.removeJavascriptInterface("NativePro");browser.destroy();}super.onDestroy();/* A user-started native service is deliberately not stopped here. */}
 }
