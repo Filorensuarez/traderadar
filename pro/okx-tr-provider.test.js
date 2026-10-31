@@ -134,3 +134,25 @@ test('verified adapter still fails closed when initial REST catalog is unavailab
   assert.equal(provider.stopped,true);
   assert.equal(provider.sockets.size,0);
 });
+
+test('duplicate subscription acknowledgement cannot reset a warmed trade window',()=>{
+  const sockets=[];
+  const provider=new OkxTrProvider({verified:true,socketFactory:()=>{
+    const socket=new MockEmitter();socket.readyState=1;socket.send=()=>{};
+    socket.terminated=false;socket.terminate=()=>{socket.terminated=true;};
+    sockets.push(socket);return socket;
+  }});
+  provider.stopped=false;
+  const market={symbol:'BTC_TRY',wireSymbol:'BTC-TRY',streamAvailable:false};
+  provider.markets.set(market.symbol,market);
+  provider.reconnect();
+  const socket=sockets[0];
+  socket.emit('open');
+  const ack=JSON.stringify({event:'subscribe',arg:{channel:'trades',instId:'BTC-TRY'}});
+  socket.emit('message',ack);
+  const first=provider.feeds.get(market.symbol);
+  socket.emit('message',ack);
+  assert.equal(socket.terminated,true);
+  assert.equal(provider.feeds.get(market.symbol),first);
+  provider.stop();
+});
