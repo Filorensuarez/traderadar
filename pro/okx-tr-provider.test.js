@@ -75,3 +75,17 @@ class MockEmitter{
   on(event,callback){this.handlers.set(event,callback);return this;}
   emit(event,...args){this.handlers.get(event)?.(...args);}
 }
+
+test('in-flight REST response from stopped session cannot be reused',async()=>{
+  let resolveResponse;
+  const provider=new OkxTrProvider({verified:true,fetchFn:()=>new Promise(resolve=>{resolveResponse=resolve;})});
+  provider.stopped=false;
+  const pending=provider.request('/api/v5/public/instruments?instType=SPOT');
+  for(let i=0;i<20&&!resolveResponse;i++)await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(typeof resolveResponse,'function');
+  provider.stop();
+  resolveResponse({ok:true,body:new ReadableStream({start(controller){
+    controller.enqueue(new TextEncoder().encode('{"code":"0","data":[]}'));controller.close();
+  }})});
+  await assert.rejects(pending,/Stopped/);
+});
