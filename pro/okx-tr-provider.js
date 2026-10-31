@@ -12,8 +12,8 @@ const safe = error => String(error?.message || 'Connection error').slice(0, 140)
 // production engine until device-level REST + WS contracts have been observed.
 export class OkxTrProvider {
   constructor({ fetchFn = fetch, socketFactory = url => new WebSocket(url, { handshakeTimeout: 12000, maxPayload: 1024*1024 }),
-    clock = Date.now, verified = false } = {}) {
-    Object.assign(this, { fetchFn, socketFactory, clock, verified });
+    clock = Date.now, onTrade = () => {}, verified = false } = {}) {
+    Object.assign(this, { fetchFn, socketFactory, clock, onTrade, verified });
     this.markets = new Map(); this.feeds = new Map(); this.sockets = new Set();
     this.stopped = true; this.timers = new Set(); this.abort = new AbortController();
     this.queue = Promise.resolve(); this.nextRequest = 0;
@@ -61,6 +61,7 @@ export class OkxTrProvider {
     for(const socket of this.sockets){socket.retired=true;socket.terminate();}
     this.sockets.clear();
     for(const feed of this.feeds.values())feed.disconnect();
+    for(const market of this.markets.values()){market.streamAvailable=false;market.availability='WebSocket abonelik onayı bekleniyor';}
     const markets=[...this.markets.values()];
     for(let i=0;i<markets.length;i+=MAX_BATCH)this.connectBatch(markets.slice(i,i+MAX_BATCH),0);
   }
@@ -89,7 +90,8 @@ export class OkxTrProvider {
           const market=allowed.get(msg.arg.instId);
           if(!market)throw Error('Unknown subscription');
           const feed=this.feeds.get(market.symbol)??new TradeCandles();
-          feed.connect(this.clock());this.feeds.set(market.symbol,feed);acknowledged.add(market.wireSymbol);return;
+          feed.connect(this.clock());this.feeds.set(market.symbol,feed);acknowledged.add(market.wireSymbol);
+          market.streamAvailable=true;market.availability='ISINMA';return;
         }
         if(msg.arg?.channel!=='trades'||!Array.isArray(msg.data))return;
         const market=allowed.get(msg.arg.instId);
@@ -99,7 +101,7 @@ export class OkxTrProvider {
           const trade=parseOkxTrTrade(row,this.clock());
           const feed=this.feeds.get(market.symbol);
           if(feed?.add(trade,this.clock())){
-            this.state.receivedTrades++;this.state.lastMessageAt=this.clock();
+            this.state.receivedTrades++;this.state.lastMessageAt=this.clock();this.onTrade(market,trade);
           }
         }
       }catch(error){this.state.rejected++;this.state.error=safe(error);}
@@ -107,7 +109,7 @@ export class OkxTrProvider {
     socket.on('error',error=>{this.state.errors++;this.state.error=safe(error);socket.terminate();});
     socket.on('close',()=>{
       clearInterval(heartbeat);this.sockets.delete(socket);
-      for(const market of markets)this.feeds.get(market.symbol)?.disconnect();
+      for(const market of markets){this.feeds.get(market.symbol)?.disconnect();market.streamAvailable=false;market.availability='WebSocket bağlantısı kesildi';}
       if(this.stopped||socket.retired)return;
       const delay=Math.min(300000,5000*2**Math.min(attempt,6));
       const timer=setTimeout(()=>{this.timers.delete(timer);this.connectBatch(markets.filter(m=>this.markets.has(m.symbol)),attempt+1);},delay);
@@ -127,7 +129,7 @@ export class OkxTrProvider {
   snapshot() {
     return {...this.state,connected:[...this.sockets].some(s=>s.readyState===WebSocket.OPEN),
       socketCount:this.sockets.size,eligibleMarkets:this.markets.size,
-      streamSupportedMarkets:this.markets.size,
+      streamSupportedMarkets:[...this.markets.values()].filter(m=>m.streamAvailable).length,
       fresh:this.state.lastMessageAt!==null&&this.clock()-this.state.lastMessageAt<=5000};
   }
   async start() {
@@ -144,6 +146,7 @@ export class OkxTrProvider {
     this.stopped=true;this.state.adapterEnabled=false;this.abort.abort();
     for(const timer of this.timers)clearTimeout(timer);this.timers.clear();
     for(const feed of this.feeds.values())feed.disconnect();
+    for(const market of this.markets.values())market.streamAvailable=false;
     for(const socket of this.sockets){socket.retired=true;socket.terminate();}
     this.sockets.clear();
   }
