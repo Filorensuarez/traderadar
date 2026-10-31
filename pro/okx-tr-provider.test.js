@@ -89,3 +89,20 @@ test('in-flight REST response from stopped session cannot be reused',async()=>{
   }})});
   await assert.rejects(pending,/Stopped/);
 });
+
+test('rejected OKX TR websocket subscription terminates socket',()=>{
+  const sockets=[];
+  const provider=new OkxTrProvider({verified:true,socketFactory:()=>{
+    const socket=new MockEmitter();socket.readyState=1;socket.send=()=>{};
+    socket.terminated=false;socket.terminate=()=>{socket.terminated=true;};
+    sockets.push(socket);return socket;
+  }});
+  provider.stopped=false;
+  provider.markets.set('BTC_TRY',{symbol:'BTC_TRY',wireSymbol:'BTC-TRY',streamAvailable:false});
+  provider.reconnect();
+  sockets[0].emit('open');
+  sockets[0].emit('message',JSON.stringify({event:'error',code:'60018'}));
+  assert.equal(sockets[0].terminated,true);
+  assert.equal(provider.markets.get('BTC_TRY').streamAvailable,false);
+  provider.stop();
+});
