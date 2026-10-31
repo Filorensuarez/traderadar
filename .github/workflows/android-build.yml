@@ -1,4 +1,5 @@
 name: Android build
+run-name: Android ${{ inputs.variant || 'debug' }} · ${{ github.ref_name }}
 on:
   workflow_dispatch:
     inputs:
@@ -26,24 +27,25 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.ref }}-${{ inputs.variant || 'debug' }}
   cancel-in-progress: true
 jobs:
   debug-build:
+    name: APK (${{ inputs.variant || 'debug' }})
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, verified official ref
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, verified official ref
         with:
           node-version: '24'
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5, verified official ref
         with:
           distribution: temurin
           java-version: '17'
@@ -60,21 +62,47 @@ jobs:
           echo "APK_VARIANT=$REQUESTED_VARIANT" >> "$GITHUB_ENV"
           echo "APK_TASK_SUFFIX=$suffix" >> "$GITHUB_ENV"
           echo "variant=$REQUESTED_VARIANT" >> "$GITHUB_OUTPUT"
+      - name: Check release signing bindings without reading values
+        if: ${{ steps.variant.outputs.variant == 'release' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          node --input-type=module <<'NODE'
+          const names = ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD'];
+          const missing = names.filter(name => !process.env[name]);
+          if (missing.length) {
+            console.log('::error title=Release signing bindings::Missing requirements in this workflow context: ' + missing.join(', '));
+            process.exit(1);
+          }
+          console.log('::notice title=Release signing bindings::All four requirements present; no values disclosed');
+          NODE
       - name: Install locked Node dependencies
         run: npm ci --ignore-scripts --no-fund --no-audit
+      - name: Audit Node dependencies with explicit scope
+        run: |
+          mkdir -p artifacts
+          set +e
+          npm audit --omit=dev --json > artifacts/npm-audit.json 2> artifacts/npm-audit.stderr
+          audit_exit=$?
+          set -e
+          echo "Node audit command exit code: $audit_exit"
+          node scripts/report-npm-audit.mjs
       - name: Compare native calculation and lifecycle gate with existing model
         run: |
           mkdir -p artifacts
           npm run test:android:core 2>&1 | tee artifacts/native-core.log
       - name: Run Pro regression tests
         run: npm run test:pro 2>&1 | tee artifacts/pro-tests.log
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3, verified signed tags
         with:
           gradle-version: '8.9'
       - name: Generate missing Wrapper and verify official SHA-256
         id: wrapper
         run: npm run prepare:android:wrapper
-      - uses: gradle/actions/wrapper-validation@v4
+      - uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3, verified signed tags
       - name: Configure Android SDK 35
         run: |
           sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
@@ -90,7 +118,9 @@ jobs:
         run: python -m unittest discover -s scripts/tests -p 'test_*.py'
       - name: Build, lint and report dependencies using Wrapper
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 --console=plain ":app:assemble${APK_TASK_SUFFIX}" ":app:lint${APK_TASK_SUFFIX}" :app:dependencies --stacktrace 2>&1 | tee ../artifacts/android-build.log
+        run: ./gradlew --no-daemon --max-workers=2 --console=plain ":app:assemble${APK_TASK_SUFFIX}" ":app:lint${APK_TASK_SUFFIX}" :app:dependencies :app:writeRuntimeSecurityDependencies --stacktrace 2>&1 | tee ../artifacts/android-build.log
+      - name: Audit resolved Android runtime libraries with OSV
+        run: python scripts/audit-android-dependencies.py --input artifacts/android-runtime-dependencies.json --output artifacts/android-dependency-audit.json --variant "$APK_VARIANT"
       - name: Sign release with maintained private key
         if: ${{ steps.variant.outputs.variant == 'release' && github.event_name == 'workflow_dispatch' }}
         env:
@@ -123,10 +153,10 @@ jobs:
           node scripts/write-android-build-info.mjs
           mkdir -p artifacts/apk
           cp "$apk" "artifacts/apk/app-$APK_VARIANT.apk"
-          cp artifacts/android-build-info.json artifacts/android-package-audit.json artifacts/apk-signature.log artifacts/apk/
+          cp artifacts/android-build-info.json artifacts/android-package-audit.json artifacts/apk-signature.log artifacts/android-runtime-dependencies.json artifacts/android-dependency-audit.json artifacts/npm-audit.json artifacts/apk/
 
       - name: Upload verified signed APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, verified official ref
         with:
           name: traderadar-android-${{ steps.variant.outputs.variant }}-apk
           path: artifacts/apk/
@@ -134,7 +164,7 @@ jobs:
           retention-days: 30
       - name: Upload verified complete Gradle Wrapper
         if: ${{ always() && steps.wrapper.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, verified official ref
         with:
           name: traderadar-gradle-wrapper-8.9
           path: |
@@ -146,7 +176,7 @@ jobs:
           retention-days: 30
       - name: Upload build diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, verified official ref
         with:
           name: traderadar-android-build-diagnostics
           path: |
@@ -154,6 +184,10 @@ jobs:
             artifacts/*.txt
             artifacts/android-build-info.json
             artifacts/android-package-audit.json
+            artifacts/android-runtime-dependencies.json
+            artifacts/android-dependency-audit.json
+            artifacts/npm-audit.json
+            artifacts/npm-audit.stderr
             artifacts/apk-manifest.xml
             android/app/build/reports/
             android/app/build/outputs/logs/

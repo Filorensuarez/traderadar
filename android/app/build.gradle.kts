@@ -1,3 +1,6 @@
+import java.security.MessageDigest
+import groovy.json.JsonOutput
+
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.traderadar.pro"
@@ -37,3 +40,19 @@ val bundleProUi by tasks.registering(Copy::class) {
 }
 android.sourceSets.getByName("main").assets.srcDir(proAssets)
 tasks.named("preBuild").configure { dependsOn(bundleProUi) }
+
+// Report the actually resolved APK runtime libraries, not guessed source versions.
+tasks.register("writeRuntimeSecurityDependencies") {
+    doLast {
+        val variant = System.getenv("APK_VARIANT") ?: "debug"
+        require(variant in listOf("debug", "release")) { "Unsupported security report variant" }
+        val libraries = configurations.getByName("${variant}RuntimeClasspath").resolvedConfiguration.resolvedArtifacts.map { artifact ->
+            val id = artifact.moduleVersion.id
+            val hash = MessageDigest.getInstance("SHA-256").digest(artifact.file.readBytes()).joinToString("") { "%02x".format(it) }
+            mapOf("group" to id.group, "name" to id.name, "version" to id.version, "sha256" to hash)
+        }.sortedBy { it["group"] + ":" + it["name"] }
+        val output = rootProject.file("../artifacts/android-runtime-dependencies.json")
+        output.parentFile.mkdirs()
+        output.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(mapOf("variant" to variant, "scope" to "APK runtime Maven artifacts", "libraries" to libraries))))
+    }
+}

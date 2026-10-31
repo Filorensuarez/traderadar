@@ -9,6 +9,12 @@ if (!apk.byteLength) throw Error('APK is empty');
 const signature = await readFile('artifacts/apk-signature.log', 'utf8');
 const certificateSha256 = signature.match(/Signer #1 certificate SHA-256 digest:\s*([a-f0-9]{64})/i)?.[1]?.toLowerCase();
 if (!certificateSha256) throw Error('Verified APK signer certificate SHA-256 was not reported');
+const certificateSubject = signature.match(/Signer #1 certificate DN:\s*(.+)/)?.[1] ?? null;
+const signerAlgorithm = signature.match(/Signer #1 key algorithm:\s*(.+)/)?.[1] ?? null;
+const packageAudit = JSON.parse(await readFile('artifacts/android-package-audit.json', 'utf8'));
+const androidAudit = JSON.parse(await readFile('artifacts/android-dependency-audit.json', 'utf8'));
+let npmAudit;
+try { npmAudit = JSON.parse(await readFile('artifacts/npm-audit.json', 'utf8')); } catch {}
 const info = {
   commit: process.env.GITHUB_SHA ?? null,
   ref: process.env.GITHUB_REF ?? null,
@@ -16,6 +22,11 @@ const info = {
   file: `app-${variant}.apk`, bytes: apk.byteLength,
   sha256: createHash('sha256').update(apk).digest('hex'),
   certificateSha256,
+  certificateSubject, signerAlgorithm,
+  permissions: packageAudit.permissions,
+  debuggable: packageAudit.debuggable,
+  androidRuntimeAudit: { status: androidAudit.status, dependenciesChecked: androidAudit.dependencies_checked ?? null, knownFindings: androidAudit.status === 'complete' ? androidAudit.findings.length : null },
+  nodeDependencyAudit: npmAudit?.auditReportVersion === 2 && !npmAudit.error ? npmAudit.metadata?.vulnerabilities ?? null : null,
   java: 17, gradle: '8.9', androidGradlePlugin: '8.7.3', kotlin: '2.0.21', compileSdk: 35, targetSdk: 35, minSdk: 26,
   signing: variant === 'debug' ? 'debug; not a Play Store release' : 'release signature verified by apksigner; see certificate report',
   certificateReport: 'apk-signature.log',
@@ -29,4 +40,6 @@ if (process.env.GITHUB_ACTIONS === 'true') {
   console.log(`::notice title=APK SHA-256::${info.sha256}`);
   console.log(`::notice title=APK signer certificate SHA-256::${certificateSha256}`);
   console.log(`::notice title=APK bytes::${apk.byteLength}`);
+  console.log(`::notice title=APK permissions::${packageAudit.permissions.join(', ')}`);
+  console.log(`::notice title=APK build mode::${variant}; debuggable=${packageAudit.debuggable}; key=${signerAlgorithm}`);
 }
