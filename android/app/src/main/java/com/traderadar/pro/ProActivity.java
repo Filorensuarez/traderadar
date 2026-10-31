@@ -31,7 +31,7 @@ public final class ProActivity extends Activity {
         Button stop=new Button(this);stop.setText("Durdur");stop.setOnClickListener(v->{stopService(new Intent(this,ScanService.class));runtime.stopped("Tarama kullanıcı tarafından durduruldu");state.setText("Tarama tamamen durduruldu");});controls.addView(stop,new LinearLayout.LayoutParams(0,dp(48),1));
         Button help=new Button(this);help.setText("Pil / izin");help.setOnClickListener(v->batteryHelp());controls.addView(help,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(controls);
         state=new TextView(this);state.setTextColor(Color.rgb(239,199,120));state.setPadding(dp(12),dp(4),dp(12),dp(8));state.setText(runtime.status);root.addView(state);
-        LinearLayout diagnostic=new LinearLayout(this);Button test=new Button(this);test.setText("Telefonda resmî belge bağlantısını test et");test.setOnClickListener(v->probeDocumentation());diagnostic.addView(test,new LinearLayout.LayoutParams(-1,dp(48)));root.addView(diagnostic);
+        LinearLayout diagnostic=new LinearLayout(this);Button test=new Button(this);test.setText("Telefonda OKX TR REST bağlantısını test et");test.setOnClickListener(v->probeDocumentation());diagnostic.addView(test,new LinearLayout.LayoutParams(-1,dp(48)));root.addView(diagnostic);
         bridgeThread=new HandlerThread("local-ui-messages");bridgeThread.start();bridgeHandler=new Handler(bridgeThread.getLooper());
         WebView.setWebContentsDebuggingEnabled(false);browser=new WebView(this);browser.setBackgroundColor(Color.rgb(11,18,32));WebSettings s=browser.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(false);s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setAllowFileAccessFromFileURLs(false);s.setAllowUniversalAccessFromFileURLs(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);s.setSupportMultipleWindows(false);s.setJavaScriptCanOpenWindowsAutomatically(false);s.setSafeBrowsingEnabled(true);s.setUserAgentString(s.getUserAgentString()+" TradeRadarNative/1");
         CookieManager.getInstance().setAcceptCookie(false);CookieManager.getInstance().setAcceptThirdPartyCookies(browser,false);
@@ -58,12 +58,45 @@ public final class ProActivity extends Activity {
     private void startScan(){try{startForegroundService(new Intent(this,ScanService.class).setAction(ScanService.START));state.setText("Tarama başlatma isteği gönderildi; bağlantı doğrulanmazsa çalışmaz");}catch(RuntimeException e){state.setText("Android hizmeti başlatamadı. Uygulama açıkken tekrar deneyin.");}}
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] grants){super.onRequestPermissionsResult(code,permissions,grants);if(code==NOTIFICATIONS&&grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)startScan();else state.setText("Kalıcı bildirim izni verilmedi; tarama başlatılmadı");}
     private void batteryHelp(){new AlertDialog.Builder(this).setTitle("Android çalışma sınırları").setMessage("Tarama yalnız Başlat ile çalışır; Durdur tüm bağlantıları kapatır. Ekran kapalıyken kısmi uyanıklık kilidi pil tüketebilir. Android 15+ dataSync hizmetlerinin süre kotası ve üretici pil kısıtları vardır; kesintisizlik garanti edilmez. Yeniden başlatmada otomatik tarama yoktur. Pil ayarını yalnız ihtiyacınız varsa kendiniz değiştirin.").setPositiveButton("Pil ayarları",(d,w)->{try{startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}catch(ActivityNotFoundException e){state.setText("Bu cihazda pil ayarları açılamadı");}}).setNegativeButton("Kapat",null).show();}
-    private void probeDocumentation(){state.setText("Bu Android cihazından resmî belge kontrol ediliyor; veri taraması değil...");new Thread(()->{
-        javax.net.ssl.HttpsURLConnection connection=null;String result;
-        try{connection=(javax.net.ssl.HttpsURLConnection)new java.net.URL(OfficialSource.DOCUMENTATION).openConnection();connection.setConnectTimeout(10000);connection.setReadTimeout(10000);connection.setInstanceFollowRedirects(false);int code=connection.getResponseCode();String cache=connection.getHeaderField("X-Cache");result="Android cihazı: HTTP "+code+(cache==null?"":" · "+cache)+". Bu test REST/WebSocket doğrulaması değildir.";
-        }catch(IOException e){result="Android cihazında bağlantı kurulamadı. Bu sonuç Codex bulut testinden ayrıdır.";}finally{if(connection!=null)connection.disconnect();}
-        final String message=result;runOnUiThread(()->{if(!isFinishing())state.setText(message);});
-    },"official-doc-probe").start();}
+    private void probeDocumentation(){state.setText("OKX TR spot katalog bağlantısı telefondan kontrol ediliyor; tarama başlamaz...");
+        new Thread(()->{
+            javax.net.ssl.HttpsURLConnection connection=null;String result;
+            try{
+                java.net.URL url=new java.net.URL("https://tr.okx.com/api/v5/public/instruments?instType=SPOT");
+                connection=(javax.net.ssl.HttpsURLConnection)url.openConnection();
+                connection.setConnectTimeout(10000);connection.setReadTimeout(10000);
+                connection.setInstanceFollowRedirects(false);
+                connection.setRequestProperty("Accept","application/json");
+                int code=connection.getResponseCode();
+                if(code!=200){result="OKX TR REST HTTP "+code+". Canlı adaptör kapalı.";}
+                else {
+                    int count=0;StringBuilder json=new StringBuilder();
+                    try(java.io.InputStream input=connection.getInputStream()){
+                        byte[] buffer=new byte[8192];int n;
+                        while((n=input.read(buffer))!=-1){
+                            count+=n;if(count>8*1024*1024)throw new IOException("Yanıt çok büyük");
+                            json.append(new String(buffer,0,n,java.nio.charset.StandardCharsets.UTF_8));
+                        }
+                    }
+                    org.json.JSONObject body=new org.json.JSONObject(json.toString());
+                    org.json.JSONArray data=body.optJSONArray("data");
+                    if(!"0".equals(body.optString("code"))||data==null)result="OKX TR REST yanıt şeması doğrulanamadı; adaptör kapalı.";
+                    else {
+                        int active=0;
+                        for(int i=0;i<data.length();i++){
+                            org.json.JSONObject market=data.optJSONObject(i);
+                            if(market!=null&&"SPOT".equals(market.optString("instType"))&&"live".equals(market.optString("state"))
+                                &&market.optString("instId").matches("[A-Z0-9]{1,24}-[A-Z0-9]{1,12}"))active++;
+                        }
+                        result=active>0?"OKX TR REST erişimi başarılı: "+active+" aktif spot parite. WebSocket henüz doğrulanmadı; tarama kapalı."
+                            :"OKX TR REST yanıtında doğrulanmış aktif spot parite yok; tarama kapalı.";
+                    }
+                }
+            }catch(Exception e){result="OKX TR REST bağlantısı veya yanıtı doğrulanamadı; tarama kapalı.";}
+            finally{if(connection!=null)connection.disconnect();}
+            final String message=result;runOnUiThread(()->{if(!isFinishing())state.setText(message);});
+        },"okxtr-rest-probe").start();
+    }
     @Override protected void onResume(){super.onResume();if(state!=null)state.setText(runtime.status);}
     private void closeBridge(){bridgeGeneration++;bridgeReady=false;uiHandler.removeCallbacks(bridgeRetry);WebMessagePort old=nativePort;nativePort=null;if(old!=null)old.close();}
     private void offerBridge(){
