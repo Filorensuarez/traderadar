@@ -144,7 +144,7 @@ export class OkxTrProvider {
     if(!this.verified){this.state.error='OKX TR device REST/WebSocket verification pending; adapter disabled';return;}
     if(!this.stopped)return;
     this.stopped=false;this.abort=new AbortController();this.queue=Promise.resolve();this.nextRequest=0;++this.requestGeneration;this.state.adapterEnabled=true;
-    try{await this.refresh();}catch(error){this.state.error=safe(error);}
+    try{await this.refresh();}catch(error){this.state.error=safe(error);this.stop();return;}
     const refresh=()=>{if(this.stopped)return;this.refresh().catch(error=>{this.state.error=safe(error);}).finally(()=>{
       if(!this.stopped){const timer=setTimeout(()=>{this.timers.delete(timer);refresh();},900000);timer.unref?.();this.timers.add(timer);}
     });};
