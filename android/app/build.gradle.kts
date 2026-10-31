@@ -56,3 +56,6 @@ tasks.register("writeRuntimeSecurityDependencies") {
         output.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(mapOf("variant" to variant, "scope" to "APK runtime Maven artifacts", "libraries" to libraries))))
     }
 }
+
+// WebSocket transport for the opt-in on-device connectivity diagnostic.
+dependencies { implementation("com.squareup.okhttp3:okhttp:4.12.0") }
