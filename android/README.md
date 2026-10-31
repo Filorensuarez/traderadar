@@ -38,6 +38,8 @@ Canlı adaptör için erişilebilir resmî belge ve cihazdan gerçek salt okunur
 
 ## Test ve APK
 
+Güncel Actions/Wrapper durumu ve Android telefondan indirme adımları: [APK Actions raporu](../docs/APK_ACTIONS_DERLEME_RAPORU.md). Wrapper jar'ı bu ortamda ağ engeli nedeniyle henüz alınamadı. Actions, Gradle 8.9 ile eksik Wrapper'ı üretip resmî SHA-256 değerleriyle doğrulamadan derlemeye geçmez. Yeni iş akışı `assembleDebug`, `lintDebug`, APK imzası ve paketlenmiş panel kontrolünü içerir; başarıyla çalıştığı henüz doğrulanmadı.
+
 Depo kökünden `npm run test:android:core`, `npm run test:pro`, `npm run test:pro:ui` çalıştırılır. Native core komutu Node 24 ve JDK compiler modülüyle Java 17 dil/hedef seviyesinde çekirdeği derler ve mevcut JS modeliyle karşılaştırır. Android framework sınıflarını derlemez veya cihazı emüle etmez.
 
 APK için tam JDK 17, Gradle 8.9, SDK/platform 35 ve build-tools 35.0.0 gerekir. `android/` içinde `gradle :app:assembleDebug --no-daemon --stacktrace` kullanılır. Beklenen çıktı `app/build/outputs/apk/debug/app-debug.apk`; **bu çalışma sırasında üretilmedi**. Debug APK test imzalıdır, Play Store yayını değildir.
