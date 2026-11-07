@@ -54,7 +54,7 @@
     data-view="daily"
     type="button"
   >
-    Günlük Yükseliş Teyidi
+    ONE Erken Yükseliş
   </button>
 
 
@@ -105,7 +105,7 @@
     ========================== -->
 
     <section id="liveRise" hidden><div class="section-head"><div><h2>Canlı Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Avrupa USDT fiyat akışı. 10 saniyede %0,5 veya 60 saniyede %1 yükseliş başlangıcı. Bu bir günlük teyit değildir.</p></div></div><p id="liveRiseStatus">Canlı bağlantılar kontrol ediliyor...</p><div id="liveRiseCards"></div></section>
-    <section id="daily">
+    <section id="daily"><h2>ONE Modeli — Erken Yükseliş Taraması</h2><p class="description">ONE/TRY grafiğindeki yatay birikim, saatlik hacim genişlemesi, EMA(7)/EMA(25) dönüşü ve fiyat kırılımı örneğine dayalı deneysel tarama. Son 6 saatte aşırı yükselmiş pariteler elenir. RSI 48–76 aralığı ve hacim en az 1,7x aranır. Sinyaller garanti değildir.</p><button id="oneStart" class="refresh-button" type="button">Erken Yükseliş Tara</button><p id="oneStatus" aria-live="polite">Tarama başlatılmadı.</p><div id="oneCards" class="coin-grid"></div><div style="display:none" aria-hidden="true">
 
       <div class="section-head">
 
@@ -169,7 +169,7 @@
 
       </div>
 
-    </section>
+    </div></section>
 
 
     <!-- =========================
@@ -456,6 +456,7 @@
   </footer>
 
 
+  <script type="module" src="./one-early-ui.js?v=1"></script>
   <script type="module" src="./second-scan-ui.js?v=1"></script>
   <script src="./api-route.js?v=3"></script>
   <script src="./app.js?v=daily-intraday-7"></script>
