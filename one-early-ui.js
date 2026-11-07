@@ -22,7 +22,21 @@ function analyze(inst,raw){
  if(score<4)return null;
  return {inst,score,range,volumeX,rsi:strength,breakout,price:p[n],recentRise};
 }
-function card(x){const d=document.createElement("div");d.className="info-box";const h=document.createElement("h3");h.textContent=x.inst.replace("-","/")+" • "+(x.breakout?"KIRILIM":"YAKIN TAKİP");const p=document.createElement("p");p.textContent="Puan: "+x.score+"/10 • Hacim: "+x.volumeX.toFixed(2)+"x • RSI: "+x.rsi.toFixed(1)+" • Önceki yatay aralık: %"+x.range.toFixed(1)+" • Son 6 saat: %"+x.recentRise.toFixed(1);d.append(h,p);return d;}
+function renderList(items,container){
+ const table=document.createElement("table");table.style.cssText="width:100%;border-collapse:collapse;font-size:13px;text-align:left";
+ const head=document.createElement("thead"),header=document.createElement("tr");
+ for(const label of ["Coin","Durum","Puan","Hacim","RSI","6s Değişim"]){const th=document.createElement("th");th.textContent=label;th.style.cssText="padding:10px 6px;border-bottom:1px solid #777";header.append(th);}
+ head.append(header);table.append(head);
+ const body=document.createElement("tbody");
+ for(const x of items){
+  const tr=document.createElement("tr");
+  for(const value of [x.inst.replace("-","/"),x.breakout?"KIRILIM":"YAKIN TAKİP",x.score+"/10",x.volumeX.toFixed(2)+"x",x.rsi.toFixed(1),"%"+x.recentRise.toFixed(1)]){
+   const td=document.createElement("td");td.textContent=value;td.style.cssText="padding:10px 6px;border-bottom:1px solid #555";tr.append(td);
+  }
+  body.append(tr);
+ }
+ table.append(body);container.replaceChildren(table);
+}
 async function scan(){
  if(active)return;active=true;$("oneStart").disabled=true;const status=$("oneStatus"),cards=$("oneCards");cards.replaceChildren();
  let checked=0,failed=0,found=[];
@@ -30,7 +44,7 @@ async function scan(){
   const instruments=(await get("/api/okx-tr/instruments")).filter(x=>x.state==="live"&&x.quoteCcy==="TRY");
   status.textContent=instruments.length+" aktif TRY paritesi taranıyor...";
   for(const x of instruments){
-   try{const raw=await get("/api/okx-tr/candles?bar=1H&instId="+encodeURIComponent(x.instId));const result=analyze(x.instId,raw);if(result){found.push(result);found.sort((a,b)=>b.score-a.score||b.volumeX-a.volumeX);cards.replaceChildren(...found.map(card));}}
+   try{const raw=await get("/api/okx-tr/candles?bar=1H&instId="+encodeURIComponent(x.instId));const result=analyze(x.instId,raw);if(result){found.push(result);found.sort((a,b)=>b.score-a.score||b.volumeX-a.volumeX);renderList(found,cards);}}
    catch(e){failed++;if(failed===1)console.warn("ONE tarama:",e);}
    checked++;status.textContent="Kontrol: "+checked+"/"+instruments.length+" • Aday: "+found.length+" • Veri hatası: "+failed;
    await sleep(650);
