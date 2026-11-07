@@ -7780,10 +7780,10 @@ const multiProviders={
  "OKX TR":{list:"https://tr.okx.com/api/v5/public/instruments?instType=SPOT",symbols:j=>j.data.filter(x=>x.state==="live"&&["TRY","USDT"].includes(x.quoteCcy)).map(x=>x.instId),url:s=>"https://tr.okx.com/api/v5/market/candles?bar=1H&limit=100&instId="+s,rows:j=>j.data.filter(x=>x[8]==="1").reverse().map(x=>[+x[4],+x[7]])},
  "OKX Global":{list:"https://www.okx.com/api/v5/public/instruments?instType=SPOT",symbols:j=>j.data.filter(x=>x.state==="live"&&x.quoteCcy==="USDT").map(x=>x.instId),url:s=>"https://www.okx.com/api/v5/market/candles?bar=1H&limit=100&instId="+s,rows:j=>j.data.filter(x=>x[8]==="1").reverse().map(x=>[+x[4],+x[7]])},
  "Binance Global":{list:"https://data-api.binance.vision/api/v3/exchangeInfo",symbols:j=>j.symbols.filter(x=>x.status==="TRADING"&&x.isSpotTradingAllowed&&x.quoteAsset==="USDT").map(x=>x.symbol),url:s=>"https://data-api.binance.vision/api/v3/klines?interval=1h&limit=100&symbol="+s,rows:j=>j.slice(0,-1).map(x=>[+x[4],+x[7]])},
- "Binance TR":{list:"https://www.binance.tr/open/v1/common/symbols",symbols:j=>(j.data?.list||j.data?.symbols||[]).map(x=>x.symbol).filter(Boolean),url:s=>"https://api.binance.me/api/v1/klines?interval=1h&limit=100&symbol="+s,rows:j=>(Array.isArray(j.data)?j.data:j.data?.list||[]).slice(0,-1).map(x=>[+x[4],+x[7]])},
- "BtcTurk":{list:"https://api.btcturk.com/api/v2/server/exchangeinfo",symbols:j=>(j.data?.symbols||[]).map(x=>x.name).filter(Boolean),url:s=>"https://api.btcturk.com/api/v2/ohlc?pairSymbol="+s+"&resolution=60",rows:j=>(j.data||[]).slice(-100).map(x=>[+(x.close??x.c),+(x.volume??x.v)])},
+ "Binance TR":{list:"https://www.binance.tr/open/v1/common/symbols",symbols:j=>(Array.isArray(j.data)?j.data:j.data?.list||j.data?.symbols||[]).map(x=>x.symbol||x.s).filter(Boolean),url:s=>"https://api.binance.me/api/v1/klines?interval=1h&limit=100&symbol="+s,rows:j=>(Array.isArray(j)?j:Array.isArray(j.data)?j.data:j.data?.list||[]).slice(0,-1).map(x=>[+(Array.isArray(x)?x[4]:x.close),+(Array.isArray(x)?x[7]:x.quoteVolume??x.volume)])},
+ "BtcTurk":{list:"https://api.btcturk.com/api/v2/server/exchangeinfo",symbols:j=>(j.data?.symbols||[]).map(x=>x.name).filter(Boolean),url:s=>"https://graph-api.btcturk.com/v1/klines/history?symbol="+s+"&resolution=60&from="+Math.floor(Date.now()/1000-110*3600)+"&to="+Math.floor(Date.now()/1000),rows:j=>{const data=Array.isArray(j)?j:j.data||j;return Array.isArray(data)?data.slice(-100).map(x=>[+(x.close??x.c),+(x.volume??x.v)]):Array.isArray(data.c)?data.c.map((c,i)=>[+c,+(data.v?.[i]??0)]):[];}},
  "KuCoin":{list:"https://api.kucoin.com/api/v2/symbols",symbols:j=>j.data.filter(x=>x.enableTrading&&x.quoteCurrency==="USDT").map(x=>x.symbol),url:s=>"https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol="+s,rows:j=>j.data.slice(1,101).reverse().map(x=>[+x[2],+x[6]])},
- "Gate.io":{list:"https://api.gateio.ws/api/v4/spot/currency_pairs",symbols:j=>j.filter(x=>x.trade_status==="tradable"&&x.quote==="USDT").map(x=>x.id),url:s=>"https://api.gateio.ws/api/v4/spot/candlesticks?interval=1h&limit=100&currency_pair="+s,rows:j=>j.slice(0,-1).reverse().map(x=>[+x[2],+x[1]*+x[2]])}
+ "Gate.io":{list:"https://api.gateio.ws/api/v4/spot/currency_pairs",symbols:j=>j.filter(x=>x.trade_status==="tradable"&&x.quote==="USDT").map(x=>x.id),url:s=>"https://api.gateio.ws/api/v4/spot/candlesticks?interval=1h&limit=100&currency_pair="+s,rows:j=>j.map(x=>({time:+x[0],close:+x[2],volume:+x[1]*+x[2]})).sort((a,b)=>a.time-b.time).slice(0,-1).map(x=>[x.close,x.volume])}
 };
 const multiState={running:false,exchanges:{},results:[],startedAt:0,finishedAt:0};
 const multiSleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -7807,15 +7807,15 @@ function multiEvaluate(exchange,symbol,rows){
 async function multiScan(name,provider){
  const state=multiState.exchanges[name]={status:"Bağlanıyor",checked:0,total:0,found:0,errors:0};
  try{
-  const symbols=provider.symbols(await multiFetch(provider.list));state.total=symbols.length;state.status="Taranıyor";
+  const symbols=provider.symbols(await multiFetch(provider.list));if(!symbols.length)throw Error("Borsa parite listesi boş veya veri biçimi değişmiş");state.total=symbols.length;state.status="Taranıyor";
   let cursor=0,blockedUntil=0;
   async function worker(){while(cursor<symbols.length){
    const symbol=symbols[cursor++];if(blockedUntil>Date.now())await multiSleep(blockedUntil-Date.now());
-   try{const result=multiEvaluate(name,symbol,provider.rows(await multiFetch(provider.url(symbol))));if(result){multiState.results.push(result);state.found++;}}
-   catch(e){state.errors++;if([418,429,451].includes(e.status)){blockedUntil=Date.now()+60000;state.status="API sınırı: bekleniyor";}}
+   try{const rows=provider.rows(await multiFetch(provider.url(symbol)));if(!Array.isArray(rows)||!rows.length)throw Error("Mum verisi boş");const result=multiEvaluate(name,symbol,rows);if(result){multiState.results.push(result);state.found++;}}
+   catch(e){state.errors++;if([418,429,451].includes(e.status)){blockedUntil=Date.now()+60000;state.status="API sınırı: bekleniyor";}if(state.errors<=3)state.error=String(e.message||e);}
    state.checked++;await multiSleep(500);
   }}
-  await Promise.all([worker(),worker()]);state.status=state.errors===state.total&&state.total?"Veri alınamadı":"Tamamlandı";
+  await Promise.all([worker(),worker()]);state.status=state.errors===state.total&&state.total?"Veri alınamadı":state.errors?"Kısmen tamamlandı":"Tamamlandı";
  }catch(e){state.status="Bağlantı hatası";state.error=e.message;}
 }
 app.get("/api/multi-early/status",(_req,res)=>{res.set("Cache-Control","no-store");res.json(multiState);});
