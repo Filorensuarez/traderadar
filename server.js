@@ -7825,3 +7825,83 @@ app.post("/api/multi-early/start",(_req,res)=>{
  Promise.all(Object.entries(multiProviders).map(([name,provider])=>multiScan(name,provider))).finally(()=>{multiState.running=false;multiState.finishedAt=Date.now();});
  res.json({started:true});
 });
+
+// Broker: conservative, read-only order-flow verification on top of the full multi-exchange universe.
+// No order placement. Missing depth/trade data means NO BUY signal.
+const brokerState={running:false,results:[],exchanges:{},startedAt:0,finishedAt:0};
+const brokerNum=x=>Number(x)||0;
+async function brokerVerify(candidate){
+ const {exchange,symbol}=candidate;
+ let depth,trades,price;
+ if(exchange==="Binance Global"){
+  [depth,trades]=await Promise.all([
+   multiFetch("https://data-api.binance.vision/api/v3/depth?limit=100&symbol="+encodeURIComponent(symbol)),
+   multiFetch("https://data-api.binance.vision/api/v3/aggTrades?limit=1000&symbol="+encodeURIComponent(symbol))
+  ]);
+  trades=trades.map(t=>({price:+t.p,qty:+t.q,buy:!t.m,time:+t.T}));
+ }else if(exchange==="OKX Global"||exchange==="OKX TR"){
+  const host=exchange==="OKX TR"?"https://tr.okx.com":"https://www.okx.com";
+  const [d,t]=await Promise.all([
+   multiFetch(host+"/api/v5/market/books?sz=100&instId="+encodeURIComponent(symbol)),
+   multiFetch(host+"/api/v5/market/trades?limit=500&instId="+encodeURIComponent(symbol))
+  ]);
+  depth={bids:d.data?.[0]?.bids,asks:d.data?.[0]?.asks};
+  trades=(t.data||[]).map(x=>({price:+x.px,qty:+x.sz,buy:x.side==="buy",time:+x.ts})).sort((a,b)=>a.time-b.time);
+ }else return null; // No reliable normalized order-flow adapter: fail closed.
+ const bids=depth?.bids||[],asks=depth?.asks||[];
+ if(bids.length<10||asks.length<10||trades.length<100)return null;
+ const bid=+bids[0][0],ask=+asks[0][0],mid=(bid+ask)/2;
+ if(!(bid>0&&ask>bid))return null;
+ const spread=(ask-bid)/mid*100;
+ const near=(rows)=>rows.filter(x=>Math.abs(+x[0]/mid-1)<=.005).reduce((a,x)=>a+(+x[0])*(+x[1]),0);
+ const buyDepth=near(bids),sellDepth=near(asks),obi=(buyDepth-sellDepth)/(buyDepth+sellDepth||1);
+ const now=Date.now(),recent=trades.filter(x=>now-x.time<=90000&&now>=x.time);
+ if(recent.length<40)return null;
+ const buy=recent.filter(x=>x.buy).reduce((a,x)=>a+x.price*x.qty,0);
+ const sell=recent.filter(x=>!x.buy).reduce((a,x)=>a+x.price*x.qty,0);
+ const total=buy+sell,cvd=(buy-sell)/(total||1);
+ const p0=recent[0].price,move=Math.abs(mid/p0-1)*100;
+ const absorption=sell>buy*.55&&move<.8&&obi>.10;
+ const liquidity=buyDepth+sellDepth;
+ const score=Math.round((absorption?25:0)+(cvd>.08?20:cvd>0?10:0)+(obi>.15?15:obi>0?7:0)+(sell>0&&move<.5?15:0)+(move<.6?10:0)+(total>20000?5:0)+(spread<.12?5:0)+(liquidity>100000?5:0));
+ // Never claim iceberg/OFI verification from snapshots.
+ if(score<80||spread>.15||move>1||total<10000||liquidity<50000||cvd<=0||obi<=0)return null;
+ const stop=mid*(1-Math.max(.006,Math.min(.02,move/100+.004)));
+ const risk=mid-stop;
+ return {exchange,symbol,score,price:mid,spread,cvd,obi,buyDepth,sellDepth,tradeNotional:total,entryLow:bid,entryHigh:ask,stop,target1:mid+2*risk,target2:mid+3*risk,at:now,
+ reasons:["Gerçekleşen işlemlerde pozitif net agresif alış","Yakın emir defterinde alış derinliği üstün","Fiyat henüz sert yükselmemiş","Spread ve likidite ön filtresi uygun"],
+ limitations:["Tek emir defteri görüntüsü: OFI ve iceberg doğrulanmadı","Son işlem örneklemi: tam 60 saniyelik CVD garantisi yok","İşlem sinyali değil, manuel alım inceleme adayı"]};
+}
+async function brokerScan(){
+ Object.assign(brokerState,{running:true,results:[],exchanges:{},startedAt:Date.now(),finishedAt:0});
+ try{
+  if(!multiState.running){
+   Object.assign(multiState,{running:true,startedAt:Date.now(),finishedAt:0,results:[],exchanges:{}});
+   await Promise.all(Object.entries(multiProviders).map(([name,p])=>multiScan(name,p)));
+   multiState.running=false;multiState.finishedAt=Date.now();
+  }else{
+   while(multiState.running)await multiSleep(1500);
+  }
+  for(const [name,s] of Object.entries(multiState.exchanges))brokerState.exchanges[name]={...s,verified:0,eligible:0,verification:"Emir akışı doğrulaması bekleniyor"};
+  const candidates=multiState.results.slice().sort((a,b)=>b.score-a.score);
+  let cursor=0;
+  async function worker(){
+   while(cursor<candidates.length){
+    const item=candidates[cursor++],state=brokerState.exchanges[item.exchange];
+    try{const result=await brokerVerify(item);if(result){brokerState.results.push(result);state.eligible++;}state.verified++;}
+    catch(e){state.verificationError=String(e.message||e);state.verified++;}
+    await multiSleep(250);
+   }
+  }
+  await Promise.all(Array.from({length:3},()=>worker()));
+  for(const [name,s] of Object.entries(brokerState.exchanges)){
+   s.verification=["Binance Global","OKX Global","OKX TR"].includes(name)?"Desteklenen adaylar doğrulandı":"Derinlik/işlem doğrulaması yok; alım adayı gösterilmez";
+  }
+ }finally{brokerState.running=false;brokerState.finishedAt=Date.now();}
+}
+app.get("/api/broker/status",(_req,res)=>{res.set("Cache-Control","no-store");res.json(brokerState);});
+app.post("/api/broker/start",(_req,res)=>{
+ if(brokerState.running||multiState.running)return res.status(409).json({error:"Tarama devam ediyor"});
+ brokerScan().catch(e=>{brokerState.error=String(e.message||e);brokerState.running=false;});
+ res.json({started:true});
+});
