@@ -444,7 +444,7 @@
     <div id="whaleCards" class="coin-grid"></div>
     <div class="info-box"><h3>Erken Birikim Adayları — Sabit Zaman Analizi</h3><p>Son 1, 5 ve 15 tamamlanmış dakikadaki agresif alış oranını ölçer. Son 15 dakikanın hacmini önceki 30 dakikayla dakikaya göre normalize ederek karşılaştırır. Alış oranı, hacim ivmesi ve sınırlı fiyat değişimi birlikte aranır. Bu bir yatırımcı kimliği tespiti veya kesin yükseliş sinyali değildir.</p><button id="whaleEarlyScan" type="button" class="refresh-button">Erken Birikim Tara</button> <button id="whaleEarlyStop" type="button" class="refresh-button">Durdur</button><p id="whaleEarlyStatus" aria-live="polite">Tarama başlatılmadı.</p></div><div id="whaleEarlyCards" class="coin-grid"></div>
   </section>
-  </main>
+  <section id="broker" hidden><h2>Broker — Balina Birikim ve Alım Adayları</h2><p class="description">Tüm tanımlı borsalar taranır. Yalnızca fiyat, hacim, gerçekleşmiş işlemler ve emir defteri kontrollerini geçen adaylar listelenir. Emir akışı doğrulanamayan borsalarda alım adayı gösterilmez. Bu bölüm emir göndermez.</p><button id="brokerStart" class="refresh-button" type="button">Tüm Borsaları Tara</button><p id="brokerStatus" aria-live="polite">Hazırlanıyor...</p><details><summary>Borsa tarama ve doğrulama durumu</summary><div id="brokerVenues"></div></details><div id="brokerResults" class="coin-grid"></div></section>\n  </main>
 
 
   <footer>
@@ -456,7 +456,7 @@
   </footer>
 
 
-  <script type="module" src="./multi-early-ui.js?v=1"></script>
+  <script type="module" src="./broker-ui.js?v=1"></script>\n  <script type="module" src="./multi-early-ui.js?v=1"></script>
   <script type="module" src="./second-scan-ui.js?v=1"></script>
   <script src="./api-route.js?v=3"></script>
   <script src="./app.js?v=daily-intraday-7"></script>
