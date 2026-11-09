@@ -13,9 +13,9 @@ async function refresh(){
    const header=document.createElement("div");header.style.cssText="display:flex;justify-content:space-between;gap:12px;align-items:center";
    const title=document.createElement("strong");title.textContent=item.symbol;
    const flag=document.createElement("span");flag.textContent=item.status;flag.style.color=item.status==="HAREKETLİLİK VAR"?"#38d39f":"inherit";
-   header.append(title,flag);box.append(header);
+   header.append(title,flag);box.append(header);if(item.exchange){const source=document.createElement("p");source.textContent="Veri kaynağı: "+item.exchange;source.style.cssText="font-size:12px;opacity:.75";box.append(source);}
    const detail=document.createElement("p");
-   detail.textContent=item.error?"Veri alınamadı: "+item.error:item.price===undefined?(item.status==="OKX TR paritesi yok"?"Bu coin için OKX TR üzerinde TRY veya USDT işlem çifti bulunamadı.":"Henüz veri yok"):"Fiyat: "+item.price+" • 5 dk: %"+item.priceChange+" • Hacim: "+item.volumeX+"x • Alıcı oranı: "+(item.buyRatio===null?"Yok":"%"+item.buyRatio);
+   detail.textContent=item.error?"Veri alınamadı: "+item.error:item.price===undefined?(item.status==="İşlem çifti bulunamadı"?"Desteklenen borsalarda aktif TRY veya USDT paritesi bulunamadı.":"Henüz veri yok"):"Fiyat: "+item.price+" • 5 dk: %"+item.priceChange+" • Hacim: "+item.volumeX+"x • Alıcı oranı: "+(item.buyRatio===null?"Yok":"%"+item.buyRatio);
    box.append(detail);
    if(item.reasons?.length){const ul=document.createElement("ul");for(const reason of item.reasons){const li=document.createElement("li");li.textContent=reason;ul.append(li);}box.append(ul);}
    container.append(box);

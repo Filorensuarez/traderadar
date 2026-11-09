@@ -7910,29 +7910,72 @@ app.post("/api/broker/start",(_req,res)=>{
 const focusSymbols=["PORTAL","AMP","PHA","INIT","MITO","BMT","PARTI","HEMI","NOM","ACT","SAGA","ZK","SOPH","TOWNS"];
 const focusState={updatedAt:0,running:false,items:focusSymbols.map(symbol=>({symbol:symbol+"/TRY",status:"Bekleniyor",reasons:[]}))};
 const focusDelay=ms=>new Promise(r=>setTimeout(r,ms));
-async function focusFetch(path){
+async function focusJson(url){
  const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),12000);
- try{const response=await fetch("https://tr.okx.com/api/v5/"+path,{signal:ctrl.signal});
- if(!response.ok)throw Error("HTTP "+response.status);
- const json=await response.json();if(String(json.code)!=="0"||!Array.isArray(json.data))throw Error(json.msg||"Veri biçimi hatası");return json.data;}
+ try{const response=await fetch(url,{signal:ctrl.signal});if(!response.ok)throw Error("HTTP "+response.status);
+ const json=await response.json();if(json.code!==undefined&&String(json.code)!=="0")throw Error(json.msg||"Borsa API hatası");return json;}
  finally{clearTimeout(timeout);}
 }
-async function focusInspect(symbol,instId){
- const [candles,trades]=await Promise.all([
- focusFetch("market/candles?instId="+instId+"&bar=1m&limit=100"),
- focusFetch("market/trades?instId="+instId+"&limit=100")
- ]);
- const completed=candles.filter(c=>c[8]==="1").sort((a,b)=>Number(a[0])-Number(b[0]));
- if(completed.length<35)throw Error("Yetersiz mum verisi");
- const last=completed.at(-1),prev=completed.at(-6),base=completed.slice(-35,-5);
- const price=+last[4],priceChange=100*(price/+prev[4]-1);
- const avg=base.reduce((sum,c)=>sum+Number(c[7]),0)/base.length;
- const recent=completed.slice(-5).reduce((sum,c)=>sum+Number(c[7]),0)/5;
+const focusVenues=[
+ {name:"OKX TR",base:"https://tr.okx.com",kind:"okx"},
+ {name:"OKX Global",base:"https://www.okx.com",kind:"okx"},
+ {name:"Binance Global",base:"https://data-api.binance.vision",kind:"binance"}
+];
+async function focusAvailable(){
+ const venueMaps=await Promise.all(focusVenues.map(async venue=>{
+  try{
+   const url=venue.kind==="okx"?venue.base+"/api/v5/public/instruments?instType=SPOT":venue.base+"/api/v3/exchangeInfo";
+   const json=await focusJson(url),map=new Map();
+   if(venue.kind==="okx"){
+    for(const x of json.data||[])if(x.state==="live"&&["TRY","USDT"].includes(x.quoteCcy))map.set(x.baseCcy+"-"+x.quoteCcy,x.instId);
+   }else{
+    for(const x of json.symbols||[])if(x.status==="TRADING"&&x.isSpotTradingAllowed&&x.quoteAsset==="USDT")map.set(x.baseAsset+"-USDT",x.symbol);
+   }
+   return {venue,map};
+  }catch(e){return {venue,map:new Map(),error:String(e.message||e)};}
+ }));
+ const routes=new Map();
+ for(const symbol of focusSymbols){
+  for(const quote of ["TRY","USDT"]){
+   for(const item of venueMaps){
+    if(quote==="TRY"&&item.venue.name!=="OKX TR")continue;
+    const instId=item.map.get(symbol+"-"+quote);
+    if(instId){routes.set(symbol,{...item.venue,instId,quote});break;}
+   }
+   if(routes.has(symbol))break;
+  }
+ }
+ return {routes,venueMaps};
+}
+async function focusInspect(symbol,route){
+ const {base,kind,instId,quote,name}=route;
+ let candles,trades;
+ if(kind==="okx"){
+  const [c,t]=await Promise.all([
+   focusJson(base+"/api/v5/market/candles?instId="+encodeURIComponent(instId)+"&bar=1m&limit=100"),
+   focusJson(base+"/api/v5/market/trades?instId="+encodeURIComponent(instId)+"&limit=100")
+  ]);
+  candles=(c.data||[]).filter(x=>x[8]==="1").map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[7]}));
+  trades=(t.data||[]).map(x=>({side:x.side,quantity:+x.sz}));
+ }else{
+  const [c,t]=await Promise.all([
+   focusJson(base+"/api/v3/klines?symbol="+encodeURIComponent(instId)+"&interval=1m&limit=100"),
+   focusJson(base+"/api/v3/trades?symbol="+encodeURIComponent(instId)+"&limit=100")
+  ]);
+  candles=c.slice(0,-1).map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[7]}));
+  trades=t.map(x=>({side:x.isBuyerMaker?"sell":"buy",quantity:+x.qty}));
+ }
+ candles.sort((x,y)=>x.time-y.time);
+ if(candles.length<35)throw Error("Yetersiz mum verisi");
+ const last=candles.at(-1),prev=candles.at(-6),baseline=candles.slice(-35,-5);
+ const price=last.close,priceChange=100*(price/prev.close-1);
+ const avg=baseline.reduce((sum,c)=>sum+c.volume,0)/baseline.length;
+ const recent=candles.slice(-5).reduce((sum,c)=>sum+c.volume,0)/5;
  const volumeX=avg>0?recent/avg:0;
- const buys=trades.filter(t=>t.side==="buy").reduce((sum,t)=>sum+Number(t.sz||0),0);
- const sells=trades.filter(t=>t.side==="sell").reduce((sum,t)=>sum+Number(t.sz||0),0);
+ const buys=trades.filter(t=>t.side==="buy").reduce((sum,t)=>sum+t.quantity,0);
+ const sells=trades.filter(t=>t.side==="sell").reduce((sum,t)=>sum+t.quantity,0);
  const buyRatio=buys+sells>0?100*buys/(buys+sells):null;
- const breakout=price>Math.max(...base.slice(-15).map(c=>+c[2]));
+ const breakout=price>Math.max(...baseline.slice(-15).map(c=>c.high));
  const priceSignal=priceChange>=0.4,volumeSignal=volumeX>=1.5,buySignal=buyRatio!==null&&buyRatio>=60;
  const reasons=[];
  if(priceSignal)reasons.push("Son 5 dakikada fiyat artışı: %"+priceChange.toFixed(2));
@@ -7940,25 +7983,27 @@ async function focusInspect(symbol,instId){
  if(buySignal)reasons.push("Son işlemlerde alıcı yönlü hacim oranı: %"+buyRatio.toFixed(1));
  if(breakout)reasons.push("Kısa vadeli direnç seviyesi aşıldı");
  const active=(priceSignal&&volumeSignal)||(priceSignal&&buySignal)||(volumeSignal&&buySignal&&breakout);
- return {symbol:instId.replace("-","/"),status:active?"HAREKETLİLİK VAR":"İzleniyor",price,priceChange:+priceChange.toFixed(2),volumeX:+volumeX.toFixed(2),buyRatio:buyRatio===null?null:+buyRatio.toFixed(1),reasons:active?reasons:[],updatedAt:Date.now()};
+ return {symbol:symbol+"/"+quote,exchange:name,status:active?"HAREKETLİLİK VAR":"İzleniyor",price,priceChange:+priceChange.toFixed(2),volumeX:+volumeX.toFixed(2),buyRatio:buyRatio===null?null:+buyRatio.toFixed(1),reasons:active?reasons:[],updatedAt:Date.now()};
 }
 async function focusRefresh(){
  if(focusState.running)return;focusState.running=true;
  try{
-  const instruments=await focusFetch("public/instruments?instType=SPOT");
-  const available=new Set(instruments.filter(x=>x.state==="live").map(x=>x.instId));
-  let cursor=0;const results=new Array(focusSymbols.length);
+  const {routes,venueMaps}=await focusAvailable(),results=new Array(focusSymbols.length);
+  let cursor=0;
   async function worker(){while(cursor<focusSymbols.length){
-   const i=cursor++,symbol=focusSymbols[i];
-   const pair=available.has(symbol+"-TRY")?symbol+"-TRY":available.has(symbol+"-USDT")?symbol+"-USDT":null;
-   if(!pair){results[i]={symbol:symbol+"/TRY",status:"OKX TR paritesi yok",reasons:[],updatedAt:Date.now()};continue;}
-   try{results[i]=await focusInspect(symbol,pair);}
-   catch(e){results[i]={symbol:pair.replace("-","/"),status:"Veri hatası",error:String(e.message||e),reasons:[],updatedAt:Date.now()};}
-   await focusDelay(250);
+   const i=cursor++,symbol=focusSymbols[i],route=routes.get(symbol);
+   if(!route){
+    const allFailed=venueMaps.every(v=>v.error);
+    results[i]={symbol,status:allFailed?"Borsa bağlantı hatası":"İşlem çifti bulunamadı",error:allFailed?venueMaps.map(v=>v.venue.name+": "+v.error).join("; "):undefined,reasons:[],updatedAt:Date.now()};
+    continue;
+   }
+   try{results[i]=await focusInspect(symbol,route);}
+   catch(e){results[i]={symbol:symbol+"/"+route.quote,exchange:route.name,status:"Veri hatası",error:String(e.message||e),reasons:[],updatedAt:Date.now()};}
+   await focusDelay(300);
   }}
   await Promise.all([worker(),worker(),worker()]);
   focusState.items=results;focusState.updatedAt=Date.now();
- }catch(e){focusState.items=focusSymbols.map(symbol=>({symbol:symbol+"/TRY",status:"Borsa bağlantı hatası",error:String(e.message||e),reasons:[]}));focusState.updatedAt=Date.now();}
+ }catch(e){focusState.items=focusSymbols.map(symbol=>({symbol,status:"Borsa bağlantı hatası",error:String(e.message||e),reasons:[]}));focusState.updatedAt=Date.now();}
  finally{focusState.running=false;}
 }
 app.get("/api/watchlist-motion",(_req,res)=>{res.set("Cache-Control","no-store");res.json(focusState);});
