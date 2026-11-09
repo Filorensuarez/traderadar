@@ -89,9 +89,9 @@
   <button id="decisionButton" class="tab" type="button" data-view="decision" style="display:none" aria-hidden="true">Orta Vadeli Yükseliş</button>
   <button id="flowButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
-  <button id="secondScanButton" class="tab" type="button" data-view="secondScan">1sn Fiyat Taraması</button>
+  
   <button id="focusButton" class="tab" type="button" data-view="focus">Favori Coin Takibi</button>
-  <button id="dailyTouchButton" class="tab" type="button" data-view="dailyTouch">Temas Araması</button>
+  
   <button id="momentumButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="momentum">Patlama</button>
   <button id="quietVolumeButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="quietVolume">Sessiz Hacim Alarmı</button>
   <button id="pullbackButton" class="tab" type="button" data-view="hourlyPullback" style="display:none" aria-hidden="true">Büyük Geri Çekilmeler</button>
@@ -400,8 +400,8 @@
  <p id="pullbackStatus" aria-live="polite">Veriler bekleniyor.</p>
  <div id="pullbackCards" class="coin-grid"></div>
 </section>
-<section id="secondScan" hidden><h2>1 Saniyelik Fiyat Taraması</h2><p class="description">Son 300 tamamlanmış 1 saniyelik mumun ortalama kapanış fiyatı, önceki 30 tamamlanmış 1 dakikalık mumun ortalamasından en az %2 yüksek olmalı. Hacim şartı aranmaz. Binance Global üzerindeki tüm aktif USDT spot pariteleri taranır. Alım garantisi değildir.</p><button id="secondScanStart" class="refresh-button" type="button">Taramayı Başlat</button><p id="secondScanStatus" aria-live="polite">Hazır.</p><div id="secondScanCards" class="coin-grid"></div></section>
-<section id="dailyTouch" hidden>
+<section id="secondScan" hidden style="display:none!important" hidden><h2>1 Saniyelik Fiyat Taraması</h2><p class="description">Son 300 tamamlanmış 1 saniyelik mumun ortalama kapanış fiyatı, önceki 30 tamamlanmış 1 dakikalık mumun ortalamasından en az %2 yüksek olmalı. Hacim şartı aranmaz. Binance Global üzerindeki tüm aktif USDT spot pariteleri taranır. Alım garantisi değildir.</p><button id="secondScanStart" class="refresh-button" type="button">Taramayı Başlat</button><p id="secondScanStatus" aria-live="polite">Hazır.</p><div id="secondScanCards" class="coin-grid"></div></section>
+<section id="dailyTouch" hidden style="display:none!important" hidden>
  <div class="section-head"><div>
  <h2>Temas Araması</h2>
  <p class="description">Güçlü yükseliş başlangıçlarını çoklu teknik teyitle tarar. Trend, hacim, agresif alış, direnç kırılımı, likidite ve ikinci fiyat teyidi birlikte değerlendirilir. Sadece doğrulanan adaylar gösterilir; sonuçlar kazanç garantisi değildir.</p>
@@ -460,10 +460,10 @@
 
   <script type="module" src="./focus-watch-ui.js?v=1"></script>
   <script type="module" src="./broker-ui.js?v=1"></script>\n  <script type="module" src="./multi-early-ui.js?v=1"></script>
-  <script type="module" src="./second-scan-ui.js?v=1"></script>
+
   <script src="./api-route.js?v=3"></script>
   <script src="./app.js?v=daily-intraday-7"></script>
-  <script type="module" src="./daily-touch-ui.js?v=touch-redesign-5"></script>
+
   <script defer src="./whale-monitor.js"></script>
   <script defer src="./whale-early.js"></script>
   <script type="module" src="./capital-manager.js"></script>
