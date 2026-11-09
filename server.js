@@ -7918,6 +7918,7 @@ async function focusJson(url){
 }
 const focusVenues=[
  {name:"OKX TR",base:"https://tr.okx.com",kind:"okx"},
+ {name:"Binance TR",base:"https://www.binance.tr",kind:"binance-tr"},
  {name:"OKX Global",base:"https://www.okx.com",kind:"okx"},
  {name:"Binance Global",base:"https://data-api.binance.vision",kind:"binance"},
  {name:"Bybit",base:"https://api.bybit.com",kind:"bybit"},
@@ -7926,12 +7927,14 @@ const focusVenues=[
 async function focusAvailable(){
  const venueMaps=await Promise.all(focusVenues.map(async venue=>{
   try{
-   const url=venue.kind==="okx"?venue.base+"/api/v5/public/instruments?instType=SPOT":venue.kind==="binance"?venue.base+"/api/v3/exchangeInfo":venue.kind==="bybit"?venue.base+"/v5/market/instruments-info?category=spot":venue.base+"/api/v2/spot/public/symbols";
+   const url=venue.kind==="okx"?venue.base+"/api/v5/public/instruments?instType=SPOT":venue.kind==="binance"?venue.base+"/api/v3/exchangeInfo":venue.kind==="binance-tr"?venue.base+"/open/v1/common/symbols":venue.kind==="bybit"?venue.base+"/v5/market/instruments-info?category=spot":venue.base+"/api/v2/spot/public/symbols";
    const json=await focusJson(url),map=new Map();
    if(venue.kind==="okx"){
     for(const x of json.data||[])if(x.state==="live"&&["TRY","USDT"].includes(x.quoteCcy))map.set(x.baseCcy+"-"+x.quoteCcy,x.instId);
    }else if(venue.kind==="binance"){
     for(const x of json.symbols||[])if(x.status==="TRADING"&&x.isSpotTradingAllowed&&x.quoteAsset==="USDT")map.set(x.baseAsset+"-USDT",x.symbol);
+   }else if(venue.kind==="binance-tr"){
+    for(const x of json.data?.list||[])if(x.baseAsset&&x.quoteAsset==="TRY"&&x.type===1)map.set(x.baseAsset+"-TRY",String(x.symbol).replaceAll("_",""));
    }else if(venue.kind==="bybit"){
     for(const x of json.result?.list||[])if(x.status==="Trading"&&x.quoteCoin==="USDT")map.set(x.baseCoin+"-USDT",x.symbol);
    }else{
@@ -7944,7 +7947,7 @@ async function focusAvailable(){
  for(const symbol of focusSymbols){
   for(const quote of ["TRY","USDT"]){
    for(const item of venueMaps){
-    if(quote==="TRY"&&item.venue.name!=="OKX TR")continue;
+    if(quote==="TRY"&&!["OKX TR","Binance TR"].includes(item.venue.name))continue;
     const instId=item.map.get(symbol+"-"+quote);
     if(instId){routes.set(symbol,{...item.venue,instId,quote});break;}
    }
@@ -8013,7 +8016,13 @@ async function focusRefresh(){
     continue;
    }
    try{results[i]=await focusInspect(symbol,route);}
-   catch(e){results[i]={symbol:symbol+"/"+route.quote,exchange:route.name,status:"Veri hatası",error:String(e.message||e),reasons:[],updatedAt:Date.now()};}
+   catch(e){
+    if(symbol==="HEMI"&&route.name==="Binance TR"){
+     const fallback=venueMaps.find(v=>v.venue.name==="Binance Global"&&v.map.has("HEMI-USDT"));
+     if(fallback){try{results[i]=await focusInspect(symbol,{...fallback.venue,instId:fallback.map.get("HEMI-USDT"),quote:"USDT"});continue;}catch(_fallbackError){/* Keep primary error */}}
+    }
+    results[i]={symbol:symbol+"/"+route.quote,exchange:route.name,status:"Veri hatası",error:String(e.message||e),reasons:[],updatedAt:Date.now()};
+   }
    await focusDelay(300);
   }}
   await Promise.all([worker(),worker(),worker()]);
