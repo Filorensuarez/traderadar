@@ -90,6 +90,7 @@
   <button id="flowButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
   <button id="secondScanButton" class="tab" type="button" data-view="secondScan">1sn Fiyat Taraması</button>
+  <button id="focusButton" class="tab" type="button" data-view="focus">Favori Coin Takibi</button>
   <button id="dailyTouchButton" class="tab" type="button" data-view="dailyTouch">Temas Araması</button>
   <button id="momentumButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="momentum">Patlama</button>
   <button id="quietVolumeButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="quietVolume">Sessiz Hacim Alarmı</button>
@@ -104,6 +105,7 @@
          GÜNLÜK YÜKSELİŞ TEYİDİ
     ========================== -->
 
+    <section id="focus" hidden><h2>Favori Coin Hareketlilik Takibi</h2><p class="description">Yalnızca seçtiğiniz 14 OKX TR paritesi izlenir. Fiyat, hacim ve gerçekleşen işlemlerin alıcı yönü birlikte değerlendirilir. Sinyaller yatırım tavsiyesi değildir.</p><button id="focusRefresh" class="refresh-button" type="button">Şimdi Yenile</button><p id="focusStatus" aria-live="polite">Yükleniyor...</p><div id="focusList"></div></section>
     <section id="liveRise" hidden><div class="section-head"><div><h2>Canlı Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Avrupa USDT fiyat akışı. 10 saniyede %0,5 veya 60 saniyede %1 yükseliş başlangıcı. Bu bir günlük teyit değildir.</p></div></div><p id="liveRiseStatus">Canlı bağlantılar kontrol ediliyor...</p><div id="liveRiseCards"></div></section>
     <section id="daily"><h2>Çoklu Borsa — Erken Yükseliş Taraması</h2><p class="description">Desteklenen borsalarda ONE/TRY örneğindeki yatay birikim, saatlik hacim genişlemesi, EMA(7)/EMA(25) dönüşü ve fiyat kırılımı örneğine dayalı deneysel tarama. Son 6 saatte aşırı yükselmiş pariteler elenir. RSI 48–76 aralığı ve hacim en az 1,7x aranır. Sinyaller garanti değildir.</p><button id="oneStart" class="refresh-button" type="button">Erken Yükseliş Tara</button><p id="oneStatus" aria-live="polite">Tarama başlatılmadı.</p><div id="oneCards"></div><div style="display:none" aria-hidden="true">
 
@@ -456,6 +458,7 @@
   </footer>
 
 
+  <script type="module" src="./focus-watch-ui.js?v=1"></script>
   <script type="module" src="./broker-ui.js?v=1"></script>\n  <script type="module" src="./multi-early-ui.js?v=1"></script>
   <script type="module" src="./second-scan-ui.js?v=1"></script>
   <script src="./api-route.js?v=3"></script>

@@ -7905,3 +7905,58 @@ app.post("/api/broker/start",(_req,res)=>{
  brokerScan().catch(e=>{brokerState.error=String(e.message||e);brokerState.running=false;});
  res.json({started:true});
 });
+
+
+const focusSymbols=["PORTAL","AMP","PHA","INIT","MITO","BMT","PARTI","HEMI","NOM","ACT","SAGA","ZK","SOPH","TOWNS"];
+const focusState={updatedAt:0,running:false,items:focusSymbols.map(symbol=>({symbol:symbol+"/TRY",status:"Bekleniyor",reasons:[]}))};
+const focusDelay=ms=>new Promise(r=>setTimeout(r,ms));
+async function focusFetch(path){
+ const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),12000);
+ try{const response=await fetch("https://tr.okx.com/api/v5/"+path,{signal:ctrl.signal});
+ if(!response.ok)throw Error("HTTP "+response.status);
+ const json=await response.json();if(String(json.code)!=="0"||!Array.isArray(json.data))throw Error(json.msg||"Veri biçimi hatası");return json.data;}
+ finally{clearTimeout(timeout);}
+}
+async function focusInspect(symbol){
+ const instId=symbol+"-TRY";
+ const [candles,trades]=await Promise.all([
+ focusFetch("market/candles?instId="+instId+"&bar=1m&limit=100"),
+ focusFetch("market/trades?instId="+instId+"&limit=100")
+ ]);
+ const completed=candles.filter(c=>c[8]==="1").sort((a,b)=>Number(a[0])-Number(b[0]));
+ if(completed.length<35)throw Error("Yetersiz mum verisi");
+ const last=completed.at(-1),prev=completed.at(-6),base=completed.slice(-35,-5);
+ const price=+last[4],priceChange=100*(price/+prev[4]-1);
+ const avg=base.reduce((sum,c)=>sum+Number(c[7]),0)/base.length;
+ const recent=completed.slice(-5).reduce((sum,c)=>sum+Number(c[7]),0)/5;
+ const volumeX=avg>0?recent/avg:0;
+ const buys=trades.filter(t=>t.side==="buy").reduce((sum,t)=>sum+Number(t.sz||0),0);
+ const sells=trades.filter(t=>t.side==="sell").reduce((sum,t)=>sum+Number(t.sz||0),0);
+ const buyRatio=buys+sells>0?100*buys/(buys+sells):null;
+ const breakout=price>Math.max(...base.slice(-15).map(c=>+c[2]));
+ const priceSignal=priceChange>=0.4,volumeSignal=volumeX>=1.5,buySignal=buyRatio!==null&&buyRatio>=60;
+ const reasons=[];
+ if(priceSignal)reasons.push("Son 5 dakikada fiyat artışı: %"+priceChange.toFixed(2));
+ if(volumeSignal)reasons.push("İşlem hacmi önceki ortalamanın "+volumeX.toFixed(2)+" katı");
+ if(buySignal)reasons.push("Son işlemlerde alıcı yönlü hacim oranı: %"+buyRatio.toFixed(1));
+ if(breakout)reasons.push("Kısa vadeli direnç seviyesi aşıldı");
+ const active=(priceSignal&&volumeSignal)||(priceSignal&&buySignal)||(volumeSignal&&buySignal&&breakout);
+ return {symbol:symbol+"/TRY",status:active?"HAREKETLİLİK VAR":"İzleniyor",price,priceChange:+priceChange.toFixed(2),volumeX:+volumeX.toFixed(2),buyRatio:buyRatio===null?null:+buyRatio.toFixed(1),reasons:active?reasons:[],updatedAt:Date.now()};
+}
+async function focusRefresh(){
+ if(focusState.running)return;focusState.running=true;
+ try{
+  let cursor=0;const results=new Array(focusSymbols.length);
+  async function worker(){while(cursor<focusSymbols.length){
+   const i=cursor++,symbol=focusSymbols[i];
+   try{results[i]=await focusInspect(symbol);}
+   catch(e){results[i]={symbol:symbol+"/TRY",status:"Veri hatası",error:String(e.message||e),reasons:[],updatedAt:Date.now()};}
+   await focusDelay(250);
+  }}
+  await Promise.all([worker(),worker(),worker()]);
+  focusState.items=results;focusState.updatedAt=Date.now();
+ }finally{focusState.running=false;}
+}
+app.get("/api/watchlist-motion",(_req,res)=>{res.set("Cache-Control","no-store");res.json(focusState);});
+setTimeout(()=>focusRefresh().catch(console.error),15000);
+setInterval(()=>focusRefresh().catch(console.error),60000);
