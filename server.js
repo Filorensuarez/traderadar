@@ -7917,8 +7917,7 @@ async function focusFetch(path){
  const json=await response.json();if(String(json.code)!=="0"||!Array.isArray(json.data))throw Error(json.msg||"Veri biçimi hatası");return json.data;}
  finally{clearTimeout(timeout);}
 }
-async function focusInspect(symbol){
- const instId=symbol+"-TRY";
+async function focusInspect(symbol,instId){
  const [candles,trades]=await Promise.all([
  focusFetch("market/candles?instId="+instId+"&bar=1m&limit=100"),
  focusFetch("market/trades?instId="+instId+"&limit=100")
@@ -7941,21 +7940,26 @@ async function focusInspect(symbol){
  if(buySignal)reasons.push("Son işlemlerde alıcı yönlü hacim oranı: %"+buyRatio.toFixed(1));
  if(breakout)reasons.push("Kısa vadeli direnç seviyesi aşıldı");
  const active=(priceSignal&&volumeSignal)||(priceSignal&&buySignal)||(volumeSignal&&buySignal&&breakout);
- return {symbol:symbol+"/TRY",status:active?"HAREKETLİLİK VAR":"İzleniyor",price,priceChange:+priceChange.toFixed(2),volumeX:+volumeX.toFixed(2),buyRatio:buyRatio===null?null:+buyRatio.toFixed(1),reasons:active?reasons:[],updatedAt:Date.now()};
+ return {symbol:instId.replace("-","/"),status:active?"HAREKETLİLİK VAR":"İzleniyor",price,priceChange:+priceChange.toFixed(2),volumeX:+volumeX.toFixed(2),buyRatio:buyRatio===null?null:+buyRatio.toFixed(1),reasons:active?reasons:[],updatedAt:Date.now()};
 }
 async function focusRefresh(){
  if(focusState.running)return;focusState.running=true;
  try{
+  const instruments=await focusFetch("public/instruments?instType=SPOT");
+  const available=new Set(instruments.filter(x=>x.state==="live").map(x=>x.instId));
   let cursor=0;const results=new Array(focusSymbols.length);
   async function worker(){while(cursor<focusSymbols.length){
    const i=cursor++,symbol=focusSymbols[i];
-   try{results[i]=await focusInspect(symbol);}
-   catch(e){results[i]={symbol:symbol+"/TRY",status:"Veri hatası",error:String(e.message||e),reasons:[],updatedAt:Date.now()};}
+   const pair=available.has(symbol+"-TRY")?symbol+"-TRY":available.has(symbol+"-USDT")?symbol+"-USDT":null;
+   if(!pair){results[i]={symbol:symbol+"/TRY",status:"OKX TR paritesi yok",reasons:[],updatedAt:Date.now()};continue;}
+   try{results[i]=await focusInspect(symbol,pair);}
+   catch(e){results[i]={symbol:pair.replace("-","/"),status:"Veri hatası",error:String(e.message||e),reasons:[],updatedAt:Date.now()};}
    await focusDelay(250);
   }}
   await Promise.all([worker(),worker(),worker()]);
   focusState.items=results;focusState.updatedAt=Date.now();
- }finally{focusState.running=false;}
+ }catch(e){focusState.items=focusSymbols.map(symbol=>({symbol:symbol+"/TRY",status:"Borsa bağlantı hatası",error:String(e.message||e),reasons:[]}));focusState.updatedAt=Date.now();}
+ finally{focusState.running=false;}
 }
 app.get("/api/watchlist-motion",(_req,res)=>{res.set("Cache-Control","no-store");res.json(focusState);});
 setTimeout(()=>focusRefresh().catch(console.error),15000);
