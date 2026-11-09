@@ -7913,23 +7913,29 @@ const focusDelay=ms=>new Promise(r=>setTimeout(r,ms));
 async function focusJson(url){
  const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),12000);
  try{const response=await fetch(url,{signal:ctrl.signal});if(!response.ok)throw Error("HTTP "+response.status);
- const json=await response.json();if(json.code!==undefined&&String(json.code)!=="0")throw Error(json.msg||"Borsa API hatası");return json;}
+ const json=await response.json();if(json.code!==undefined&&!["0","00000"].includes(String(json.code)))throw Error(json.msg||"Borsa API hatası");if(json.retCode!==undefined&&json.retCode!==0)throw Error(json.retMsg||"Borsa API hatası");return json;}
  finally{clearTimeout(timeout);}
 }
 const focusVenues=[
  {name:"OKX TR",base:"https://tr.okx.com",kind:"okx"},
  {name:"OKX Global",base:"https://www.okx.com",kind:"okx"},
- {name:"Binance Global",base:"https://data-api.binance.vision",kind:"binance"}
+ {name:"Binance Global",base:"https://data-api.binance.vision",kind:"binance"},
+ {name:"Bybit",base:"https://api.bybit.com",kind:"bybit"},
+ {name:"Bitget",base:"https://api.bitget.com",kind:"bitget"}
 ];
 async function focusAvailable(){
  const venueMaps=await Promise.all(focusVenues.map(async venue=>{
   try{
-   const url=venue.kind==="okx"?venue.base+"/api/v5/public/instruments?instType=SPOT":venue.base+"/api/v3/exchangeInfo";
+   const url=venue.kind==="okx"?venue.base+"/api/v5/public/instruments?instType=SPOT":venue.kind==="binance"?venue.base+"/api/v3/exchangeInfo":venue.kind==="bybit"?venue.base+"/v5/market/instruments-info?category=spot":venue.base+"/api/v2/spot/public/symbols";
    const json=await focusJson(url),map=new Map();
    if(venue.kind==="okx"){
     for(const x of json.data||[])if(x.state==="live"&&["TRY","USDT"].includes(x.quoteCcy))map.set(x.baseCcy+"-"+x.quoteCcy,x.instId);
-   }else{
+   }else if(venue.kind==="binance"){
     for(const x of json.symbols||[])if(x.status==="TRADING"&&x.isSpotTradingAllowed&&x.quoteAsset==="USDT")map.set(x.baseAsset+"-USDT",x.symbol);
+   }else if(venue.kind==="bybit"){
+    for(const x of json.result?.list||[])if(x.status==="Trading"&&x.quoteCoin==="USDT")map.set(x.baseCoin+"-USDT",x.symbol);
+   }else{
+    for(const x of json.data||[])if(x.status==="online"&&x.quoteCoin==="USDT")map.set(x.baseCoin+"-USDT",x.symbol);
    }
    return {venue,map};
   }catch(e){return {venue,map:new Map(),error:String(e.message||e)};}
@@ -7957,15 +7963,24 @@ async function focusInspect(symbol,route){
   ]);
   candles=(c.data||[]).filter(x=>x[8]==="1").map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[7]}));
   trades=(t.data||[]).map(x=>({side:x.side,quantity:+x.sz}));
- }else{
+ }else if(kind==="binance"){
   const [c,t]=await Promise.all([
    focusJson(base+"/api/v3/klines?symbol="+encodeURIComponent(instId)+"&interval=1m&limit=100"),
    focusJson(base+"/api/v3/trades?symbol="+encodeURIComponent(instId)+"&limit=100")
   ]);
   candles=c.slice(0,-1).map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[7]}));
   trades=t.map(x=>({side:x.isBuyerMaker?"sell":"buy",quantity:+x.qty}));
+ }else if(kind==="bybit"){
+  const [c,t]=await Promise.all([focusJson(base+"/v5/market/kline?category=spot&symbol="+instId+"&interval=1&limit=100"),focusJson(base+"/v5/market/recent-trade?category=spot&symbol="+instId+"&limit=100")]);
+  candles=(c.result?.list||[]).map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[6]}));
+  trades=(t.result?.list||[]).map(x=>({side:String(x.S||x.side).toLowerCase()==="buy"?"buy":"sell",quantity:+(x.v||x.size||0)}));
+ }else if(kind==="bitget"){
+  const [c,t]=await Promise.all([focusJson(base+"/api/v2/spot/market/candles?symbol="+instId+"&granularity=1min&limit=100"),focusJson(base+"/api/v2/spot/market/fills?symbol="+instId+"&limit=100")]);
+  candles=(c.data||[]).map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[6]}));
+  trades=(t.data||[]).map(x=>({side:String(x.side).toLowerCase(),quantity:+(x.size||0)}));
  }
  candles.sort((x,y)=>x.time-y.time);
+ candles=candles.filter(x=>x.time<Date.now()-60000&&Number.isFinite(x.close)&&Number.isFinite(x.volume));
  if(candles.length<35)throw Error("Yetersiz mum verisi");
  const last=candles.at(-1),prev=candles.at(-6),baseline=candles.slice(-35,-5);
  const price=last.close,priceChange=100*(price/prev.close-1);
