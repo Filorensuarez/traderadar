@@ -7934,7 +7934,7 @@ async function focusAvailable(){
    }else if(venue.kind==="binance"){
     for(const x of json.symbols||[])if(x.status==="TRADING"&&x.isSpotTradingAllowed&&x.quoteAsset==="USDT")map.set(x.baseAsset+"-USDT",x.symbol);
    }else if(venue.kind==="binance-tr"){
-    for(const x of json.data?.list||[])if(x.baseAsset&&x.quoteAsset==="TRY"&&x.type===1)map.set(x.baseAsset+"-TRY",String(x.symbol).replaceAll("_",""));
+    for(const x of json.data?.list||[])if(x.baseAsset&&x.quoteAsset==="TRY"&&[1,3].includes(Number(x.type)))map.set(x.baseAsset+"-TRY",{symbol:x.symbol,type:Number(x.type)});
    }else if(venue.kind==="bybit"){
     for(const x of json.result?.list||[])if(x.status==="Trading"&&x.quoteCoin==="USDT")map.set(x.baseCoin+"-USDT",x.symbol);
    }else{
@@ -7943,18 +7943,18 @@ async function focusAvailable(){
    return {venue,map};
   }catch(e){return {venue,map:new Map(),error:String(e.message||e)};}
  }));
- const routes=new Map();
+ const routes=new Map(),candidates=new Map();
  for(const symbol of focusSymbols){
   for(const quote of ["TRY","USDT"]){
    for(const item of venueMaps){
     if(quote==="TRY"&&!["OKX TR","Binance TR"].includes(item.venue.name))continue;
     const instId=item.map.get(symbol+"-"+quote);
-    if(instId){routes.set(symbol,{...item.venue,instId,quote});break;}
+    if(instId){const route={...item.venue,instId,quote};if(!candidates.has(symbol))candidates.set(symbol,[]);candidates.get(symbol).push(route);if(!routes.has(symbol))routes.set(symbol,route);}
    }
    if(routes.has(symbol))break;
   }
  }
- return {routes,venueMaps};
+ return {routes,venueMaps,candidates};
 }
 async function focusInspect(symbol,route){
  const {base,kind,instId,quote,name}=route;
@@ -7973,6 +7973,14 @@ async function focusInspect(symbol,route){
   ]);
   candles=c.slice(0,-1).map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[7]}));
   trades=t.map(x=>({side:x.isBuyerMaker?"sell":"buy",quantity:+x.qty}));
+ }else if(kind==="binance-tr"){
+  const pair=typeof instId==="object"?instId:{symbol:String(instId),type:1};
+  const next=pair.type===3,code=next?pair.symbol:pair.symbol.replaceAll("_","");
+  const candleUrl=(next?"https://cloudme-tr.2meta.app/api/v1":"https://api.binance.me/api/v1")+"/klines?symbol="+encodeURIComponent(code)+"&interval=1m&limit=100";
+  const tradeUrl=(next?"https://www.binance.tr/open/v1/market":"https://api.binance.me/api/v3")+"/trades?symbol="+encodeURIComponent(code)+"&limit=100";
+  const [c,t]=await Promise.all([focusJson(candleUrl),focusJson(tradeUrl)]);
+  candles=(c.data||[]).map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[7]}));
+  trades=(t.data||[]).map(x=>({side:x.isBuyerMaker?"sell":"buy",quantity:+x.qty}));
  }else if(kind==="bybit"){
   const [c,t]=await Promise.all([focusJson(base+"/v5/market/kline?category=spot&symbol="+instId+"&interval=1&limit=100"),focusJson(base+"/v5/market/recent-trade?category=spot&symbol="+instId+"&limit=100")]);
   candles=(c.result?.list||[]).map(x=>({time:+x[0],close:+x[4],high:+x[2],volume:+x[6]}));
@@ -8006,7 +8014,7 @@ async function focusInspect(symbol,route){
 async function focusRefresh(){
  if(focusState.running)return;focusState.running=true;
  try{
-  const {routes,venueMaps}=await focusAvailable(),results=new Array(focusSymbols.length);
+  const {routes,venueMaps,candidates}=await focusAvailable(),results=new Array(focusSymbols.length);
   let cursor=0;
   async function worker(){while(cursor<focusSymbols.length){
    const i=cursor++,symbol=focusSymbols[i],route=routes.get(symbol);
@@ -8015,14 +8023,12 @@ async function focusRefresh(){
     results[i]={symbol,status:allFailed?"Borsa bağlantı hatası":"İşlem çifti bulunamadı",error:allFailed?venueMaps.map(v=>v.venue.name+": "+v.error).join("; "):undefined,reasons:[],updatedAt:Date.now()};
     continue;
    }
-   try{results[i]=await focusInspect(symbol,route);}
-   catch(e){
-    if(symbol==="HEMI"&&route.name==="Binance TR"){
-     const fallback=venueMaps.find(v=>v.venue.name==="Binance Global"&&v.map.has("HEMI-USDT"));
-     if(fallback){try{results[i]=await focusInspect(symbol,{...fallback.venue,instId:fallback.map.get("HEMI-USDT"),quote:"USDT"});continue;}catch(_fallbackError){/* Keep primary error */}}
-    }
-    results[i]={symbol:symbol+"/"+route.quote,exchange:route.name,status:"Veri hatası",error:String(e.message||e),reasons:[],updatedAt:Date.now()};
+   const errors=[];
+   for(const candidate of candidates.get(symbol)||[]){
+    try{results[i]=await focusInspect(symbol,candidate);break;}
+    catch(e){errors.push(candidate.name+": "+String(e.message||e));}
    }
+   if(!results[i])results[i]={symbol:symbol+"/"+route.quote,exchange:route.name,status:"Veri hatası",error:errors.join("; "),reasons:[],updatedAt:Date.now()};
    await focusDelay(300);
   }}
   await Promise.all([worker(),worker(),worker()]);
