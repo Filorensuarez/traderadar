@@ -57,12 +57,12 @@ function clearTrades(){
 
 
 
-const KUCOIN_PROXY="https://traderadar-yro7.onrender.com/api/kucoin-public";
+const KUCOIN_PROXY="https://traderadar-kucoin-proxy.yakup2402576.workers.dev";
 async function kucoinJson(kind,symbol,type){
  const path=kind==="tickers"?"/api/v1/market/allTickers":"/api/v1/market/candles?symbol="+encodeURIComponent(symbol)+"&type="+type;
  const proxy=kind==="tickers"?KUCOIN_PROXY+"/tickers":KUCOIN_PROXY+"/candles?symbol="+encodeURIComponent(symbol)+"&type="+type;
  let lastError="";
- for(const url of ["https://api.kucoin.com"+path,proxy]){
+ for(const url of [proxy,"https://api.kucoin.com"+path]){
   try{
    const response=await fetch(url,{signal:AbortSignal.timeout(9500),cache:"no-store"});
    if(!response.ok)throw Error("HTTP "+response.status);
