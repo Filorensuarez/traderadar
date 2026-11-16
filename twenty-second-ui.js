@@ -1,8 +1,34 @@
 const start=document.getElementById("twentyStart"),stop=document.getElementById("twentyStop");
 const names=["binance","okx"];
-const state=Object.fromEntries(names.map(k=>[k,{socket:null,history:new Map(),alerts:new Map(),connected:false,error:"",last:0,retry:null,connections:[],tracked:0}]));
+const state=Object.fromEntries(names.map(k=>[k,{socket:null,history:new Map(),alerts:new Map(),connected:false,error:"",last:0,retry:null,connections:[],tracked:0,baseline:new Map(),pending:new Set()}]));
 let running=false,renderTimer=null;
 const esc=x=>String(x??"—").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function baseline(kind,symbol){
+ const st=state[kind],cached=st.baseline.get(symbol),now=Date.now();
+ if(cached&&now-cached.fetched<30000)return cached.close;
+ if(st.pending.has(symbol))return null;
+ st.pending.add(symbol);
+ try{
+  const url=kind==="binance"
+   ?"https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=5m&limit=3"
+   :"https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol.replace(/USDT$/,"-USDT"))+"&bar=5m&limit=3";
+  const response=await fetch(url,{signal:AbortSignal.timeout(7000),cache:"no-store"});
+  if(!response.ok)throw Error("5dk mum HTTP "+response.status);
+  const json=await response.json();
+  let closed;
+  if(kind==="binance"){closed=json.filter(x=>Number(x[6])<Date.now()).at(-1);closed=closed?Number(closed[4]):null;}
+  else {closed=(json.data||[]).find(x=>x[8]==="1");closed=closed?Number(closed[4]):null;}
+  if(!(closed>0))throw Error("Kapanmış 5dk mum bulunamadı");
+  st.baseline.set(symbol,{close:closed,fetched:Date.now()});return closed;
+ }catch(e){st.error="5dk mum: "+e.message;return null;}
+ finally{st.pending.delete(symbol);}
+}
+async function confirm(kind,symbol,price,peak){
+ const st=state[kind],close=await baseline(kind,symbol);
+ if(!running||!close)return;
+ const change=100*(peak/close-1);
+ if(change>=2){const old=st.alerts.get(symbol),now=Date.now();st.alerts.set(symbol,{symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close,change:+change.toFixed(2),at:now,first:old?.first||now});}
+}
 function observe(kind,symbol,price){
  if(!running||!(price>0)||!/USDT$/.test(symbol))return;
  const st=state[kind],now=Date.now();st.last=now;
@@ -11,16 +37,16 @@ function observe(kind,symbol,price){
  h.push({t:now,p:price});while(h.length>1&&h[0].t<now-22000)h.shift();
  const prior=h.find(x=>x.t<=now-18000);if(!prior)return;
  const change=100*(price/prior.p-1);
- if(change>=2){const old=st.alerts.get(symbol);st.alerts.set(symbol,{symbol:symbol.replace(/USDT$/,"/USDT"),price,change:+change.toFixed(2),at:now,first:old?.first||now});}
+ if(change>=0.5){const peak=Math.max(...h.map(x=>x.p));void confirm(kind,symbol,price,peak);}
 }
 function reconnect(kind,fn){const st=state[kind];st.connected=false;if(running&&!st.retry)st.retry=setTimeout(()=>{st.retry=null;fn();},5000);}
 function binance(){
  if(!running)return;const st=state.binance;
  try{
- const ws=new WebSocket("wss://stream.binance.com:9443/ws/!ticker@arr");st.socket=ws;st.connections.push(ws);
+ const ws=new WebSocket("wss://data-stream.binance.vision/ws/!ticker@arr");st.socket=ws;st.connections.push(ws);
  ws.onopen=()=>{st.connected=true;st.error="";};
  ws.onmessage=e=>{try{const data=JSON.parse(e.data);if(Array.isArray(data))for(const t of data)observe("binance",String(t.s||""),Number(t.c));}catch(err){st.error=err.message;}};
- ws.onerror=()=>{st.error="Binance WebSocket bağlantısı engellenmiş olabilir (451).";};
+ ws.onerror=()=>{st.error="Binance alternatif piyasa akışına erişilemiyor; bölgesel kısıtlama olabilir.";};
  ws.onclose=()=>reconnect("binance",binance);
  }catch(e){st.error=e.message;reconnect("binance",binance);}
 }
@@ -55,12 +81,12 @@ function render(){
  const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,50);
  const connected=st.connected&&now-st.last<15000;
  status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.error?" · Hata: "+st.error:"");
- cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+'</h3><p>Fiyat: '+esc(x.price)+' USDT · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>20 saniyelik canlı fiyat hareketi; mum kapanış teyidi değildir.</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
+ cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
  if(running)return;running=true;start.disabled=true;stop.disabled=false;
- for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.error="";st.last=0;st.connected=false;}
+ for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.baseline.clear();st.error="";st.last=0;st.connected=false;}
  binance();okx();render();renderTimer=setInterval(render,1000);
 }
 function end(){
