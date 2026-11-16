@@ -55,6 +55,65 @@ function clearTrades(){
  tradeFeeds.clear();
 }
 
+
+let backfillGeneration=0;
+async function fetchJson(url){
+ const response=await fetch(url,{signal:AbortSignal.timeout(7500),cache:"no-store"});
+ if(!response.ok)throw Error("HTTP "+response.status);
+ return response.json();
+}
+async function backfillOne(kind,symbol,generation){
+ try{
+  const inst=symbol.replace(/USDT$/,"-USDT");
+  const url=kind==="binance"
+   ?"https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=12"
+   :"https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(inst)+"&bar=1m&limit=12";
+  const data=await fetchJson(url),now=Date.now();
+  const candles=kind==="binance"?data.map(x=>({t:Number(x[0]),high:Number(x[2]),close:Number(x[4])})):
+   (data.data||[]).map(x=>({t:Number(x[0]),high:Number(x[2]),close:Number(x[4])})).reverse();
+  if(!running||generation!==backfillGeneration)return;
+  const ordered=candles.filter(x=>x.t<=now&&x.high>0&&x.close>0).sort((a,b)=>a.t-b.t);
+  let best=null;
+  for(const candle of ordered){
+   if(candle.t<now-300000||candle.t>now)continue;
+   const prior=ordered.filter(x=>x.t<candle.t&&x.t>=candle.t-300000);
+   if(prior.length<3)continue;
+   const baseline=prior[0].close;
+   const change=100*(candle.high/baseline-1);
+   const at=Math.min(now,candle.t+59000);
+   if(change>=2&&(!best||change>best.change))best={at,change,peak:candle.high,close:baseline,price:candle.close};
+  }
+  if(!best||!running||generation!==backfillGeneration)return;
+  const st=state[kind],old=st.alerts.get(symbol);
+  if(old&&old.at>=best.at)return;
+  st.alerts.set(symbol,{rawSymbol:symbol,symbol:symbol.replace(/USDT$/,"/USDT"),price:best.price,peak:best.peak,close:best.close,change:+best.change.toFixed(2),at:best.at,first:best.at,historical:true});
+  trackTrades(kind,symbol);
+ }catch(e){/* A failed historical query must not interrupt live scanning. */}
+}
+async function backfill(kind,generation){
+ const st=state[kind];st.backfillStatus="Geçmiş taranıyor";
+ try{
+  const url=kind==="binance"?"https://data-api.binance.vision/api/v3/ticker/24hr":"https://www.okx.com/api/v5/market/tickers?instType=SPOT";
+  const data=await fetchJson(url);
+  const items=kind==="binance"?data:(data.data||[]);
+  const candidates=items.map(x=>{
+   const symbol=kind==="binance"?String(x.symbol||""):String(x.instId||"").replace("-","");
+   const last=Number(kind==="binance"?x.lastPrice:x.last);
+   const open=Number(kind==="binance"?x.openPrice:x.open24h);
+   const volume=Number(kind==="binance"?x.quoteVolume:x.volCcy24h)* (kind==="binance"?1:last);
+   return {symbol,score:open>0?100*(last/open-1):0,volume};
+  }).filter(x=>x.symbol.endsWith("USDT")&&x.volume>0).sort((a,b)=>b.score-a.score).slice(0,60);
+  let checked=0;
+  for(let i=0;i<candidates.length;i+=5){
+   if(!running||generation!==backfillGeneration)return;
+   await Promise.all(candidates.slice(i,i+5).map(x=>backfillOne(kind,x.symbol,generation)));
+   checked+=Math.min(5,candidates.length-i);
+   st.backfillStatus="Geçmiş: "+checked+"/"+candidates.length+" aday tarandı";
+  }
+  st.backfillStatus="Geçmiş tarama tamamlandı (ilk 60 aday, 1 dk mum)";
+ }catch(e){st.backfillStatus="Geçmiş tarama erişilemedi: "+e.message;}
+}
+
 const esc=x=>String(x??"—").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function baseline(kind,symbol){
  const st=state[kind],cached=st.baseline.get(symbol),now=Date.now();
@@ -153,17 +212,17 @@ function render(){
  const now=Date.now();for(const [key,v] of st.alerts)if(now-v.at>300000)st.alerts.delete(key);
  cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,50);
  const connected=st.connected&&now-st.last<15000;
- status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.error?" · Hata: "+st.error:"");
- cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
+ status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
+ cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
- if(running)return;clearTrades();running=true;start.disabled=true;stop.disabled=false;
- for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.baseline.clear();st.error="";st.last=0;st.connected=false;}
- binance();okx();render();renderTimer=setInterval(render,1000);
+ if(running)return;clearTrades();backfillGeneration++;running=true;start.disabled=true;stop.disabled=false;
+ for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.baseline.clear();st.error="";st.backfillStatus="";st.last=0;st.connected=false;}
+ binance();okx();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);render();renderTimer=setInterval(render,1000);
 }
 function end(){
- running=false;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;
+ running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;
  for(const k of names){const st=state[k];clearTimeout(st.retry);st.retry=null;for(const ws of st.connections){ws.onclose=null;ws.close();}st.connections=[];st.socket=null;st.connected=false;document.getElementById(k+"TwentyStatus").textContent="Durduruldu";}
 }
 start?.addEventListener("click",begin);stop?.addEventListener("click",end);
