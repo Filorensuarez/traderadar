@@ -1,12 +1,12 @@
 const start=document.getElementById("twentyStart"),stop=document.getElementById("twentyStop");
-const names=["binance","okx"];
+const names=["binance","okx","kucoin"];
 const state=Object.fromEntries(names.map(k=>[k,{socket:null,history:new Map(),alerts:new Map(),connected:false,error:"",last:0,retry:null,connections:[],tracked:0,baseline:new Map(),pending:new Set()}]));
 let running=false,renderTimer=null;
 
 const tradeFeeds=new Map();
 function trackTrades(kind,symbol){
  const key=kind+":"+symbol;
- if(tradeFeeds.has(key)||tradeFeeds.size>=24)return;
+ if(kind==="kucoin"||tradeFeeds.has(key)||tradeFeeds.size>=24)return;
  const feed={ws:null,events:[],error:"",last:0};
  tradeFeeds.set(key,feed);
  const url=kind==="binance"?"wss://data-stream.binance.vision/ws/"+symbol.toLowerCase()+"@trade":"wss://ws.okx.com:8443/ws/v5/public";
@@ -30,7 +30,7 @@ function trackTrades(kind,symbol){
 }
 function pressure(kind,symbol){
  const feed=tradeFeeds.get(kind+":"+symbol);
- if(!feed)return "Alış baskısı: Veri bekleniyor";
+ if(!feed)return kind==="kucoin"?"Alış baskısı: KuCoin işlem akışı henüz bağlı değil":"Alış baskısı: Veri bekleniyor";
  const now=Date.now();
  while(feed.events.length&&feed.events[0].t<now-20000)feed.events.shift();
  const events=feed.events;
@@ -67,10 +67,12 @@ async function backfillOne(kind,symbol,generation){
   const inst=symbol.replace(/USDT$/,"-USDT");
   const url=kind==="binance"
    ?"https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=12"
-   :"https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(inst)+"&bar=1m&limit=12";
+   :kind==="okx"?"https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(inst)+"&bar=1m&limit=12"
+   :"https://api.kucoin.com/api/v1/market/candles?symbol="+encodeURIComponent(inst)+"&type=1min";
   const data=await fetchJson(url),now=Date.now();
   const candles=kind==="binance"?data.map(x=>({t:Number(x[0]),high:Number(x[2]),close:Number(x[4])})):
-   (data.data||[]).map(x=>({t:Number(x[0]),high:Number(x[2]),close:Number(x[4])})).reverse();
+   kind==="okx"?(data.data||[]).map(x=>({t:Number(x[0]),high:Number(x[2]),close:Number(x[4])})).reverse():
+   (data.data||[]).map(x=>({t:Number(x[0])*1000,high:Number(x[3]),close:Number(x[2])})).reverse();
   if(!running||generation!==backfillGeneration)return;
   const ordered=candles.filter(x=>x.t<=now&&x.high>0&&x.close>0).sort((a,b)=>a.t-b.t);
   let best=null;
@@ -93,14 +95,14 @@ async function backfillOne(kind,symbol,generation){
 async function backfill(kind,generation){
  const st=state[kind];st.backfillStatus="Geçmiş taranıyor";
  try{
-  const url=kind==="binance"?"https://data-api.binance.vision/api/v3/ticker/24hr":"https://www.okx.com/api/v5/market/tickers?instType=SPOT";
+  const url=kind==="binance"?"https://data-api.binance.vision/api/v3/ticker/24hr":kind==="okx"?"https://www.okx.com/api/v5/market/tickers?instType=SPOT":"https://api.kucoin.com/api/v1/market/allTickers";
   const data=await fetchJson(url);
-  const items=kind==="binance"?data:(data.data||[]);
+  const items=kind==="binance"?data:kind==="okx"?(data.data||[]):(data.data?.ticker||[]);
   const candidates=items.map(x=>{
-   const symbol=kind==="binance"?String(x.symbol||""):String(x.instId||"").replace("-","");
-   const last=Number(kind==="binance"?x.lastPrice:x.last);
-   const open=Number(kind==="binance"?x.openPrice:x.open24h);
-   const volume=Number(kind==="binance"?x.quoteVolume:x.volCcy24h)* (kind==="binance"?1:last);
+   const symbol=kind==="binance"?String(x.symbol||""):String(kind==="okx"?x.instId:x.symbol||"").replace("-","");
+   const last=Number(kind==="binance"?x.lastPrice:kind==="okx"?x.last:x.last);
+   const open=Number(kind==="binance"?x.openPrice:kind==="okx"?x.open24h:x.last/(1+Number(x.changeRate||0)));
+   const volume=kind==="binance"?Number(x.quoteVolume):kind==="okx"?Number(x.volCcy24h)*last:Number(x.volValue);
    return {symbol,score:open>0?100*(last/open-1):0,volume};
   }).filter(x=>x.symbol.endsWith("USDT")&&x.volume>0).sort((a,b)=>b.score-a.score).slice(0,60);
   let checked=0;
@@ -123,13 +125,15 @@ async function baseline(kind,symbol){
  try{
   const url=kind==="binance"
    ?"https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=5m&limit=3"
-   :"https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol.replace(/USDT$/,"-USDT"))+"&bar=5m&limit=3";
+   :kind==="okx"?"https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol.replace(/USDT$/,"-USDT"))+"&bar=5m&limit=3"
+   :"https://api.kucoin.com/api/v1/market/candles?symbol="+encodeURIComponent(symbol.replace(/USDT$/,"-USDT"))+"&type=5min";
   const response=await fetch(url,{signal:AbortSignal.timeout(7000),cache:"no-store"});
   if(!response.ok)throw Error("5dk mum HTTP "+response.status);
   const json=await response.json();
   let closed;
   if(kind==="binance"){closed=json.filter(x=>Number(x[6])<Date.now()).at(-1);closed=closed?Number(closed[4]):null;}
-  else {closed=(json.data||[]).find(x=>x[8]==="1");closed=closed?Number(closed[4]):null;}
+  else if(kind==="okx"){closed=(json.data||[]).find(x=>x[8]==="1");closed=closed?Number(closed[4]):null;}
+  else {closed=(json.data||[]).find(x=>Number(x[0])*1000+300000<=Date.now());closed=closed?Number(closed[2]):null;}
   if(!(closed>0))throw Error("Kapanmış 5dk mum bulunamadı");
   st.baseline.set(symbol,{close:closed,fetched:Date.now()});return closed;
  }catch(e){st.error="5dk mum: "+e.message;return null;}
@@ -182,6 +186,29 @@ function binance(){
  void pollBinance();
  clearInterval(binancePolling);binancePolling=setInterval(()=>{if(running&&Date.now()-st.last>6000)void pollBinance();},5000);
 }
+let kucoinPolling=null,kucoinBusy=false;
+async function pollKucoin(){
+ if(!running||kucoinBusy)return;kucoinBusy=true;
+ const st=state.kucoin;
+ try{
+  const response=await fetch("https://api.kucoin.com/api/v1/market/allTickers",{signal:AbortSignal.timeout(8500),cache:"no-store"});
+  if(!response.ok)throw Error("HTTP "+response.status);
+  const json=await response.json();
+  if(String(json.code)!=="200000"||!Array.isArray(json.data?.ticker))throw Error("KuCoin fiyat listesi alınamadı");
+  let count=0;
+  for(const x of json.data.ticker){
+   const symbol=String(x.symbol||"");
+   if(!symbol.endsWith("-USDT"))continue;
+   observe("kucoin",symbol.replace("-",""),Number(x.last));count++;
+  }
+  st.tracked=count;st.connected=count>0;st.error="";
+ }catch(e){st.connected=false;st.error="KuCoin veri hatası: "+e.message;}
+ finally{kucoinBusy=false;}
+}
+function kucoin(){
+ void pollKucoin();clearInterval(kucoinPolling);
+ kucoinPolling=setInterval(()=>{if(running)void pollKucoin();},3000);
+}
 async function okx(){
  if(!running)return;const st=state.okx;
  try{
@@ -212,17 +239,17 @@ function render(){
  const now=Date.now();for(const [key,v] of st.alerts)if(now-v.at>300000)st.alerts.delete(key);
  cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,50);
  const connected=st.connected&&now-st.last<15000;
- status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
+ status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"||kind==="kucoin"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
  cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
  if(running)return;clearTrades();backfillGeneration++;running=true;start.disabled=true;stop.disabled=false;
  for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.baseline.clear();st.error="";st.backfillStatus="";st.last=0;st.connected=false;}
- binance();okx();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);render();renderTimer=setInterval(render,1000);
+ binance();okx();kucoin();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);void backfill("kucoin",backfillGeneration);render();renderTimer=setInterval(render,1000);
 }
 function end(){
- running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;
+ running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;clearInterval(kucoinPolling);kucoinPolling=null;
  for(const k of names){const st=state[k];clearTimeout(st.retry);st.retry=null;for(const ws of st.connections){ws.onclose=null;ws.close();}st.connections=[];st.socket=null;st.connected=false;document.getElementById(k+"TwentyStatus").textContent="Durduruldu";}
 }
 start?.addEventListener("click",begin);stop?.addEventListener("click",end);
