@@ -90,6 +90,7 @@
   <button id="flowButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
   
+  <button id="twentySecondButton" class="tab" type="button" data-view="twentySecond">20 Sn %2 Radar</button>
   <button id="focusButton" class="tab" type="button" data-view="focus">Favori Coin Takibi</button>
   
   <button id="momentumButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="momentum">Patlama</button>
@@ -107,7 +108,7 @@
 
     <section id="focus" hidden><h2>Favori Coin Hareketlilik Takibi</h2><p class="description">Seçtiğiniz 14 coin önce OKX TR TRY, bulunamazsa OKX TR, OKX Global veya Binance Global USDT paritesinden izlenir. Fiyat, hacim ve gerçekleşen işlemlerin alıcı yönü birlikte değerlendirilir. Sinyaller yatırım tavsiyesi değildir.</p><button id="focusRefresh" class="refresh-button" type="button">Şimdi Yenile</button><p id="focusStatus" aria-live="polite">Yükleniyor...</p><div id="focusList"></div></section>
     <section id="liveRise" hidden><div class="section-head"><div><h2>Canlı Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Avrupa USDT fiyat akışı. 10 saniyede %0,5 veya 60 saniyede %1 yükseliş başlangıcı. Bu bir günlük teyit değildir.</p></div></div><p id="liveRiseStatus">Canlı bağlantılar kontrol ediliyor...</p><div id="liveRiseCards"></div></section>
-    <section id="buyRise"><h2>Erken Yükseliş ve Alım Baskısı Radarı</h2><p class="description">Binance Global USDT paritelerinin canlı fiyatlarını saniyeler içinde izler; son 5, 10, 30 ve 60 saniyelik yükselişleri sıralar. Gate.io gerçekleşmiş işlemlerinden alım baskısı teyitlerini ayrı gösterir. Fiyat ön alarmı alım teyidi değildir; sunucu yeniden başladığında bellek sıfırlanır.</p><button id="buyRiseRefresh" class="refresh-button" type="button">Şimdi Kontrol Et</button><p id="buyRiseStatus" aria-live="polite">Radar bağlanıyor...</p><div id="buyRiseCards"></div></section>
+    <section id="twentySecond" hidden><h2>20 Saniyelik %2 Yükseliş Radarı</h2><p class="description">Son 20 tamamlanmış 1 saniyelik mumun en yüksek fiyatı, son kapanmış 5 dakikalık mumun kapanış fiyatından en az %2 yukarıdaysa sinyal verir. Canlı tarama otomatik yapılır. Ön eleme nedeniyle her hareket yakalanamayabilir.</p><p id="twentySecondStatus" aria-live="polite">Bağlantı bekleniyor...</p><div id="twentySecondCards" class="coin-grid"></div></section>
     <section id="daily"><h2>Çoklu Borsa — Erken Yükseliş Taraması</h2><p class="description">Desteklenen borsalarda ONE/TRY örneğindeki yatay birikim, saatlik hacim genişlemesi, EMA(7)/EMA(25) dönüşü ve fiyat kırılımı örneğine dayalı deneysel tarama. Son 6 saatte aşırı yükselmiş pariteler elenir. RSI 48–76 aralığı ve hacim en az 1,7x aranır. Sinyaller garanti değildir.</p><button id="oneStart" class="refresh-button" type="button">Erken Yükseliş Tara</button><p id="oneStatus" aria-live="polite">Tarama başlatılmadı.</p><div id="oneCards"></div><div style="display:none" aria-hidden="true">
 
       <div class="section-head">
@@ -475,6 +476,6 @@
   <script defer src="./install-app.js?v=2"></script>
   <script type="module" src="./hourly-pullback-ui.js"></script>
 
-<script type="module" src="./buy-rise-ui.js?v=3"></script>
+<script type="module" src="./twenty-second-ui.js?v=1"></script>
 </body>
 </html>
