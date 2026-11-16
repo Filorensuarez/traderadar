@@ -1,3 +1,4 @@
+import {startSecondsRadar,secondsRadarSnapshot} from "./seconds-radar.js";
 import {runSecondScan,secondScanStatus} from "./second-scan.js";
 import {startQuietRadar,quietSnapshot,onQuietAlert} from "./quiet-volume-server.js";
 import {startLiveRise,liveRiseSnapshot} from "./live-rise-radar.js";
@@ -7730,6 +7731,7 @@ app.get(
 ========================= */
 
 app.get("/api/quiet-volume",(_req,res)=>{res.set("Cache-Control","no-store");res.set("Access-Control-Allow-Origin","https://filorensuarez.github.io");res.json(quietSnapshot());});
+app.get("/api/seconds-radar",(_req,res)=>{res.set("Cache-Control","no-store");res.json(secondsRadarSnapshot());});
 app.get("/api/buy-rise",(_req,res)=>{res.set("Cache-Control","no-store");const snapshot=firstReactionSnapshot();res.json({...snapshot,rows:snapshot.rows.filter(r=>r.change10Pct>=0.25&&r.buySharePct>=65&&r.volumeAcceleration>=2.5).sort((a,b)=>b.volumeAcceleration-a.volumeAcceleration),description:"Fiyat yükselişi ve agresif alım artışı birlikte; Gate.io spot USDT canlı gerçekleşmiş işlemleri."});});
 app.get("/api/live-rise",(_req,res)=>{res.set("Cache-Control","no-store");res.json(liveRiseSnapshot());});
 
@@ -8040,3 +8042,5 @@ async function focusRefresh(){
 app.get("/api/watchlist-motion",(_req,res)=>{res.set("Cache-Control","no-store");res.json(focusState);});
 setTimeout(()=>focusRefresh().catch(console.error),15000);
 setInterval(()=>focusRefresh().catch(console.error),60000);
+
+startSecondsRadar();
