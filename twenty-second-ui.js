@@ -40,15 +40,35 @@ function observe(kind,symbol,price){
  if(change>=0.5){const peak=Math.max(...h.map(x=>x.p));void confirm(kind,symbol,price,peak);}
 }
 function reconnect(kind,fn){const st=state[kind];st.connected=false;if(running&&!st.retry)st.retry=setTimeout(()=>{st.retry=null;fn();},5000);}
+let binancePolling=null;
+async function pollBinance(){
+ if(!running)return;
+ const st=state.binance;
+ const hosts=["https://data-api.binance.vision","https://api.binance.com","https://api1.binance.com"];
+ for(const host of hosts){
+  try{
+   const response=await fetch(host+"/api/v3/ticker/price",{signal:AbortSignal.timeout(6000),cache:"no-store"});
+   if(!response.ok)throw Error("HTTP "+response.status);
+   const batch=await response.json();
+   if(!Array.isArray(batch))throw Error("Geçersiz fiyat yanıtı");
+   let count=0;
+   for(const x of batch){if(String(x.symbol||"").endsWith("USDT")){observe("binance",x.symbol,Number(x.price));count++;}}
+   if(count){st.connected=true;st.error="";st.tracked=count;return;}
+  }catch(e){st.error="Binance REST erişim hatası: "+e.message;}
+ }
+ st.connected=false;
+}
 function binance(){
  if(!running)return;const st=state.binance;
  try{
  const ws=new WebSocket("wss://data-stream.binance.vision/ws/!ticker@arr");st.socket=ws;st.connections.push(ws);
  ws.onopen=()=>{st.connected=true;st.error="";};
  ws.onmessage=e=>{try{const data=JSON.parse(e.data);if(Array.isArray(data))for(const t of data)observe("binance",String(t.s||""),Number(t.c));}catch(err){st.error=err.message;}};
- ws.onerror=()=>{st.error="Binance alternatif piyasa akışına erişilemiyor; bölgesel kısıtlama olabilir.";};
- ws.onclose=()=>reconnect("binance",binance);
+ ws.onerror=()=>{st.error="Binance WebSocket erişimi başarısız; REST yedeği deneniyor.";};
+ ws.onclose=()=>{st.connected=false;reconnect("binance",binance);};
  }catch(e){st.error=e.message;reconnect("binance",binance);}
+ void pollBinance();
+ clearInterval(binancePolling);binancePolling=setInterval(()=>{if(running&&Date.now()-st.last>6000)void pollBinance();},5000);
 }
 async function okx(){
  if(!running)return;const st=state.okx;
@@ -90,7 +110,7 @@ function begin(){
  binance();okx();render();renderTimer=setInterval(render,1000);
 }
 function end(){
- running=false;start.disabled=false;stop.disabled=true;clearInterval(renderTimer);
+ running=false;start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;
  for(const k of names){const st=state[k];clearTimeout(st.retry);st.retry=null;for(const ws of st.connections){ws.onclose=null;ws.close();}st.connections=[];st.socket=null;st.connected=false;document.getElementById(k+"TwentyStatus").textContent="Durduruldu";}
 }
 start?.addEventListener("click",begin);stop?.addEventListener("click",end);
