@@ -37,6 +37,36 @@ app.use("/api", (req,res,next)=>{
   if(req.method==="OPTIONS")return res.sendStatus(204);
   next();
 });
+
+const kucoinProxyCache=new Map();
+app.get("/api/kucoin-public/:kind",async(req,res)=>{
+ const kind=req.params.kind,symbol=String(req.query.symbol||"");
+ if(!["tickers","candles"].includes(kind))return res.status(404).json({error:"Unsupported kind"});
+ if(kind==="candles"&&!/^[A-Z0-9]+-USDT$/.test(symbol))return res.status(400).json({error:"Invalid symbol"});
+ const type=req.query.type==="5min"?"5min":"1min";
+ const key=kind+":"+symbol+":"+type,ttl=kind==="tickers"?2500:10000;
+ const old=kucoinProxyCache.get(key);
+ if(old&&Date.now()-old.at<ttl)return res.json(old.data);
+ const suffix=kind==="tickers"?"/api/v1/market/allTickers":"/api/v1/market/candles?symbol="+encodeURIComponent(symbol)+"&type="+type;
+ try{
+  let data=null,lastError="";
+  for(const host of ["https://api.kucoin.com","https://api.kucoin.io"]){
+   try{
+    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),7000);
+    let response;try{response=await fetch(host+suffix,{signal:ctrl.signal,headers:{Accept:"application/json"}});}finally{clearTimeout(timer);}
+    if(!response.ok)throw Error("HTTP "+response.status);
+    const candidate=await response.json();
+    if(String(candidate.code)!=="200000"||!Array.isArray(kind==="tickers"?candidate.data?.ticker:candidate.data))throw Error("Invalid KuCoin data");
+    data=candidate;break;
+   }catch(e){lastError=String(e.message||e);}
+  }
+  if(!data)throw Error(lastError||"KuCoin unreachable");
+  kucoinProxyCache.set(key,{at:Date.now(),data});
+  if(kucoinProxyCache.size>250)for(const [k,v] of kucoinProxyCache)if(Date.now()-v.at>30000)kucoinProxyCache.delete(k);
+  res.set("Cache-Control","no-store");res.json(data);
+ }catch(e){res.status(502).json({error:"KuCoin upstream unavailable",detail:String(e.message||e)});}
+});
+
 app.get("/api/second-scan",(_req,res)=>{res.set("Cache-Control","no-store");res.json(secondScanStatus());});
 app.post("/api/second-scan/start",(_req,res)=>{if(secondScanStatus().running)return res.status(409).json({error:"Tarama sürüyor"});runSecondScan().catch(console.error);res.json({started:true});});
 // Binance TR public market-data proxy for the GitHub Pages frontend.
