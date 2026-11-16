@@ -2,6 +2,59 @@ const start=document.getElementById("twentyStart"),stop=document.getElementById(
 const names=["binance","okx"];
 const state=Object.fromEntries(names.map(k=>[k,{socket:null,history:new Map(),alerts:new Map(),connected:false,error:"",last:0,retry:null,connections:[],tracked:0,baseline:new Map(),pending:new Set()}]));
 let running=false,renderTimer=null;
+
+const tradeFeeds=new Map();
+function trackTrades(kind,symbol){
+ const key=kind+":"+symbol;
+ if(tradeFeeds.has(key)||tradeFeeds.size>=24)return;
+ const feed={ws:null,events:[],error:"",last:0};
+ tradeFeeds.set(key,feed);
+ const url=kind==="binance"?"wss://data-stream.binance.vision/ws/"+symbol.toLowerCase()+"@trade":"wss://ws.okx.com:8443/ws/v5/public";
+ try{
+  const ws=new WebSocket(url);feed.ws=ws;
+  ws.onopen=()=>{if(kind==="okx")ws.send(JSON.stringify({op:"subscribe",args:[{channel:"trades",instId:symbol.replace(/USDT$/,"-USDT")}]}));};
+  ws.onmessage=e=>{try{
+   const msg=JSON.parse(e.data);
+   const trades=kind==="binance"?[msg]:msg.arg?.channel==="trades"?(msg.data||[]):[];
+   for(const t of trades){
+    const buy=kind==="binance"?t.m===false:t.side==="buy";
+    const qty=Number(kind==="binance"?t.q:t.sz),price=Number(kind==="binance"?t.p:t.px);
+    if(!(qty>0&&price>0))continue;
+    feed.events.push({t:Date.now(),buy,notional:qty*price});feed.last=Date.now();
+   }
+   while(feed.events.length&&feed.events[0].t<Date.now()-20000)feed.events.shift();
+  }catch(err){feed.error=err.message;}};
+  ws.onerror=()=>{feed.error="İşlem akışına erişilemiyor";};
+  ws.onclose=()=>{feed.error="İşlem akışı kesildi";};
+ }catch(e){feed.error=e.message;}
+}
+function pressure(kind,symbol){
+ const feed=tradeFeeds.get(kind+":"+symbol);
+ if(!feed)return "Alış baskısı: Veri bekleniyor";
+ const now=Date.now();
+ while(feed.events.length&&feed.events[0].t<now-20000)feed.events.shift();
+ const events=feed.events;
+ if(!events.length||now-feed.last>10000)return "Alış baskısı: "+(feed.error||"İşlem verisi bekleniyor");
+ let buy=0,sell=0,buyCount=0,sellCount=0;
+ for(const e of events){if(e.buy){buy+=e.notional;buyCount++;}else{sell+=e.notional;sellCount++;}}
+ const pct=100*buy/(buy+sell);
+ const grade=pct>=80?"Çok güçlü":pct>=65?"Güçlü":pct>=55?"Orta":pct>=45?"Dengeli":"Zayıf";
+ return "Alış baskısı: "+grade+" · Alış hacmi: %"+pct.toFixed(1)+" · Satış hacmi: %"+(100-pct).toFixed(1)+" · Alıcı yönlü işlem: "+buyCount+" · Satıcı yönlü işlem: "+sellCount+" · Son 20 sn (benzersiz kişi sayısı değil)";
+}
+function cleanupTrades(){
+ for(const [key,feed] of tradeFeeds){
+  const i=key.indexOf(":"),kind=key.slice(0,i),symbol=key.slice(i+1);
+  if(!state[kind].alerts.has(symbol)){
+   if(feed.ws){feed.ws.onclose=null;feed.ws.close();}
+   tradeFeeds.delete(key);
+  }
+ }
+}
+function clearTrades(){
+ for(const feed of tradeFeeds.values())if(feed.ws){feed.ws.onclose=null;feed.ws.close();}
+ tradeFeeds.clear();
+}
+
 const esc=x=>String(x??"—").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function baseline(kind,symbol){
  const st=state[kind],cached=st.baseline.get(symbol),now=Date.now();
@@ -27,7 +80,7 @@ async function confirm(kind,symbol,price,peak){
  const st=state[kind],close=await baseline(kind,symbol);
  if(!running||!close)return;
  const change=100*(peak/close-1);
- if(change>=2){const old=st.alerts.get(symbol),now=Date.now();st.alerts.set(symbol,{symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close,change:+change.toFixed(2),at:now,first:old?.first||now});}
+ if(change>=2){const old=st.alerts.get(symbol),now=Date.now();st.alerts.set(symbol,{rawSymbol:symbol,symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close,change:+change.toFixed(2),at:now,first:old?.first||now});trackTrades(kind,symbol);}
 }
 function observe(kind,symbol,price){
  if(!running||!(price>0)||!/USDT$/.test(symbol))return;
@@ -98,19 +151,19 @@ function render(){
  const st=state[kind],status=document.getElementById(kind+"TwentyStatus"),cards=document.getElementById(kind+"TwentyCards");
  if(!status||!cards)return;
  const now=Date.now();for(const [key,v] of st.alerts)if(now-v.at>300000)st.alerts.delete(key);
- const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,50);
+ cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,50);
  const connected=st.connected&&now-st.last<15000;
  status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.error?" · Hata: "+st.error:"");
- cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
+ cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
- if(running)return;running=true;start.disabled=true;stop.disabled=false;
+ if(running)return;clearTrades();running=true;start.disabled=true;stop.disabled=false;
  for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.baseline.clear();st.error="";st.last=0;st.connected=false;}
  binance();okx();render();renderTimer=setInterval(render,1000);
 }
 function end(){
- running=false;start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;
+ running=false;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;
  for(const k of names){const st=state[k];clearTimeout(st.retry);st.retry=null;for(const ws of st.connections){ws.onclose=null;ws.close();}st.connections=[];st.socket=null;st.connected=false;document.getElementById(k+"TwentyStatus").textContent="Durduruldu";}
 }
 start?.addEventListener("click",begin);stop?.addEventListener("click",end);
