@@ -17,6 +17,7 @@ async function verify(symbol){
   const closedSeconds=seconds.filter(x=>Number(x[6])<now).slice(-20);
   const closedFive=fives.filter(x=>Number(x[6])<now).at(-1);
   if(closedSeconds.length!==20||!closedFive)return;
+  if(closedSeconds.some((x,i)=>i>0&&Number(x[0])-Number(closedSeconds[i-1][0])!==1000))return;
   // The comparison uses the last completed 5-minute candle close, never the live 5m candle.
   const baseline=Number(closedFive[4]);
   const peak=Math.max(...closedSeconds.map(x=>Number(x[2])));
