@@ -56,6 +56,24 @@ function clearTrades(){
 }
 
 
+
+const KUCOIN_PROXY="https://traderadar-yro7.onrender.com/api/kucoin-public";
+async function kucoinJson(kind,symbol,type){
+ const path=kind==="tickers"?"/api/v1/market/allTickers":"/api/v1/market/candles?symbol="+encodeURIComponent(symbol)+"&type="+type;
+ const proxy=kind==="tickers"?KUCOIN_PROXY+"/tickers":KUCOIN_PROXY+"/candles?symbol="+encodeURIComponent(symbol)+"&type="+type;
+ let lastError="";
+ for(const url of ["https://api.kucoin.com"+path,proxy]){
+  try{
+   const response=await fetch(url,{signal:AbortSignal.timeout(9500),cache:"no-store"});
+   if(!response.ok)throw Error("HTTP "+response.status);
+   const json=await response.json();
+   if(String(json.code)!=="200000")throw Error(json.msg||json.error||"KuCoin veri yanıtı hatalı");
+   return json;
+  }catch(e){lastError=String(e.message||e);}
+ }
+ throw Error("Doğrudan erişim ve yedek sunucu başarısız: "+lastError);
+}
+
 let backfillGeneration=0;
 async function fetchJson(url){
  const response=await fetch(url,{signal:AbortSignal.timeout(7500),cache:"no-store"});
@@ -69,7 +87,7 @@ async function backfillOne(kind,symbol,generation){
    ?"https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=12"
    :kind==="okx"?"https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(inst)+"&bar=1m&limit=12"
    :"https://api.kucoin.com/api/v1/market/candles?symbol="+encodeURIComponent(inst)+"&type=1min";
-  const data=await fetchJson(url),now=Date.now();
+  const data=kind==="kucoin"?await kucoinJson("candles",inst,"1min"):await fetchJson(url),now=Date.now();
   const candles=kind==="binance"?data.map(x=>({t:Number(x[0]),high:Number(x[2]),close:Number(x[4])})):
    kind==="okx"?(data.data||[]).map(x=>({t:Number(x[0]),high:Number(x[2]),close:Number(x[4])})).reverse():
    (data.data||[]).map(x=>({t:Number(x[0])*1000,high:Number(x[3]),close:Number(x[2])})).reverse();
@@ -96,7 +114,7 @@ async function backfill(kind,generation){
  const st=state[kind];st.backfillStatus="Geçmiş taranıyor";
  try{
   const url=kind==="binance"?"https://data-api.binance.vision/api/v3/ticker/24hr":kind==="okx"?"https://www.okx.com/api/v5/market/tickers?instType=SPOT":"https://api.kucoin.com/api/v1/market/allTickers";
-  const data=await fetchJson(url);
+  const data=kind==="kucoin"?await kucoinJson("tickers"):await fetchJson(url);
   const items=kind==="binance"?data:kind==="okx"?(data.data||[]):(data.data?.ticker||[]);
   const candidates=items.map(x=>{
    const symbol=kind==="binance"?String(x.symbol||""):String(kind==="okx"?x.instId:x.symbol||"").replace("-","");
@@ -127,9 +145,7 @@ async function baseline(kind,symbol){
    ?"https://data-api.binance.vision/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=5m&limit=3"
    :kind==="okx"?"https://www.okx.com/api/v5/market/candles?instId="+encodeURIComponent(symbol.replace(/USDT$/,"-USDT"))+"&bar=5m&limit=3"
    :"https://api.kucoin.com/api/v1/market/candles?symbol="+encodeURIComponent(symbol.replace(/USDT$/,"-USDT"))+"&type=5min";
-  const response=await fetch(url,{signal:AbortSignal.timeout(7000),cache:"no-store"});
-  if(!response.ok)throw Error("5dk mum HTTP "+response.status);
-  const json=await response.json();
+  const json=kind==="kucoin"?await kucoinJson("candles",symbol.replace(/USDT$/,"-USDT"),"5min"):await (async()=>{const response=await fetch(url,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!response.ok)throw Error("5dk mum HTTP "+response.status);return response.json();})();
   let closed;
   if(kind==="binance"){closed=json.filter(x=>Number(x[6])<Date.now()).at(-1);closed=closed?Number(closed[4]):null;}
   else if(kind==="okx"){closed=(json.data||[]).find(x=>x[8]==="1");closed=closed?Number(closed[4]):null;}
@@ -191,9 +207,7 @@ async function pollKucoin(){
  if(!running||kucoinBusy)return;kucoinBusy=true;
  const st=state.kucoin;
  try{
-  const response=await fetch("https://api.kucoin.com/api/v1/market/allTickers",{signal:AbortSignal.timeout(8500),cache:"no-store"});
-  if(!response.ok)throw Error("HTTP "+response.status);
-  const json=await response.json();
+  const json=await kucoinJson("tickers");
   if(String(json.code)!=="200000"||!Array.isArray(json.data?.ticker))throw Error("KuCoin fiyat listesi alınamadı");
   let count=0;
   for(const x of json.data.ticker){
