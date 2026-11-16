@@ -48,18 +48,7 @@
   </header>
 <nav class="tabs">
 
-  <button
-    id="dailyButton"
-    class="tab active"
-    data-view="daily"
-    type="button"
-  >
-    ONE Erken Yükseliş
-  </button>
-
-
-
-  <button
+<button
     id="radarButton" style="display:none" aria-hidden="true"
     class="tab"
     data-view="radar"
@@ -90,10 +79,8 @@
   <button id="flowButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
   
-  <button id="twentySecondButton" class="tab" type="button" data-view="twentySecond">20 Sn %2 Radar</button>
-  <button id="focusButton" class="tab" type="button" data-view="focus">Favori Coin Takibi</button>
-  
-  <button id="momentumButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="momentum">Patlama</button>
+  <button id="twentySecondButton" class="tab active" type="button" data-view="twentySecond">20 Sn %2 Radar</button>
+<button id="momentumButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="momentum">Patlama</button>
   <button id="quietVolumeButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="quietVolume">Sessiz Hacim Alarmı</button>
   <button id="pullbackButton" class="tab" type="button" data-view="hourlyPullback" style="display:none" aria-hidden="true">Büyük Geri Çekilmeler</button>
   <button id="capitalButton" class="tab" type="button" data-view="capital" style="display:none" aria-hidden="true">Sermaye Yönetimi</button>
@@ -106,77 +93,9 @@
          GÜNLÜK YÜKSELİŞ TEYİDİ
     ========================== -->
 
-    <section id="focus" hidden><h2>Favori Coin Hareketlilik Takibi</h2><p class="description">Seçtiğiniz 14 coin önce OKX TR TRY, bulunamazsa OKX TR, OKX Global veya Binance Global USDT paritesinden izlenir. Fiyat, hacim ve gerçekleşen işlemlerin alıcı yönü birlikte değerlendirilir. Sinyaller yatırım tavsiyesi değildir.</p><button id="focusRefresh" class="refresh-button" type="button">Şimdi Yenile</button><p id="focusStatus" aria-live="polite">Yükleniyor...</p><div id="focusList"></div></section>
-    <section id="liveRise" hidden><div class="section-head"><div><h2>Canlı Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Avrupa USDT fiyat akışı. 10 saniyede %0,5 veya 60 saniyede %1 yükseliş başlangıcı. Bu bir günlük teyit değildir.</p></div></div><p id="liveRiseStatus">Canlı bağlantılar kontrol ediliyor...</p><div id="liveRiseCards"></div></section>
+<section id="liveRise" hidden><div class="section-head"><div><h2>Canlı Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Avrupa USDT fiyat akışı. 10 saniyede %0,5 veya 60 saniyede %1 yükseliş başlangıcı. Bu bir günlük teyit değildir.</p></div></div><p id="liveRiseStatus">Canlı bağlantılar kontrol ediliyor...</p><div id="liveRiseCards"></div></section>
     <section id="twentySecond" hidden><h2>20 Saniyelik %2 Yükseliş Radarı</h2><p class="description">Son 20 tamamlanmış 1 saniyelik mumun en yüksek fiyatı, son kapanmış 5 dakikalık mumun kapanış fiyatından en az %2 yukarıdaysa sinyal verir. Canlı tarama otomatik yapılır. Ön eleme nedeniyle her hareket yakalanamayabilir.</p><p id="twentySecondStatus" aria-live="polite">Bağlantı bekleniyor...</p><div id="twentySecondCards" class="coin-grid"></div></section>
-    <section id="daily"><h2>Çoklu Borsa — Erken Yükseliş Taraması</h2><p class="description">Desteklenen borsalarda ONE/TRY örneğindeki yatay birikim, saatlik hacim genişlemesi, EMA(7)/EMA(25) dönüşü ve fiyat kırılımı örneğine dayalı deneysel tarama. Son 6 saatte aşırı yükselmiş pariteler elenir. RSI 48–76 aralığı ve hacim en az 1,7x aranır. Sinyaller garanti değildir.</p><button id="oneStart" class="refresh-button" type="button">Erken Yükseliş Tara</button><p id="oneStatus" aria-live="polite">Tarama başlatılmadı.</p><div id="oneCards"></div><div style="display:none" aria-hidden="true">
-
-      <div class="section-head">
-
-        <div>
-          <h2>
-            Günlük Yükseliş Teyidi
-          </h2>
-
-          <p class="description">
-            OKX TR ve BtcTurk TRY, OKX Global ve Binance Global USDT çiftleri taranır. Yeni erken kırılım ve hacim teyidi kuralları uygulanır.
-            
-        </div>
-
-        <button
-          id="refreshButton"
-          class="refresh-button"
-          type="button"
-        >
-          Yenile
-        </button>
-
-      </div>
-
-<div class="exchange-tabs">
-  <button id="okxtrButton" class="exchange-button active" type="button">OKX TR</button>
-  <button id="btcturkButton" class="exchange-button" type="button">BtcTurk</button>
-  <button id="okxglobalButton" class="exchange-button" type="button">OKX Global</button>
-  <button id="binanceglobalButton" class="exchange-button" type="button">Binance Global</button>
-</div>
-      <div class="info-box">
-
-        <span>
-          Sistem günlük EMA, taban, hacim ve direnç analizine ek olarak desteklenen borsalarda 1 dakikalık verilerden 5/15 dakikalık ivme, hacim ve fiyat teyidi arar. Binance Global için agresif alım oranı da incelenir. Doğrulanamayan sinyaller kesin teyit olarak gösterilmez. İkinci fiyat kontrolü, emir defteri ve çoklu zaman kontrolü desteklenen borsalarda uygulanır. Haber ve yeni listeleme kontrolü henüz yoktur. Teknik teyitler alım garantisi değildir.
-        </span>
-
-      </div>
-
-
-      <div class="info-box" style="margin-top:14px">
-        <strong>Haftalık Sinyal Başarısı</strong>
-        <p id="weeklyPerformanceStatus" class="description">Haftalık sonuçlar yükleniyor...</p>
-        <div id="weeklyPerformanceMetrics" class="description"></div>
-        <small class="description">Yalnızca tüm teyitleri geçen sinyaller ölçülür. Gözlemlenen fiyat hareketi, gerçekleşmiş işlem kârı değildir. Her pazartesi 03.00 (Türkiye saati) yeni hafta başlar.</small>
-      </div>
-      <div
-        id="updated"
-        class="updated"
-      >
-        Veriler bekleniyor...
-      </div>
-
-
-      <div
-        id="cards"
-        class="coin-grid"
-      >
-
-        <div class="empty-card">
-          Piyasa taranıyor...
-        </div>
-
-      </div>
-
-    </div></section>
-
-
-    <!-- =========================
+<!-- =========================
      ANLIK YÜKSELİŞ RADARI
 ========================== -->
 
