@@ -219,9 +219,49 @@ async function pollKucoin(){
  }catch(e){st.connected=false;st.error="KuCoin veri hatası: "+e.message;}
  finally{kucoinBusy=false;}
 }
-function kucoin(){
+let kucoinSocket=null,kucoinPing=null,kucoinReconnect=null;
+async function kucoin(){
+ if(!running)return;
+ const st=state.kucoin;
+ // KuCoin public WebSocket, equivalent to OKX's streaming price feed.
+ try{
+  let auth=null;
+  for(const url of [KUCOIN_PROXY+"/bullet","https://api.kucoin.com/api/v1/bullet-public"]){
+   try{
+    const response=await fetch(url,{method:url.includes("/bullet-public")?"POST":"GET",signal:AbortSignal.timeout(8500),cache:"no-store"});
+    if(!response.ok)throw Error("HTTP "+response.status);
+    const json=await response.json();
+    if(String(json.code)!=="200000"||!json.data?.token||!json.data?.instanceServers?.length)throw Error("WebSocket token alınamadı");
+    auth=json.data;break;
+   }catch(e){st.error="KuCoin WebSocket yetkilendirme: "+e.message;}
+  }
+  if(!running)return;
+  if(!auth)throw Error("KuCoin WebSocket yetkilendirme başarısız");
+  const server=auth.instanceServers.find(x=>x.protocol==="websocket")||auth.instanceServers[0];
+  const endpoint=server.endpoint+(server.endpoint.includes("?")?"&":"?")+"token="+encodeURIComponent(auth.token)+"&connectId=traderadar"+Date.now();
+  const ws=new WebSocket(endpoint);kucoinSocket=ws;st.connections.push(ws);
+  ws.onopen=()=>{
+   if(!running)return;
+   st.connected=true;st.error="";
+   ws.send(JSON.stringify({id:String(Date.now()),type:"subscribe",topic:"/market/ticker:all",privateChannel:false,response:true}));
+   clearInterval(kucoinPing);
+   kucoinPing=setInterval(()=>{if(ws.readyState===1)ws.send(JSON.stringify({id:String(Date.now()),type:"ping"}));},Math.max(10000,Math.min(Number(server.pingInterval)||18000,18000)));
+  };
+  ws.onmessage=e=>{try{
+   const msg=JSON.parse(e.data);
+   if(msg.type==="error"){st.error="KuCoin WebSocket: "+(msg.data||msg.code);return;}
+   if(msg.type!=="message"||!msg.topic?.startsWith("/market/ticker:"))return;
+   const symbol=String(msg.subject||msg.topic.split(":")[1]||"");
+   if(!symbol.endsWith("-USDT"))return;
+   observe("kucoin",symbol.replace("-",""),Number(msg.data?.price||msg.data?.lastTradedPrice));
+   st.tracked=st.history.size;
+  }catch(e){st.error=e.message;}};
+  ws.onerror=()=>{st.error="KuCoin WebSocket erişim hatası; REST yedeği deneniyor";};
+  ws.onclose=()=>{clearInterval(kucoinPing);st.connected=false;if(running&&!kucoinReconnect)kucoinReconnect=setTimeout(()=>{kucoinReconnect=null;void kucoin();},5000);};
+ }catch(e){st.error=e.message;if(running&&!kucoinReconnect)kucoinReconnect=setTimeout(()=>{kucoinReconnect=null;void kucoin();},8000);}
+ // REST polling is a fallback only, as in Binance.
  void pollKucoin();clearInterval(kucoinPolling);
- kucoinPolling=setInterval(()=>{if(running)void pollKucoin();},3000);
+ kucoinPolling=setInterval(()=>{if(running&&Date.now()-st.last>7000)void pollKucoin();},3000);
 }
 async function okx(){
  if(!running)return;const st=state.okx;
@@ -263,7 +303,7 @@ function begin(){
  binance();okx();kucoin();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);void backfill("kucoin",backfillGeneration);render();renderTimer=setInterval(render,1000);
 }
 function end(){
- running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;clearInterval(kucoinPolling);kucoinPolling=null;
+ running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;clearInterval(kucoinPolling);kucoinPolling=null;clearInterval(kucoinPing);clearTimeout(kucoinReconnect);kucoinReconnect=null;kucoinSocket=null;
  for(const k of names){const st=state[k];clearTimeout(st.retry);st.retry=null;for(const ws of st.connections){ws.onclose=null;ws.close();}st.connections=[];st.socket=null;st.connected=false;document.getElementById(k+"TwentyStatus").textContent="Durduruldu";}
 }
 start?.addEventListener("click",begin);stop?.addEventListener("click",end);
