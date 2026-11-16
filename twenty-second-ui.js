@@ -1,5 +1,5 @@
 const start=document.getElementById("twentyStart"),stop=document.getElementById("twentyStop");
-const names=["binance","okx","kucoin"];
+const names=["binance","okx"];
 const state=Object.fromEntries(names.map(k=>[k,{socket:null,history:new Map(),alerts:new Map(),connected:false,error:"",last:0,retry:null,connections:[],tracked:0,baseline:new Map(),pending:new Set()}]));
 let running=false,renderTimer=null;
 
@@ -300,7 +300,7 @@ function render(){
 function begin(){
  if(running)return;clearTrades();backfillGeneration++;running=true;start.disabled=true;stop.disabled=false;
  for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.baseline.clear();st.error="";st.backfillStatus="";st.last=0;st.connected=false;}
- binance();okx();kucoin();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);void backfill("kucoin",backfillGeneration);render();renderTimer=setInterval(render,1000);
+ binance();okx();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);render();renderTimer=setInterval(render,1000);
 }
 function end(){
  running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;clearInterval(kucoinPolling);kucoinPolling=null;clearInterval(kucoinPing);clearTimeout(kucoinReconnect);kucoinReconnect=null;kucoinSocket=null;
