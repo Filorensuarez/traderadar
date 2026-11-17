@@ -41,6 +41,23 @@ function pressure(kind,symbol){
  const grade=pct>=80?"Çok güçlü":pct>=65?"Güçlü":pct>=55?"Orta":pct>=45?"Dengeli":"Zayıf";
  return "Alış baskısı: "+grade+" · Alış hacmi: %"+pct.toFixed(1)+" · Satış hacmi: %"+(100-pct).toFixed(1)+" · Alıcı yönlü işlem: "+buyCount+" · Satıcı yönlü işlem: "+sellCount+" · Son 20 sn (benzersiz kişi sayısı değil)";
 }
+function moneyFlow(kind,symbol){
+ const feed=tradeFeeds.get(kind+":"+symbol);
+ if(!feed)return "Büyük alım gücü: Veri bekleniyor";
+ const now=Date.now();
+ while(feed.events.length&&feed.events[0].t<now-20000)feed.events.shift();
+ if(!feed.events.length||now-feed.last>10000)return "Büyük alım gücü: "+(feed.error||"İşlem verisi bekleniyor");
+ let buy=0,sell=0,largeBuy=0,largeSell=0,largeBuyCount=0,largeSellCount=0;
+ for(const e of feed.events){
+  if(e.buy){buy+=e.notional;if(e.notional>=10000){largeBuy+=e.notional;largeBuyCount++;}}
+  else {sell+=e.notional;if(e.notional>=10000){largeSell+=e.notional;largeSellCount++;}}
+ }
+ const net=buy-sell,largeNet=largeBuy-largeSell,largeTotal=largeBuy+largeSell;
+ const ratio=largeTotal>0?largeBuy/largeTotal:0;
+ const grade=largeTotal===0?"Büyük işlem yok":largeBuy>=100000&&ratio>=0.75&&largeNet>=50000?"Çok güçlü":largeBuy>=30000&&ratio>=0.65&&largeNet>=15000?"Güçlü":largeNet>0&&ratio>=0.55?"Orta":largeNet>0?"Zayıf":"Zayıf";
+ const money=n=>new Intl.NumberFormat("tr-TR",{maximumFractionDigits:0}).format(n);
+ return "Büyük alım gücü: "+grade+" · Büyük alış: "+money(largeBuy)+" USDT ("+largeBuyCount+" işlem) · Büyük satış: "+money(largeSell)+" USDT ("+largeSellCount+" işlem) · Büyük işlem neti: "+(largeNet>=0?"+":"")+money(largeNet)+" USDT · Tüm işlemler neti: "+(net>=0?"+":"")+money(net)+" USDT · Son 20 sn · Büyük işlem eşiği: 10.000 USDT (gerçek sermaye girişi değildir)";
+}
 function cleanupTrades(){
  for(const [key,feed] of tradeFeeds){
   const i=key.indexOf(":"),kind=key.slice(0,i),symbol=key.slice(i+1);
@@ -294,7 +311,7 @@ function render(){
  cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,50);
  const connected=st.connected&&now-st.last<15000;
  status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"||kind==="kucoin"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
- cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
+ cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
