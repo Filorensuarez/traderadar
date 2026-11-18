@@ -4,6 +4,41 @@ const state=Object.fromEntries(names.map(k=>[k,{socket:null,history:new Map(),al
 let running=false,renderTimer=null;
 
 const tradeFeeds=new Map();
+
+const twoHourFlows=new Map();
+function loadTwoHourFlow(kind,symbol){
+ const key=kind+":"+symbol,old=twoHourFlows.get(key),now=Date.now();
+ if(old&&(old.loading||now-old.at<120000))return;
+ const entry={loading:true,at:now,label:"Son 2 saat alış hacmi: Hesaplanıyor"};twoHourFlows.set(key,entry);
+ if(kind!=="binance"){entry.loading=false;entry.label="Son 2 saat büyük para girişi: OKX için doğrulanmış alış/satış ayrımı bulunmuyor";return;}
+ (async()=>{
+  let error="";
+  for(const host of ["https://data-api.binance.vision","https://api.binance.com","https://api1.binance.com"]){
+   try{
+    const response=await fetch(host+"/api/v3/klines?symbol="+encodeURIComponent(symbol)+"&interval=1m&limit=121",{signal:AbortSignal.timeout(8000),cache:"no-store"});
+    if(!response.ok)throw Error("HTTP "+response.status);
+    const rows=await response.json();
+    if(!Array.isArray(rows))throw Error("Mum verisi geçersiz");
+    const closed=rows.filter(x=>Number(x[6])<Date.now()).slice(-120);
+    if(closed.length<100)throw Error("2 saatlik veri eksik");
+    let total=0,buy=0;
+    for(const x of closed){total+=Number(x[7]);buy+=Number(x[10]);}
+    if(!(total>0)||!(buy>=0))throw Error("Hacim bilgisi eksik");
+    const pct=buy/total*100,net=2*buy-total;
+    const grade=pct>=65?"Çok güçlü":pct>=57?"Güçlü":pct>=52?"Orta":pct>=48?"Dengeli":"Zayıf";
+    const fmt=n=>new Intl.NumberFormat("tr-TR",{maximumFractionDigits:0}).format(n);
+    entry.label="Son 2 saat alıcı yönlü hacim: "+grade+" · Alış: "+fmt(buy)+" USDT · Satış: "+fmt(total-buy)+" USDT · Alış payı: %"+pct.toFixed(1)+" · Net agresif alış-satış farkı: "+fmt(net)+" USDT (borsaya net para girişi değildir)";
+    entry.loading=false;entry.at=Date.now();return;
+   }catch(e){error=e.message;}
+  }
+  entry.loading=false;entry.at=Date.now();entry.label="Son 2 saat alış hacmi: Veri alınamadı ("+error+")";
+ })();
+}
+function twoHourFlow(kind,symbol){
+ loadTwoHourFlow(kind,symbol);
+ return twoHourFlows.get(kind+":"+symbol)?.label||"Son 2 saat: Veri bekleniyor";
+}
+
 function trackTrades(kind,symbol){
  const key=kind+":"+symbol;
  if(kind==="kucoin"||tradeFeeds.has(key)||tradeFeeds.size>=24)return;
@@ -311,11 +346,11 @@ function render(){
  cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,50);
  const connected=st.connected&&now-st.last<15000;
  status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"||kind==="kucoin"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
- cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
+ cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+esc(twoHourFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
- if(running)return;clearTrades();backfillGeneration++;running=true;start.disabled=true;stop.disabled=false;
+ if(running)return;clearTrades();twoHourFlows.clear();backfillGeneration++;running=true;start.disabled=true;stop.disabled=false;
  for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.baseline.clear();st.error="";st.backfillStatus="";st.last=0;st.connected=false;}
  binance();okx();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);render();renderTimer=setInterval(render,1000);
 }
