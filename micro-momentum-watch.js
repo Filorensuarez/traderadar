@@ -228,7 +228,7 @@ export async function scanMicroMomentum(){
   const live=blocks.flat();
   const types={"ALIM TEYİDİ":0,"ERKEN UYARI":1,"GEÇ KALINDI":2};
   state.rows=live.sort((a,b)=>types[a.status]-types[b.status]||
-    b.firstSeenAt-a.firstSeenAt||b.speedPct-a.speedPct).slice(0,60);
+    b.firstSeenAt-a.firstSeenAt||b.speedPct-a.speedPct);
   state.checked=providers.filter(p=>!state.sources[p.name].error).length;
   state.eligible=Object.values(state.sources).reduce((s,v)=>s+v.eligible,0);
   state.confirmed=live.filter(x=>x.status==="ALIM TEYİDİ").length;
