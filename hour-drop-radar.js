@@ -86,3 +86,4 @@ async function loop(){
 }
 el("hourDropToggle")?.addEventListener("click",()=>{if(running){running=false;}else{void loop();}});
 render();
+void loop();
