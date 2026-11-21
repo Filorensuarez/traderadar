@@ -93,7 +93,7 @@ function publish(){
  for(const [key,x] of active)if(time-x.lastCheckedAt>MAX_ACTIVE_AGE)active.delete(key);
  // Expose only fully confirmed results; no near-threshold candidates leave the backend.
  state.rows=confirmedMomentumRows([...active.values()])
-  .sort((a,b)=>b.firstSeenAt-a.firstSeenAt||(Number(b.priceChangePct)||0)-(Number(a.priceChangePct)||0)).slice(0,80);
+  .sort((a,b)=>b.firstSeenAt-a.firstSeenAt||(Number(b.priceChangePct)||0)-(Number(a.priceChangePct)||0));
  state.updatedAt=time;
 }
 export function minuteMomentumStatus(){return {...state,rows:confirmedMomentumRows(state.rows),
