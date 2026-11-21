@@ -210,7 +210,7 @@ async function scanSource(p,timestamp){
      a.x.status="ALIM TEYİDİ";
      stat.verified++;
     }
-   }catch(err){a.x.reason="Hacim teyidi alınamadı: "+String(err.message).slice(0,60);}
+   }catch(err){a.x.reason="Hacim teyidi alınamadı: "+String(err.message);}
   }));
   return list.map(a=>a.x);
  }catch(err){
