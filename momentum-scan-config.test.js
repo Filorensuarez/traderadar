@@ -48,3 +48,17 @@ test("OKX istek aralığı korundu; fiyatın %2 teyidi değişmedi",()=>{
  assert.match(src,/if\(result\.confirmed\)/);
  assert.doesNotMatch(src,/MIN_DAILY_USDT/);
 });
+
+test("Günlük en çok düşenler ve yükselenler ayrım yapılmadan taranır",()=>{
+ const mixed=Array.from({length:40},(_,i)=>({symbol:"ASSET"+i+"USDT",dayChange:i===35?-55:i===36?80:0,volume:i===35?1:100000}));
+ const seen=new Set();let offset=0;
+ for(let i=0;i<3;i++){
+  const result=chooseMomentumMarkets("OKX",mixed,offset);
+  for(const item of result.selected)seen.add(item.symbol);
+  offset=result.nextOffset;
+ }
+ assert.equal(seen.size,40);
+ assert(seen.has("ASSET35USDT"));
+ assert(seen.has("ASSET36USDT"));
+ assert.deepEqual(chooseMomentumMarkets("OKX",mixed).selected.map(x=>x.symbol),mixed.slice(0,16).map(x=>x.symbol));
+});
