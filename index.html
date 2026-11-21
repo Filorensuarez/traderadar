@@ -91,6 +91,7 @@
   <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
   
   <button id="twentySecondButton" class="tab active" type="button" data-view="twentySecond">20 Sn %2 Radar</button>
+  <button id="hourDropButton" class="tab" type="button" data-view="hourDrop">1 Dk / 1 Saat %7 Düşüş</button>
   <button id="focusButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="focus">Favori Coin Takibi</button>
   
   <button id="momentumButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="momentum">Patlama</button>
@@ -106,6 +107,7 @@
          GÜNLÜK YÜKSELİŞ TEYİDİ
     ========================== -->
 
+    <section id="hourDrop" hidden><h2>1 Dakikalık Mum / 1 Saatlik Referans — %7 Düşüş</h2><p class="description">Binance Global ve OKX Global aktif USDT çiftleri dönüşümlü taranır. Son tamamlanmış 1 dakikalık mumun en düşük fiyatı, son tamamlanmış 1 saatlik mumun kapanışından en az %7 düşükse gösterilir. Günlük yükselen/düşen ayrımı yapılmaz. Borsa hız sınırları nedeniyle tüm pariteler eş zamanlı kontrol edilmez.</p><button id="hourDropToggle" class="refresh-button" type="button">Taramayı Başlat</button><p id="hourDropStatus" aria-live="polite">Hazır.</p><div id="hourDropResults" class="coin-grid"></div></section>
     <section id="focus" hidden style="display:none!important"><h2>Favori Coin Hareketlilik Takibi</h2><p class="description">Seçtiğiniz 14 coin önce OKX TR TRY, bulunamazsa OKX TR, OKX Global veya Binance Global USDT paritesinden izlenir. Fiyat, hacim ve gerçekleşen işlemlerin alıcı yönü birlikte değerlendirilir. Sinyaller yatırım tavsiyesi değildir.</p><button id="focusRefresh" class="refresh-button" type="button">Şimdi Yenile</button><p id="focusStatus" aria-live="polite">Yükleniyor...</p><div id="focusList"></div></section>
     <section id="liveRise" hidden><div class="section-head"><div><h2>Canlı Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Avrupa USDT fiyat akışı. 10 saniyede %0,5 veya 60 saniyede %1 yükseliş başlangıcı. Bu bir günlük teyit değildir.</p></div></div><p id="liveRiseStatus">Canlı bağlantılar kontrol ediliyor...</p><div id="liveRiseCards"></div></section>
     <section id="twentySecond" hidden><h2>20 Saniyelik %2 Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Global USDT çiftleri ayrı taranır. Başlat düğmesine basıldığında canlı fiyat akışı açılır. Son 20 saniyelik fiyat hareketleri izlenir. Son kapanmış 5 dakikalık mumun kapanış fiyatına göre en az %2 yükselen adaylar ayrı ayrı gösterilir. Veri kaynağı engellenirse bağlantı hatası belirtilir.</p><button id="twentyStart" class="refresh-button" type="button">Radarı Başlat</button> <button id="twentyStop" class="refresh-button" type="button" disabled>Durdur</button><h3>Binance Global — USDT</h3><p id="binanceTwentyStatus" aria-live="polite">Başlatılmadı</p><div id="binanceTwentyCards" class="coin-grid"></div><h3>OKX Global — USDT</h3><p id="okxTwentyStatus" aria-live="polite">Başlatılmadı</p><div id="okxTwentyCards" class="coin-grid"></div></section>
