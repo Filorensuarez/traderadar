@@ -11,26 +11,39 @@ const cooldown = new Map();
 const sockets = new Set();
 let started = false;
 
-function observe(source, symbol, value, at=Date.now()) {
-  const price=Number(value);
-  if(!Number.isFinite(price)||price<=0||!/USDT$/.test(symbol))return;
-  const key=source+":"+symbol;
-  const points=history.get(key)||[];
-  points.push({t:at,p:price});
-  while(points.length>1&&points[0].t<at-185000)points.shift();
-  history.set(key,points);
-  feeds[source].updatedAt=at;
-  const base10=points.find(x=>x.t<=at-10000);
-  const base60=points.find(x=>x.t<=at-60000);
-  const p10=base10?(price/base10.p-1)*100:null;
-  const p60=base60?(price/base60.p-1)*100:null;
-  // Confirm movement with an observed baseline, never 24-hour ticker percentage.
-  const qualifies=(p10!==null&&p10>=0.5)||(p60!==null&&p60>=1);
-  if(!qualifies||at-(cooldown.get(key)||0)<120000)return;
-  cooldown.set(key,at);
-  const entryRisk=assessEntryRisk(points,at);
-  alerts.unshift({entryRisk,source:feeds[source].name,symbol:symbol.replace(/USDT$/,"/USDT"),price,currency:"USDT",change10s:p10===null?null:+p10.toFixed(2),change60s:p60===null?null:+p60.toFixed(2),detectedAt:at,status:"ERKEN HAREKET"});
-  if(alerts.length>100)alerts.length=100;
+const strongest = new Map();
+const windows=[5,10,20,60];
+function observe(source,symbol,value,at=Date.now()){
+ const price=Number(value);
+ if(!Number.isFinite(price)||price<=0||!/USDT$/.test(symbol))return;
+ const key=source+":"+symbol,points=history.get(key)||[];
+ // Retain one price per second; all incoming updates are still evaluated immediately.
+ if(points.length&&Math.floor(points.at(-1).t/1000)===Math.floor(at/1000))points[points.length-1]={t:at,p:price};
+ else points.push({t:at,p:price});
+ while(points.length>1&&points[0].t<at-65000)points.shift();
+ history.set(key,points);feeds[source].updatedAt=at;
+ const changes={};
+ for(const seconds of windows){
+  const base=points.find(x=>x.t<=at-seconds*1000);
+  changes[seconds]=base?100*(price/base.p-1):null;
+ }
+ // Detect from the observed price baseline, irrespective of daily red/green status.
+ const qualifies=(changes[5]!==null&&changes[5]>=0.18)||(changes[10]!==null&&changes[10]>=0.3)||(changes[20]!==null&&changes[20]>=0.5)||(changes[60]!==null&&changes[60]>=1);
+ const score=Math.max(...windows.map(w=>changes[w]===null?0:changes[w]/Math.sqrt(w)));
+ if(qualifies){
+  const row={source:feeds[source].name,symbol:symbol.replace(/USDT$/,"/USDT"),price,currency:"USDT",
+   change5s:changes[5]===null?null:+changes[5].toFixed(3),
+   change10s:changes[10]===null?null:+changes[10].toFixed(3),
+   change20s:changes[20]===null?null:+changes[20].toFixed(3),
+   change60s:changes[60]===null?null:+changes[60].toFixed(3),
+   score:+score.toFixed(4),detectedAt:at,status:"ANLIK YÜKSELİŞ",buyPressure:"DOĞRULANMADI"};
+  strongest.set(key,row);
+  if(at-(cooldown.get(key)||0)>=30000){
+   cooldown.set(key,at);
+   alerts.unshift({...row,entryRisk:assessEntryRisk(points,at)});
+   if(alerts.length>150)alerts.length=150;
+  }
+ }else strongest.delete(key);
 }
 function attach(ws,source,onMessage,onClose){
   sockets.add(ws);
@@ -80,4 +93,12 @@ function okxRestart(){
   },1000);
 }
 export function startLiveRise(){if(started)return;started=true;binance();okx();}
-export function liveRiseSnapshot(){return {ok:true,updatedAt:Date.now(),feeds,rows:alerts.slice(0,60),thresholds:{tenSeconds:0.5,sixtySeconds:1},note:"Canlı fiyat ivmesi uyarısıdır; günlük teknik yükseliş teyidi değildir."};}
+export function liveRiseSnapshot(){
+ const now=Date.now();
+ for(const [key,row] of strongest)if(now-row.detectedAt>8000)strongest.delete(key);
+ return {ok:true,updatedAt:now,feeds,trackedSymbols:history.size,
+ rows:[...strongest.values()].sort((a,b)=>b.score-a.score).slice(0,100),
+ recentAlerts:alerts.filter(x=>now-x.detectedAt<180000).slice(0,100),
+ thresholds:{fiveSeconds:0.18,tenSeconds:0.3,twentySeconds:0.5,sixtySeconds:1},
+ note:"Canlı fiyat değişimleri; alış baskısı yalnız fiyat verisiyle doğrulanamaz. Borsa güncellemeleri gecikebilir."};
+}
