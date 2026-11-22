@@ -2,7 +2,7 @@ import WebSocket from "ws";
 
 // Binance Global spot USDT: 1-second observed candles vs last COMPLETED 1h candle close.
 const state={connected:false,error:null,updatedAt:0,total:0,referencesReady:0,referenceHour:0,loading:false};
-const symbols=new Set(),reference=new Map(),candles=new Map(),previous=new Map(),alerts=[],lastAlert=new Map(),hourLast=new Map();
+const symbols=new Set(),reference=new Map(),candles=new Map(),previous=new Map(),alerts=[],lastAlert=new Map(),hourLast=new Map(),lastPrices=new Map();
 let started=false,socket=null,refreshTimer=null;
 const API_HOSTS=["https://api.binance.com/api/v3","https://api1.binance.com/api/v3","https://data-api.binance.vision/api/v3"];
 const WS_HOSTS=["wss://stream.binance.com:9443/ws/!miniTicker@arr","wss://stream.binance.com:443/ws/!miniTicker@arr","wss://data-stream.binance.vision/ws/!miniTicker@arr"];
@@ -51,6 +51,7 @@ function observe(symbol,raw,at=Date.now()){
  state.total=symbols.size;
  const price=Number(raw);
  if(!(price>0))return;
+ lastPrices.set(symbol,{price,at});
  state.updatedAt=at;
  const hour=Math.floor(at/3600000)*3600000;
  if(state.referenceHour!==hour){state.referenceHour=hour;previous.clear();}
@@ -64,8 +65,8 @@ function observe(symbol,raw,at=Date.now()){
  let bars=candles.get(symbol);
  if(!bars){bars=[];candles.set(symbol,bars);}
  const last=bars.at(-1);
- if(last?.second===second){last.high=Math.max(last.high,price);last.low=Math.min(last.low,price);last.close=price;}
- else bars.push({second,open:price,high:price,low:price,close:price});
+ if(last?.second===second){last.high=Math.max(last.high,price);last.low=Math.min(last.low,price);last.close=price;last.observed=true;}
+ else bars.push({second,open:price,high:price,low:price,close:price,observed:true});
  while(bars.length&&bars[0].second<second-299)bars.shift();
  if(!ref||ref.hour!==state.referenceHour)return;
  const change=100*(price/ref.close-1);
@@ -78,6 +79,21 @@ function observe(symbol,raw,at=Date.now()){
  alerts.unshift({symbol:symbol.replace(/USDT$/,"/USDT"),price,referenceClose:ref.close,changePct:round(change),at,second,referenceCloseTime:ref.closeTime,observedSeconds:bars.length,status:"%2 EŞİĞİ AŞILDI"});
  // Keep all alerts in the current rolling 300-second window.
  while(alerts.length&&at-alerts.at(-1).at>300000)alerts.pop();
+}
+// Advance each known symbol's 300-slot memory every second even without a trade.
+function advanceMemory(){
+ const now=Date.now(),second=Math.floor(now/1000);
+ for(const [symbol,tick] of lastPrices){
+  let bars=candles.get(symbol);
+  if(!bars){bars=[];candles.set(symbol,bars);}
+  const last=bars.at(-1);
+  if(last?.second!==second){
+   // Carry forward the last known price, explicitly marked as not newly observed.
+   bars.push({second,open:tick.price,high:tick.price,low:tick.price,close:tick.price,observed:false});
+  }
+  while(bars.length&&bars[0].second<second-299)bars.shift();
+ }
+ while(alerts.length&&now-alerts.at(-1).at>300000)alerts.pop();
 }
 function connect(){
  const ws=new WebSocket(WS_HOSTS[wsHostIndex]);
@@ -97,6 +113,7 @@ function connect(){
 export function startBinance300Radar(){
  if(started)return;started=true;
  connect();
+ const clock=setInterval(advanceMemory,1000);clock.unref?.();
  refreshReferences().catch(e=>state.error=e.message);
  refreshTimer=setInterval(()=>refreshReferences().catch(e=>state.error=e.message),60000);
  refreshTimer.unref?.();
@@ -104,8 +121,8 @@ export function startBinance300Radar(){
 export function binance300Snapshot(){
  const now=Date.now();
  const ready=[...symbols].filter(x=>reference.get(x)?.hour===state.referenceHour).length;
- return {ok:true,updatedAt:now,state:{...state,connected:state.connected&&now-state.updatedAt<15000,referencesReady:ready,tracked:candles.size,ready:state.connected&&now-state.updatedAt<15000&&ready>0},
+ return {ok:true,updatedAt:now,state:{...state,connected:state.connected&&now-state.updatedAt<15000,referencesReady:ready,tracked:candles.size,lastPriceUpdates:lastPrices.size,memoryUpdatedAt:now,ready:state.connected&&now-state.updatedAt<15000&&ready>0},
  thresholdPct:2,windowSeconds:300,reference:"Son tamamlanmış 1 saatlik mum kapanışı",
  rows:alerts.filter(x=>now-x.at<=300000),
- note:"REST HTTP 418 olsa bile WebSocket üzerinden tüm gözlenen USDT sembolleri kaydedilir. Saatlik referans REST ile alınamazsa ilk tam saat sınırından sonra gözlenen önceki saat kapanışı kullanılır. WebSocket verisi her parite için her saniye garanti değildir."};
+ note:"Her saniye 300 saniyelik fiyat hafızası ilerletilir. Yeni borsa fiyatı gelmediyse son bilinen fiyat taşınır ve gözlenmedi olarak işaretlenir; yeni fiyat uydurulmaz. REST 418 durumunda saatlik referans için saat sınırı beklenebilir."};
 }
