@@ -15,23 +15,24 @@ async function refreshReferences(){
  if(state.loading)return;
  state.loading=true;
  try{
-  const info=await json(API+"/exchangeInfo?permissions=SPOT");
+  const info=await json(API+"/exchangeInfo");
   const active=info.symbols.filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT"&&s.isSpotTradingAllowed!==false).map(s=>s.symbol);
   symbols.clear();for(const symbol of active)symbols.add(symbol);
   state.total=symbols.size;
   const hour=Math.floor(Date.now()/3600000)*3600000;
   state.referenceHour=hour;
+  const pending=active.filter(symbol=>reference.get(symbol)?.hour!==hour);
   // Preserve existing references until replacements arrive. Each reference is timestamped.
   let cursor=0;
   async function worker(){
-   while(cursor<active.length){
-    const symbol=active[cursor++];
+   while(cursor<pending.length){
+    const symbol=pending[cursor++];
     try{
      const klines=await json(API+"/klines?symbol="+encodeURIComponent(symbol)+"&interval=1h&limit=3");
      const completed=klines.filter(k=>Number(k[6])<Date.now()-1000).at(-1);
      if(completed&&Number(completed[4])>0)reference.set(symbol,{close:Number(completed[4]),closeTime:Number(completed[6]),hour});
     }catch(e){state.error="Saatlik referans: "+String(e.message||e);}
-    await new Promise(resolve=>setTimeout(resolve,650));
+    await new Promise(resolve=>setTimeout(resolve,350));
    }
   }
   await Promise.all(Array.from({length:4},worker));
@@ -60,7 +61,8 @@ function observe(symbol,raw,at=Date.now()){
  if(at-(lastAlert.get(symbol)||0)<30000)return;
  lastAlert.set(symbol,at);
  alerts.unshift({symbol:symbol.replace(/USDT$/,"/USDT"),price,referenceClose:ref.close,changePct:round(change),at,second,referenceCloseTime:ref.closeTime,observedSeconds:bars.length,status:"%2 EŞİĞİ AŞILDI"});
- if(alerts.length>300)alerts.length=300;
+ // Keep all alerts in the current rolling 300-second window.
+ while(alerts.length&&at-alerts.at(-1).at>300000)alerts.pop();
 }
 function connect(){
  const ws=new WebSocket("wss://stream.binance.com:9443/ws/!miniTicker@arr");
@@ -89,6 +91,6 @@ export function binance300Snapshot(){
  const ready=[...symbols].filter(x=>reference.get(x)?.hour===state.referenceHour).length;
  return {ok:true,updatedAt:now,state:{...state,referencesReady:ready,tracked:candles.size},
  thresholdPct:2,windowSeconds:300,reference:"Son tamamlanmış 1 saatlik mum kapanışı",
- rows:alerts.filter(x=>now-x.at<=300000).slice(0,100),
+ rows:alerts.filter(x=>now-x.at<=300000),
  note:"Gerçekleşen fiyat güncellemelerinden saniyelik OHLC üretilir. İşlem olmayan saniyelerde mum oluşturulmaz; Binance miniTicker her saniye her parite için güncelleme garantisi vermez."};
 }
