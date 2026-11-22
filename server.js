@@ -1,3 +1,4 @@
+import {startBinance300Radar,binance300Snapshot} from "./binance-300-radar.js";
 import {startTwentySecondRadar,twentySecondSnapshot} from "./twenty-second-radar.js";
 import {runSecondScan,secondScanStatus} from "./second-scan.js";
 import {startQuietRadar,quietSnapshot,onQuietAlert} from "./quiet-volume-server.js";
@@ -7762,6 +7763,7 @@ app.get(
 
 app.get("/api/quiet-volume",(_req,res)=>{res.set("Cache-Control","no-store");res.set("Access-Control-Allow-Origin","https://filorensuarez.github.io");res.json(quietSnapshot());});
 app.get("/api/twenty-second-radar",(_req,res)=>{res.set("Cache-Control","no-store");res.json(twentySecondSnapshot());});
+app.get("/api/binance-300",(_req,res)=>{res.set("Cache-Control","no-store");res.json(binance300Snapshot());});
 app.get("/api/live-rise",(_req,res)=>{res.set("Cache-Control","no-store");res.json(liveRiseSnapshot());});
 
 app.listen(
@@ -7793,6 +7795,7 @@ onQuietAlert(alert=>sendPush({title:"Sessiz Hacim: "+alert.symbol,body:"Alış h
 // Optional continuous WebSocket scanners are opt-in because multiple concurrent
 // market feeds can exhaust the free instance or fail during reconnect storms.
 startDailyTouch();
+startBinance300Radar();
 if(process.env.ENABLE_EXTRA_RADARS==="1"){
   startQuietRadar();
   startLiveRise();
