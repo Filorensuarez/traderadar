@@ -6,7 +6,7 @@ async function update(){
   const response=await fetch("/api/binance-300",{cache:"no-store"});
   if(!response.ok)throw Error("HTTP "+response.status);
   const data=await response.json(),s=data.state;
-  status.textContent=(s.connected?"Canlı bağlantı var":"Bağlantı yok")+" | USDT pariteleri: "+s.total+" | Saatlik referansı hazır: "+s.referencesReady+" | Fiyat hafızası: "+s.tracked+" | Son 300 sn alarm: "+data.rows.length+(s.error?" | "+s.error:"");
+  status.textContent=(s.ready?"Radar aktif":s.connected?"Fiyat akışı bağlı; saatlik referans bekleniyor":"Fiyat bağlantısı yok")+" | USDT pariteleri: "+s.total+" | Saatlik referansı hazır: "+s.referencesReady+" | Fiyat hafızası: "+s.tracked+" | Son 300 sn alarm: "+data.rows.length+(s.error?" | REST sorunu: "+s.error:"");
   cards.replaceChildren();
   for(const item of data.rows){
    const article=document.createElement("article");article.className="coin-card";
