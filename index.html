@@ -27,12 +27,460 @@
   <link rel="apple-touch-icon" href="./icons/traderadar-192.png">
   <link rel="stylesheet" href="./mobile-app.css?v=2">
 </head>
+
 <body>
-<header class="topbar"><div><h1>TradeRadar</h1><p class="subtitle">20 Saniyelik %2 Yükseliş Radarı</p></div></header>
-<main class="container">
-<section id="twentySecond"><h2>20 Saniyelik %2 Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Global USDT çiftleri ayrı taranır. Başlat düğmesine basıldığında canlı fiyat akışı açılır. Son 20 saniyelik fiyat hareketleri izlenir. Günlük değişim negatif olsa bile son 20 saniyede en az %2 yükselen coinler ayrı ayrı gösterilir. Geç alım riski son 3 dakikalık canlı fiyat hareketlerinden değerlendirilir. Geçmiş tarama tüm uygun pariteleri sırayla kontrol eder; borsa hız sınırları nedeniyle tamamlanması zaman alabilir. Veri kaynağı engellenirse bağlantı hatası belirtilir.</p><button id="twentyStart" class="refresh-button" type="button">Radarı Başlat</button> <button id="twentyStop" class="refresh-button" type="button" disabled>Durdur</button><h3>Binance Global — USDT</h3><p id="binanceTwentyStatus" aria-live="polite">Başlatılmadı</p><div id="binanceTwentyCards" class="coin-grid"></div><h3>OKX Global — USDT</h3><p id="okxTwentyStatus" aria-live="polite">Başlatılmadı</p><div id="okxTwentyCards" class="coin-grid"></div></section>
-</main>
-<footer>TradeRadar teknik analiz aracıdır. Gösterilen sonuçlar kesin kazanç veya yatırım garantisi değildir.</footer>
-<script type="module" src="./twenty-second-ui.js?v=17"></script>
+
+  <header class="topbar">
+    <div>
+      <h1>TradeRadar</h1>
+      <p class="subtitle">
+        Teknik Yükseliş Tarama Sistemi
+      </p>
+    </div>
+
+    <div
+      id="status"
+      class="status"
+    >
+      Bağlanıyor...
+    </div>
+    <div class="install-controls"><button id="installTradeRadar" class="install-button" type="button">Uygulamayı Yükle</button><span id="installHelp" class="install-help" role="status" aria-live="polite" hidden></span></div>
+  </header>
+<nav class="tabs">
+
+  <button
+    id="dailyButton" style="display:none" aria-hidden="true"
+    class="tab active"
+    data-view="daily"
+    type="button"
+  >
+    ONE Erken Yükseliş
+  </button>
+
+
+
+  <button
+    id="radarButton" style="display:none" aria-hidden="true"
+    class="tab"
+    data-view="radar"
+    type="button"
+  >
+    Anlık Yükseliş Radarı
+  </button>
+
+  <button
+    id="xManagerButton"
+    class="tab"
+    data-view="xmanager"
+    type="button"
+  >
+    X Manager
+  </button>
+
+  <button
+    id="scenarioButton" style="display:none" aria-hidden="true"
+    class="tab"
+    data-view="scenario"
+    type="button"
+  >
+    Yükseliş Senaryosu
+  </button>
+
+  <button id="decisionButton" class="tab" type="button" data-view="decision" style="display:none" aria-hidden="true">Orta Vadeli Yükseliş</button>
+  <button id="flowButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="flow">Kripto Alış–Satış Baskısı</button>
+  <button id="longButton" class="tab" data-view="long" type="button" style="display:none" aria-hidden="true">36 Saatlik Başarı İstatistikleri</button>
+  
+  <button id="twentySecondButton" class="tab active" type="button" data-view="twentySecond">20 Sn %2 Radar</button>
+  <button id="hourDropButton" class="tab" type="button" data-view="hourDrop">1 Dk / 1 Saat %7 Düşüş</button>
+  <button id="focusButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="focus">Favori Coin Takibi</button>
+  
+  <button id="momentumButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="momentum">Patlama</button>
+  <button id="quietVolumeButton" style="display:none" aria-hidden="true" class="tab" type="button" data-view="quietVolume">Sessiz Hacim Alarmı</button>
+  <button id="pullbackButton" class="tab" type="button" data-view="hourlyPullback" style="display:none" aria-hidden="true">Büyük Geri Çekilmeler</button>
+  <button id="capitalButton" class="tab" type="button" data-view="capital" style="display:none" aria-hidden="true">Sermaye Yönetimi</button>
+  <button id="whaleButton" class="tab" data-view="whale" type="button" style="display:none" aria-hidden="true">Büyük Yatırımcı Takibi</button>
+</nav>
+    <main class="container">
+
+    <!-- =========================
+         1. BÖLÜM
+         GÜNLÜK YÜKSELİŞ TEYİDİ
+    ========================== -->
+
+    <section id="hourDrop" hidden><h2>1 Dakikalık Mum / 1 Saatlik Referans — %7 Düşüş</h2><p class="description">Binance Global ve OKX Global aktif USDT çiftleri dönüşümlü taranır. Son tamamlanmış 1 dakikalık mumun en düşük fiyatı, son tamamlanmış 1 saatlik mumun kapanışından en az %7 düşükse gösterilir. Günlük yükselen/düşen ayrımı yapılmaz. Borsa hız sınırları nedeniyle tüm pariteler eş zamanlı kontrol edilmez.</p><button id="hourDropToggle" class="refresh-button" type="button">Taramayı Başlat</button><p id="hourDropStatus" aria-live="polite">Hazır.</p><div id="hourDropResults" class="coin-grid"></div></section>
+    <section id="focus" hidden style="display:none!important"><h2>Favori Coin Hareketlilik Takibi</h2><p class="description">Seçtiğiniz 14 coin önce OKX TR TRY, bulunamazsa OKX TR, OKX Global veya Binance Global USDT paritesinden izlenir. Fiyat, hacim ve gerçekleşen işlemlerin alıcı yönü birlikte değerlendirilir. Sinyaller yatırım tavsiyesi değildir.</p><button id="focusRefresh" class="refresh-button" type="button">Şimdi Yenile</button><p id="focusStatus" aria-live="polite">Yükleniyor...</p><div id="focusList"></div></section>
+    <section id="liveRise" hidden><div class="section-head"><div><h2>Canlı Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Avrupa USDT fiyat akışı. 10 saniyede %0,5 veya 60 saniyede %1 yükseliş başlangıcı. Bu bir günlük teyit değildir.</p></div></div><p id="liveRiseStatus">Canlı bağlantılar kontrol ediliyor...</p><div id="liveRiseCards"></div></section>
+    <section id="twentySecond" hidden><h2>20 Saniyelik %2 Yükseliş Radarı</h2><p class="description">Binance Global ve OKX Global USDT çiftleri ayrı taranır. Başlat düğmesine basıldığında canlı fiyat akışı açılır. Son 20 saniyelik fiyat hareketleri izlenir. Günlük değişim negatif olsa bile son 20 saniyede en az %2 yükselen coinler ayrı ayrı gösterilir. Geç alım riski son 3 dakikalık canlı fiyat hareketlerinden değerlendirilir. Geçmiş tarama tüm uygun pariteleri sırayla kontrol eder; borsa hız sınırları nedeniyle tamamlanması zaman alabilir. Veri kaynağı engellenirse bağlantı hatası belirtilir.</p><button id="twentyStart" class="refresh-button" type="button">Radarı Başlat</button> <button id="twentyStop" class="refresh-button" type="button" disabled>Durdur</button><h3>Binance Global — USDT</h3><p id="binanceTwentyStatus" aria-live="polite">Başlatılmadı</p><div id="binanceTwentyCards" class="coin-grid"></div><h3>OKX Global — USDT</h3><p id="okxTwentyStatus" aria-live="polite">Başlatılmadı</p><div id="okxTwentyCards" class="coin-grid"></div></section>
+    <section id="daily" hidden style="display:none!important"><h2>Çoklu Borsa — Erken Yükseliş Taraması</h2><p class="description">Desteklenen borsalarda ONE/TRY örneğindeki yatay birikim, saatlik hacim genişlemesi, EMA(7)/EMA(25) dönüşü ve fiyat kırılımı örneğine dayalı deneysel tarama. Son 6 saatte aşırı yükselmiş pariteler elenir. RSI 48–76 aralığı ve hacim en az 1,7x aranır. Sinyaller garanti değildir.</p><button id="oneStart" class="refresh-button" type="button">Erken Yükseliş Tara</button><p id="oneStatus" aria-live="polite">Tarama başlatılmadı.</p><div id="oneCards"></div><div style="display:none" aria-hidden="true">
+
+      <div class="section-head">
+
+        <div>
+          <h2>
+            Günlük Yükseliş Teyidi
+          </h2>
+
+          <p class="description">
+            OKX TR ve BtcTurk TRY, OKX Global ve Binance Global USDT çiftleri taranır. Yeni erken kırılım ve hacim teyidi kuralları uygulanır.
+            
+        </div>
+
+        <button
+          id="refreshButton"
+          class="refresh-button"
+          type="button"
+        >
+          Yenile
+        </button>
+
+      </div>
+
+<div class="exchange-tabs">
+  <button id="okxtrButton" class="exchange-button active" type="button">OKX TR</button>
+  <button id="btcturkButton" class="exchange-button" type="button">BtcTurk</button>
+  <button id="okxglobalButton" class="exchange-button" type="button">OKX Global</button>
+  <button id="binanceglobalButton" class="exchange-button" type="button">Binance Global</button>
+</div>
+      <div class="info-box">
+
+        <span>
+          Sistem günlük EMA, taban, hacim ve direnç analizine ek olarak desteklenen borsalarda 1 dakikalık verilerden 5/15 dakikalık ivme, hacim ve fiyat teyidi arar. Binance Global için agresif alım oranı da incelenir. Doğrulanamayan sinyaller kesin teyit olarak gösterilmez. İkinci fiyat kontrolü, emir defteri ve çoklu zaman kontrolü desteklenen borsalarda uygulanır. Haber ve yeni listeleme kontrolü henüz yoktur. Teknik teyitler alım garantisi değildir.
+        </span>
+
+      </div>
+
+
+      <div class="info-box" style="margin-top:14px">
+        <strong>Haftalık Sinyal Başarısı</strong>
+        <p id="weeklyPerformanceStatus" class="description">Haftalık sonuçlar yükleniyor...</p>
+        <div id="weeklyPerformanceMetrics" class="description"></div>
+        <small class="description">Yalnızca tüm teyitleri geçen sinyaller ölçülür. Gözlemlenen fiyat hareketi, gerçekleşmiş işlem kârı değildir. Her pazartesi 03.00 (Türkiye saati) yeni hafta başlar.</small>
+      </div>
+      <div
+        id="updated"
+        class="updated"
+      >
+        Veriler bekleniyor...
+      </div>
+
+
+      <div
+        id="cards"
+        class="coin-grid"
+      >
+
+        <div class="empty-card">
+          Piyasa taranıyor...
+        </div>
+
+      </div>
+
+    </div></section>
+
+
+    <!-- =========================
+     ANLIK YÜKSELİŞ RADARI
+========================== -->
+
+<section
+  id="radar"
+  hidden
+>
+
+  <div class="section-head">
+
+    <div>
+
+      <h2>
+        Anlık Yükseliş Radarı
+      </h2>
+
+      <p class="description">
+        1, 3, 5 ve 15 dakikalık fiyat
+        hareketi ile hacim ve fiyat
+        ivmesini analiz eder.
+      </p>
+
+    </div>
+
+    <button
+      id="radarRefreshButton"
+      class="refresh-button"
+      type="button"
+    >
+      Yenile
+    </button>
+
+  </div>
+
+
+  <div class="info-box">
+
+    <span>
+      OKX, KuCoin ve Gate.io
+      1 dakikalık verileri taranır.
+      Hareketleniyor, kırılım yaklaşıyor
+      ve güçlü teyit sinyalleri gösterilir.
+    </span>
+
+  </div>
+
+
+  <div
+    id="radarStatus"
+    class="status-line"
+  >
+    Radar hazırlanıyor...
+  </div>
+
+
+  <div
+    id="radarUpdated"
+    class="updated-line"
+  >
+    Henüz tarama yapılmadı.
+  </div>
+
+
+  <div
+    id="radarCards"
+    class="cards"
+  >
+  </div>
+
+</section>
+    <!-- =========================
+     YÜKSELİŞ SENARYOSU
+========================== -->
+
+<section id="scenario" hidden>
+  <div class="section-head">
+    <div>
+      <h2>Yükseliş Senaryosu — Erken Hareket Radarı</h2>
+      <p class="description">Yatay birikim, hacim ivmesi, direnç kırılımı ve geri çekilme riskini birlikte inceler. Mevcut ücretsiz borsa verileri kullanılır; kesin yükseliş tahmini değildir.</p>
+      <button id="enableNotificationsButton" class="refresh-button" type="button">Bildirimleri Aç</button>
+      <div id="notificationStatus" class="updated-line">Bildirimler kapalı.</div>
+    </div>
+    <button id="scenarioRefreshButton" class="refresh-button" type="button">Yeniden Tara</button>
+  </div>
+  <div id="scenarioStatus" class="updated-line">Henüz tarama yapılmadı.</div>
+  <div id="scenarioResults" class="cards"></div>
+</section>
+  <section id="xmanager" hidden>
+  <h2>X Manager – Gönderi Stüdyosu</h2>
+  <p class="description">Taslaklar otomatik hazırlanır. Paylaşmadan önce kontrol edin.</p>
+  <div class="scenario-tabs" id="xModeTabs">
+    <button type="button" class="scenario-button active" data-xmode="general">1. Genel Yorum</button>
+    <button type="button" class="scenario-button" data-xmode="signal">2. Sinyal Grafiği</button>
+    <button type="button" class="scenario-button" data-xmode="lookup">3. Yükseliş Analizi</button>
+  </div>
+  <div id="xGeneralPanel" class="info-box">
+    <h3>Genel Kripto Yorumları</h3>
+    <p class="description">Farklı piyasa gözlemlerinden özgün metin taslağı oluşturur. Güncel veri kullanmadığında kesin piyasa iddiası kurmaz.</p>
+    <label for="xGeneralTopic">Yorum konusu</label>
+    <input id="xGeneralTopic" class="x-field" maxlength="160" placeholder="Örnek: Bitcoin neden düşüyor?" autocomplete="off">
+    <button type="button" class="refresh-button" id="xGenerateGeneral">Konuya Özel Metin Hazırla</button>
+    <p class="description">Güncel haberler doğrulanamıyorsa metin bunu açıkça belirtir. <a id="xTopicNews" href="#" target="_blank" rel="noopener noreferrer" hidden style="color:#8bbcff">Konuyla ilgili güncel haberleri incele</a></p>
+  </div>
+  <div id="xSignalPanel" class="info-box" hidden>
+    <h3>Sinyal Grafikleri</h3>
+    <select id="xSignalSelect" class="x-field" aria-label="Sinyal seçimi"></select>
+    <button type="button" class="refresh-button" id="xRefreshSignals">Sinyalleri Getir</button>
+    <button type="button" class="refresh-button" id="xGeneratePost">Metin ve Grafik Oluştur</button>
+  </div>
+  <div id="xLookupPanel" class="info-box" hidden>
+    <h3>Yükseliş Analizi</h3>
+    <label for="xCoinInput">Coin adı (örnek: BTC, W, ETH)</label>
+    <input id="xCoinInput" class="x-field" maxlength="18" placeholder="BTC" autocomplete="off">
+    <label for="xExchangeSelect">USDT veri kaynağı</label>
+    <select id="xExchangeSelect" class="x-field"><option value="OKX">OKX</option><option value="KUCOIN">KuCoin</option><option value="GATE.IO">Gate.io</option></select>
+    <button type="button" class="refresh-button" id="xAnalyzeCoin">Grafiği ve Yorumu Hazırla</button>
+  </div>
+  <p id="xManagerStatus" aria-live="polite">Bir bölüm seçin.</p>
+  <div id="xChartPanel" class="info-box" hidden>
+    <h3>Gerçek USDT Günlük Grafiği</h3>
+    <canvas id="xChartCanvas" width="1100" height="940" style="display:block;width:100%;max-width:1100px;background:#0c172b;border-radius:12px"></canvas>
+    <button type="button" class="refresh-button" id="xDownloadChart">Grafiği İndir</button>
+    <p class="description">Grafik gerçek USDT verileriyle hazırlanır; teknik işaretler kesin neden göstermez.</p>
+  </div>
+  <div class="info-box" id="xDraftPanel" hidden>
+    <label for="xPostText">Otomatik gönderi metni</label>
+    <textarea id="xPostText" maxlength="280" rows="7" class="x-field" style="min-height:150px"></textarea>
+    <p><span id="xPostCount">0</span>/280 karakter</p>
+    <button type="button" class="refresh-button" id="xCopyPost">Metni Kopyala</button>
+    <button type="button" class="refresh-button" id="xOpenComposer">Metni X'te Paylaş</button>
+  </div>
+  <p class="description">Paylaşımlar sizin onayınızla yapılır. Teknik analiz kesin kazanç veya fiyat hareketinin kesin nedeni değildir.</p>
+</section>
+  <section id="long" hidden>
+    <div class="section-head">
+      <div>
+        <h2>36 Saatlik Sinyal Başarı İstatistikleri</h2>
+        <p class="description">Üç sistemin gerçek sinyalleri ayrı ölçülür. Radar 15 dakika; günlük teyit ve senaryolar 60 dakika sonra ölçülür. Başarı eşiği +%0,5 olarak uygulanır.</p>
+      </div>
+      <button type="button" id="statsRefreshButton" class="refresh-button">İstatistikleri Yenile</button>
+    </div>
+    <div class="info-box">
+      <h3>GMT/OGN Erken Formasyon Başarısı</h3>
+      <p>Yalnız kırılım öncesi hazırlık sinyalleri ölçülür. 15 dakika sonraki fiyat en az %0,5 yükselirse başarılı sayılır. Bu oran kesin alım olasılığı değildir.</p>
+      <p id="prepumpStats">İlk ölçüm verileri bekleniyor.</p>
+    </div>
+    <p id="statsStatus" class="updated" aria-live="polite">İstatistikler yükleniyor...</p>
+    <div id="statsCards" class="coin-grid"></div>
+    <div class="info-box">
+      <p>Başarı oranı yalnız sonucu doğrulanmış sinyaller üzerinden hesaplanır. İlgili değerlendirme süresi dolmayan veya fiyatı doğrulanamayan sinyaller başarı/başarısızlık hesabına katılmaz.</p>
+      <p>Bu ölçüm işlem getirisi veya bir sonraki sinyalin kazanma olasılığı değildir. Ölçüm, kayıt sistemi kurulduktan sonra oluşan sinyallerle başlar ve son 36 saati kapsar.</p>
+    </div>
+  </section>
+  <section id="decision" hidden>
+    <div class="section-head">
+      <div><h2>Orta Vadeli Yükseliş</h2>
+      <p class="description">OGN benzeri birikim, EMA uyumu, hacim artışı ve direnç kırılımı aranır. Yükselişin başlangıcı yalnızca teknik koşullarla sınıflandırılır.</p></div>
+      <button type="button" class="refresh-button" id="decisionRefresh">Planları Yenile</button>
+    </div>
+    <div class="info-box">
+      <h3>Otomatik Yükseliş Öncesi Tarama</h3>
+      <p>Tüm borsalarda geçmiş sıkışma, azalan hacim, EMA dönüşü ve direnç yakınlığı aranır. Güncel anlık radar teyidi varsa YÜKSELİŞ BAŞLIYOR gösterilir.</p>
+      <button type="button" id="mediumWatchRefresh" class="refresh-button">Tarama Sonuçlarını Yenile</button>
+      <p id="mediumWatchStatus" aria-live="polite">Sonuçlar yükleniyor...</p>
+      <div id="mediumWatchCards" class="coin-grid"></div>
+    </div>
+    <div class="info-box">
+      <label for="mediumSymbol">Coin (USDT)</label>
+      <input id="mediumSymbol" type="text" value="OGN" maxlength="20" placeholder="OGN" style="max-width:180px;padding:10px;margin:8px"/>
+      <select id="mediumExchange" style="padding:10px;margin:8px">
+        <option value="OKX">OKX</option><option value="KUCOIN">KuCoin</option><option value="GATE">Gate.io</option>
+      </select>
+      <button type="button" id="mediumAnalyze" class="refresh-button">Orta Vadeyi Analiz Et</button>
+      <div id="mediumResult" aria-live="polite">Coin seçerek tamamlanmış günlük mumları analiz edin.</div>
+    </div>
+    <p id="decisionStatus" aria-live="polite">Sanal işlem planları henüz yüklenmedi.</p>
+    <div id="decisionCards" class="coin-grid"></div>
+    <div class="info-box">Fiyatlar gerçek alış/satış teklifi değildir. Komisyon, kayma ve emir defteri teyidi bulunmadığı için burada görülen planlar doğrudan alım emri sayılmaz.</div>
+  </section>
+  
+  
+  <section id="flow" hidden>
+    <h2>Kripto Alış–Satış Baskısı Radarı</h2>
+    <p>Son 30 saniyedeki gerçekleşen piyasa alışları ve satışları, önceki 60 saniyenin ortalamasıyla karşılaştırılır.</p>
+    <button id="flowRefresh" class="refresh-button" type="button">Akışı Yenile</button>
+    <p id="flowStatus" aria-live="polite">İşlem akışı bekleniyor.</p>
+    <div id="flowCards" class="coin-grid"></div>
+    <p>Alış baskısı ve satış baskısı fiyatın kesin yönünü göstermez. İlk sürüm Gate.io USDT paritelerini izler.</p>
+  </section>
+<section id="capital" hidden>
+ <div class="section-head"><div><h2>Sermaye Yönetimi</h2><p class="description">100.000 TL başlangıç • 12 ay • 3.000.000 TL hedef. Sadece planlama ve manuel kayıt; gerçek emir gönderilmez.</p></div></div>
+ <div class="info-box"><h3>Hedef ve risk sınırları</h3><p id="capitalSummary"></p><p id="capitalLimits"></p><p id="capitalWarnings" aria-live="polite"></p></div>
+ <div class="info-box">
+ <h3>İşlem büyüklüğü hesaplayıcısı</h3>
+ <p id="capitalSelected" class="description">İlk Tepki radarından coin seçebilir veya bilgileri elle girebilirsiniz.</p>
+ <p id="capitalExchange" class="description"></p>
+ <div class="capital-field"><label for="capitalSymbol">Coin / Parite</label><input class="x-field" id="capitalSymbol" placeholder="Örnek: ARPA/USDT" maxlength="30"></div>
+ <div class="capital-field"><label for="capitalEntry">Planlanan giriş fiyatı</label><input class="x-field" id="capitalEntry" type="number" step="any" min="0" placeholder="Örnek: 0.04"></div>
+ <div class="capital-field"><label for="capitalStop">Zarar-kes fiyatı</label><input class="x-field" id="capitalStop" type="number" step="any" min="0" placeholder="Örnek: 0.038"></div>
+ <div class="capital-field"><label for="capitalTarget">Hedef fiyat</label><input class="x-field" id="capitalTarget" type="number" step="any" min="0" placeholder="Örnek: 0.044"></div>
+ <button class="refresh-button" id="capitalScenario" type="button">Örnek Risk Senaryosu Oluştur</button>
+ <button class="refresh-button" id="capitalCalculate" type="button">Riski Hesapla</button>
+ <p id="capitalPlan" aria-live="polite">İşlem bilgilerini girerek hesaplayın.</p>
+ <button class="refresh-button" id="capitalRecord" type="button" disabled>Planı Günlüğe Kaydet</button>
+ </div>
+ <div class="info-box"><h3>Manuel işlem günlüğü</h3>
+ <p class="description">Yalnız gerçekleşmiş işlemlerin net TL kârını veya zararını kaydedin. Kayıtlar bu tarayıcıda tutulur; borsa hesabıyla bağlantı yoktur.</p>
+ <div class="capital-field"><label for="capitalPnl">Gerçekleşen net kâr / zarar (TL)</label><input class="x-field" id="capitalPnl" type="number" step="0.01" placeholder="Örnek: -500"></div>
+ <button id="capitalAddPnl" class="refresh-button" type="button">Sonucu Kaydet</button>
+ <button id="capitalExport" class="refresh-button" type="button">Günlüğü Dışa Aktar</button>
+ <p id="capitalLedger" aria-live="polite"></p></div>
+ <p class="description">Kaldıraç yok. İşlem başına azami planlanan risk %0,5; günlük zarar limiti %2; toplam düşüş uyarısı %10. Fiyat kayması ve komisyonlar gerçek zararı artırabilir.</p>
+</section>
+<section id="hourlyPullback" hidden>
+ <div class="section-head">
+  <div>
+   <h2>Büyük Geri Çekilmeler — Saatlik Alım Fırsatı</h2>
+   <p class="description">Son 168 tamamlanmış 1 saatlik mumun en yüksek fiyatından %20'den fazla düşen coinleri takip eder. Düşüş tespit edildikten sonraki tamamlanmış yeşil 1 saatlik mum kapanınca “ALIM FIRSATI” olarak işaretler.</p>
+  </div>
+  <button id="pullbackScan" class="refresh-button" type="button">Şimdi Tara</button>
+ </div>
+ <div class="info-box"><span>BINANCE, COINBASE, OKX, KUCOIN ve GATE.IO Spot piyasaları taranır. Borsa başına günlük hacmi en az 1 milyon USD/USDT olan en yüksek hacimli 80 parite kontrol edilir. Bu bir uyarıdır; otomatik alım yapılmaz ve sinyal kâr garantisi değildir.</span></div>
+ <p id="pullbackStatus" aria-live="polite">Veriler bekleniyor.</p>
+ <div id="pullbackCards" class="coin-grid"></div>
+</section>
+<section id="secondScan" hidden style="display:none!important" hidden><h2>1 Saniyelik Fiyat Taraması</h2><p class="description">Son 300 tamamlanmış 1 saniyelik mumun ortalama kapanış fiyatı, önceki 30 tamamlanmış 1 dakikalık mumun ortalamasından en az %2 yüksek olmalı. Hacim şartı aranmaz. Binance Global üzerindeki tüm aktif USDT spot pariteleri taranır. Alım garantisi değildir.</p><button id="secondScanStart" class="refresh-button" type="button">Taramayı Başlat</button><p id="secondScanStatus" aria-live="polite">Hazır.</p><div id="secondScanCards" class="coin-grid"></div></section>
+<section id="dailyTouch" hidden style="display:none!important" hidden>
+ <div class="section-head"><div>
+ <h2>Temas Araması</h2>
+ <p class="description">Güçlü yükseliş başlangıçlarını çoklu teknik teyitle tarar. Trend, hacim, agresif alış, direnç kırılımı, likidite ve ikinci fiyat teyidi birlikte değerlendirilir. Sadece doğrulanan adaylar gösterilir; sonuçlar kazanç garantisi değildir.</p>
+ </div></div>
+ <div class="info-box" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+ <button id="dailyTouchScan" class="refresh-button" type="button">Taramayı Başlat</button>
+ <button id="dailyTouchNotify" class="refresh-button" type="button">Bildirimleri Aç</button>
+ <button id="dailyTouchStop" class="refresh-button" type="button" disabled>Durdur</button>
+ </div>
+ <p id="dailyTouchStatus" class="updated-line" aria-live="polite">Tarama hazırlanıyor...</p>
+ <div id="dailyTouchCards" class="coin-grid"></div>
+ <p class="description" style="font-size:0.85rem">Sinyal puanı başarı olasılığı değildir. %5 ve %10 seviyeleri yalnızca fiyat hedefleridir.</p>
+</section>
+<section id="quietVolume" hidden>
+ <h2>Sessiz Hacim — Hızlı Yükseliş Başlangıcı</h2>
+ <p class="description">Binance Spot USDT işlemleri canlı izlenir. Fiyat henüz yükselmeye başlarken güçlü ilk hareketten sonra en az 30 saniye beklenir ve ikinci bir fiyat yükselişi teyit edilir. Küçük ve kısa süreli hareketler tek başına sinyal oluşturmaz. Bu, gelecekte hızlı yükseliş garantisi değildir.</p>
+ <div class="info-box">
+ <p><strong>Tarama formülü:</strong> 15 sn fiyat artışı ≥ %0,35; 60 sn fiyat artışı %1,2–%3,5; agresif alış oranı ≥ %78; 15 sn alış hacmi ≥ 5.000 USDT; alış ivmesi ≥ 5 kat. İlk adaydan en az 30 sn sonra fiyatın ilave ≥ %0,7 yükselmesi gerekir. Aynı coine 30 dk, genel sinyallere en az 90 sn ara verilir. İlk 120 sn veri toplanır.</p>
+ <button id="quietStart" class="refresh-button" type="button">Canlı İzlemeyi Başlat</button>
+ <button id="quietStop" class="refresh-button" type="button">Ekran Yenilemeyi Durdur</button>
+ <button id="quietPush" class="refresh-button" type="button">Telefon Bildirimlerini Aç</button>
+ <p id="quietStatus" aria-live="polite">Hazır.</p>
+ <p id="quietStats" class="updated-line">İzlenen: 0 • Hazır: 0 • Alarm: 0</p>
+ </div><div id="quietCards" class="coin-grid"></div>
+ <p class="description">Puan, teknik filtrelerin ağırlıklı göstergesidir; %5–%10 yükseliş olasılığı veya başarı garantisi değildir. Sunucu uykuya geçerse canlı takip kesilir. Emir verilmez, kazanç garantisi yoktur.</p>
+</section>
+<section id="momentum" hidden>
+ <h2>Patlama — Yükseliş ve Risk Planı</h2>
+ <p class="description">Yalnızca OKX TR aktif spot pariteleri taranır. Son kapanmış 3 adet 1 dakikalık mum incelenir. Son mumun kapanış fiyatı, bu 3 mumdan önceki 30 mumun ortalama kapanış fiyatından belirlediğiniz oranda yüksekse takip listesine alınır. Hacim ve alıcı işlemi şartı aranmaz. Bölüm açıkken tarama 60 saniyede bir yenilenir.</p>
+ <div class="info-box"><label for="patlamaThreshold">Hedef yükseliş (%)</label> <input class="x-field" id="patlamaThreshold" type="number" min="0.1" max="50" step="0.1" value="1" style="max-width:110px"> <label for="patlamaCapital">Aktif işlem bütçesi (TL)</label> <input class="x-field" id="patlamaCapital" type="number" min="0" value="20000" style="max-width:145px"> <label for="patlamaRisk">İşlem başı risk (TL)</label> <input class="x-field" id="patlamaRisk" type="number" min="1" value="200" style="max-width:120px"> <label for="patlamaStop">Stop mesafesi (%)</label> <input class="x-field" id="patlamaStop" type="number" min="0.1" max="50" step="0.1" value="2" style="max-width:110px"><p id="patlamaRiskPlan" aria-live="polite"></p><p class="description">Günlük zarar limiti: 400 TL • Haftalık: 1.000 TL • Aynı anda en fazla 2 pozisyon • Kaldıraç yok. Bu sınırlar manuel takip edilir; otomatik emir gönderilmez. Komisyon ve kayma dahil değildir.</p></div>
+ <button id="patlamaScan" class="refresh-button" type="button">Patlama Tara</button>
+ <div class="info-box"><h3>Dipten Dönüş Adayları</h3><p class="description">OKX TR spot paritelerinde son 48 saatlik fiyat aralığının alt %32 bölümünde bulunan, RSI(14) değeri 20–48 arasında olan ve kapanmış 1 saatlik mumda yukarı dönüş gösteren pariteleri tarar. Hacim ve EMA20 ek değerlendirme puanı verir. Bu tarama kesin yükseliş tahmini değildir.</p><button id="patlamaDipScan" class="refresh-button" type="button">Dipten Dönüş Adaylarını Tara</button><p id="patlamaDipStatus" aria-live="polite">Dip taraması başlatılmadı.</p><div id="patlamaDipCards" class="coin-grid"></div></div>
+ <p id="patlamaStatus" aria-live="polite">Tarama başlatılmadı.</p>
+ <div id="patlamaCards" class="coin-grid"></div>
+</section>
+  <section id="whale" hidden>
+    <h2>Büyük Yatırımcı Takibi</h2>
+    <p class="description">Binance Spot üzerindeki gerçekleşmiş toplulaştırılmış işlemleri inceler. Büyük işlem, kurumsal yatırımcı kimliği veya gelecekte yükseliş kanıtı değildir.</p>
+    <div class="info-box"><label for="whaleMin">Büyük işlem alt sınırı (USDT)</label> <input id="whaleMin" type="number" min="1000" step="1000" value="10000" class="x-field" style="max-width:180px"> <button id="whaleScan" type="button" class="refresh-button">Tüm Uygun Pariteleri Tara</button> <button id="whaleStop" type="button" class="refresh-button">Durdur</button></div>
+    <p class="description">Tüm aktif Binance Spot USDT pariteleri, coin sayısı veya günlük hacim alt sınırı olmadan taranır. Her paritede yalnızca son 1000 toplulaştırılmış işlem incelenir. CVD, emir defteri ve fon kimliği bu sürümde ölçülmez. Sıralama 24 saatlik hacme göredir.</p>
+    <p id="whaleStatus" aria-live="polite">Taramayı başlatın.</p>
+    <div id="whaleCards" class="coin-grid"></div>
+    <div class="info-box"><h3>Erken Birikim Adayları — Sabit Zaman Analizi</h3><p>Son 1, 5 ve 15 tamamlanmış dakikadaki agresif alış oranını ölçer. Son 15 dakikanın hacmini önceki 30 dakikayla dakikaya göre normalize ederek karşılaştırır. Alış oranı, hacim ivmesi ve sınırlı fiyat değişimi birlikte aranır. Bu bir yatırımcı kimliği tespiti veya kesin yükseliş sinyali değildir.</p><button id="whaleEarlyScan" type="button" class="refresh-button">Erken Birikim Tara</button> <button id="whaleEarlyStop" type="button" class="refresh-button">Durdur</button><p id="whaleEarlyStatus" aria-live="polite">Tarama başlatılmadı.</p></div><div id="whaleEarlyCards" class="coin-grid"></div>
+  </section>
+  <section id="broker" hidden><h2>Broker — Balina Birikim ve Alım Adayları</h2><p class="description">Tüm tanımlı borsalar taranır. Yalnızca fiyat, hacim, gerçekleşmiş işlemler ve emir defteri kontrollerini geçen adaylar listelenir. Emir akışı doğrulanamayan borsalarda alım adayı gösterilmez. Bu bölüm emir göndermez.</p><button id="brokerStart" class="refresh-button" type="button">Tüm Borsaları Tara</button><p id="brokerStatus" aria-live="polite">Hazırlanıyor...</p><details><summary>Borsa tarama ve doğrulama durumu</summary><div id="brokerVenues"></div></details><div id="brokerResults" class="coin-grid"></div></section>
+  </main>
+
+
+  <footer>
+
+    TradeRadar teknik analiz aracıdır.
+    Gösterilen sonuçlar kesin kazanç
+    veya yatırım garantisi değildir.
+
+  </footer>
+
+
+  <script type="module" src="./focus-watch-ui.js?v=2"></script>
+  <script type="module" src="./broker-ui.js?v=1"></script>
+  <script type="module" src="./multi-early-ui.js?v=1"></script>
+
+  <script src="./api-route.js?v=3"></script>
+  <script src="./app.js?v=daily-intraday-7"></script>
+
+  <script defer src="./whale-monitor.js"></script>
+  <script defer src="./whale-early.js"></script>
+  <script type="module" src="./capital-manager.js"></script>
+  <script type="module" src="./patlama-ui.js?v=dip-1"></script>
+  <script defer src="./quiet-volume-ui.js?v=confirm-2"></script>
+
+  <script defer src="./tab-navigation-fix.js"></script>
+  <script defer src="./install-app.js?v=2"></script>
+  <script type="module" src="./hourly-pullback-ui.js"></script>
+
+<script type="module" src="./twenty-second-ui.js?v=16"></script>
+  <script type="module" src="./hour-drop-radar.js?v=2"></script>
 </body>
 </html>
