@@ -4,6 +4,17 @@ const state=Object.fromEntries(names.map(k=>[k,{socket:null,history:new Map(),al
 let running=false,renderTimer=null;
 
 const tradeFeeds=new Map();
+function entryRisk(st,row,now){
+ const points=(st.history.get(row.rawSymbol)||[]).filter(p=>now-p.t<=180000);
+ const latest=Number(row.price),peak=Math.max(Number(row.peak)||0,...points.map(p=>p.p));
+ const old1=points.find(p=>p.t<=now-60000),old3=points.find(p=>p.t<=now-180000);
+ const p1=old1?100*(latest/old1.p-1):null,p3=old3?100*(latest/old3.p-1):null;
+ const retreat=peak>0?100*(1-latest/peak):null;
+ if(row.historical||!points.length||!old1)return "Alım riski: YETERLİ CANLI VERİ YOK — alım teyidi değildir";
+ if(retreat>=1||p1<=-0.5||(p3!==null&&p3>=3))return "Alım riski: YÜKSEK — geç alım / satış baskısı ihtimali";
+ return "Alım riski: İZLE — yükselişin devamı doğrulanmadı";
+}
+
 
 const twoHourFlows=new Map();
 function loadTwoHourFlow(kind,symbol){
@@ -174,15 +185,16 @@ async function backfill(kind,generation){
    const open=Number(kind==="binance"?x.openPrice:kind==="okx"?x.open24h:x.last/(1+Number(x.changeRate||0)));
    const volume=kind==="binance"?Number(x.quoteVolume):kind==="okx"?Number(x.volCcy24h)*last:Number(x.volValue);
    return {symbol,score:open>0?100*(last/open-1):0,volume};
-  }).filter(x=>x.symbol.endsWith("USDT")&&x.volume>0).sort((a,b)=>b.score-a.score).slice(0,60);
+  }).filter(x=>x.symbol.endsWith("USDT")&&x.volume>0).sort((a,b)=>b.score-a.score);
   let checked=0;
   for(let i=0;i<candidates.length;i+=5){
    if(!running||generation!==backfillGeneration)return;
    await Promise.all(candidates.slice(i,i+5).map(x=>backfillOne(kind,x.symbol,generation)));
    checked+=Math.min(5,candidates.length-i);
+   if(i+5<candidates.length)await new Promise(resolve=>setTimeout(resolve,1100));
    st.backfillStatus="Geçmiş: "+checked+"/"+candidates.length+" aday tarandı";
   }
-  st.backfillStatus="Geçmiş tarama tamamlandı (ilk 60 aday, 1 dk mum)";
+  st.backfillStatus="Geçmiş tarama tamamlandı ("+candidates.length+" aday, 1 dk mum)";
  }catch(e){st.backfillStatus="Geçmiş tarama erişilemedi: "+e.message;}
 }
 
@@ -218,7 +230,7 @@ function observe(kind,symbol,price){
  const st=state[kind],now=Date.now();st.last=now;
  let h=st.history.get(symbol);if(!h){h=[];st.history.set(symbol,h);}
  if(h.length&&now-h.at(-1).t<300)return;
- h.push({t:now,p:price});while(h.length>1&&h[0].t<now-22000)h.shift();
+ h.push({t:now,p:price});while(h.length>1&&h[0].t<now-185000)h.shift();
  const prior=h.find(x=>x.t<=now-18000);if(!prior)return;
  const change=100*(price/prior.p-1);
  if(change>=0.5){const peak=Math.max(...h.map(x=>x.p));void confirm(kind,symbol,price,peak);}
@@ -343,10 +355,10 @@ function render(){
  const st=state[kind],status=document.getElementById(kind+"TwentyStatus"),cards=document.getElementById(kind+"TwentyCards");
  if(!status||!cards)return;
  const now=Date.now();for(const [key,v] of st.alerts)if(now-v.at>300000)st.alerts.delete(key);
- cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,50);
+ cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,100);
  const connected=st.connected&&now-st.last<15000;
  status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"||kind==="kucoin"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
- cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+esc(twoHourFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
+ cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(entryRisk(st,x,now))+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+esc(twoHourFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
