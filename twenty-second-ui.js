@@ -1,7 +1,8 @@
 const start=document.getElementById("twentyStart"),stop=document.getElementById("twentyStop");
 const names=["binance","okx"];
 const state=Object.fromEntries(names.map(k=>[k,{socket:null,history:new Map(),alerts:new Map(),connected:false,error:"",last:0,retry:null,connections:[],tracked:0,baseline:new Map(),pending:new Set()}]));
-let running=false,renderTimer=null;
+let running=false,renderTimer=null,priceMemoryTimer=null;
+const latestPrices=Object.fromEntries(names.map(k=>[k,new Map()]));
 
 const tradeFeeds=new Map();
 function entryRisk(st,row,now){
@@ -225,27 +226,42 @@ async function confirm(kind,symbol,price,peak){
  const change=100*(peak/close-1);
  if(change>=2){const old=st.alerts.get(symbol),now=Date.now();st.alerts.set(symbol,{rawSymbol:symbol,symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close,change:+change.toFixed(2),at:now,first:old?.first||now});trackTrades(kind,symbol);}
 }
-function observe(kind,symbol,price){
- if(!running||!(price>0)||!/USDT$/.test(symbol))return;
- const st=state[kind],now=Date.now();st.last=now;
- let h=st.history.get(symbol);if(!h){h=[];st.history.set(symbol,h);}
- // Detect a 2% move at the first qualifying live tick, not after waiting 18 seconds.
- // Only earlier observed prices within the preceding 20 seconds are eligible.
+function detectMove(kind,symbol,price,now){
+ const st=state[kind],h=st.history.get(symbol)||[];
  const window=h.filter(x=>now-x.t<=20000);
  const low=window.length?window.reduce((a,b)=>b.p<a.p?b:a):null;
  const change=low?100*(price/low.p-1):0;
- h.push({t:now,p:price});while(h.length>1&&h[0].t<now-185000)h.shift();
- if(change>=2){
-  const old=st.alerts.get(symbol),peak=Math.max(price,...window.map(x=>x.p));
-  // Do not keep refreshing an existing alert's expiry on every subsequent tick.
-  if(!old||now-old.at>=300000){
-   st.alerts.set(symbol,{rawSymbol:symbol,symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close:low.p,change:+change.toFixed(2),at:now,first:now,historical:false});
-   trackTrades(kind,symbol);
-  }else if(!old.historical&&change>old.change){
-   st.alerts.set(symbol,{...old,price,peak,change:+change.toFixed(2)});
+ if(change<2)return;
+ const old=st.alerts.get(symbol),peak=Math.max(price,...window.map(x=>x.p));
+ if(!old||now-old.at>=300000){
+  st.alerts.set(symbol,{rawSymbol:symbol,symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close:low.p,change:+change.toFixed(2),at:now,first:now,historical:false});
+  trackTrades(kind,symbol);
+ }else if(!old.historical&&change>old.change){
+  st.alerts.set(symbol,{...old,price,peak,change:+change.toFixed(2)});
+ }
+}
+function observe(kind,symbol,price){
+ if(!running||!(price>0)||!/USDT$/.test(symbol))return;
+ const now=Date.now(),st=state[kind],last=latestPrices[kind].get(symbol);
+ st.last=now;
+ latestPrices[kind].set(symbol,price);
+ // Every received price change is checked immediately, without scanning coins.
+ if(last!==price)detectMove(kind,symbol,price,now);
+}
+function snapshotPrices(){
+ if(!running)return;
+ const now=Date.now();
+ for(const kind of names){
+  const st=state[kind];
+  for(const [symbol,price] of latestPrices[kind]){
+   let h=st.history.get(symbol);
+   if(!h){h=[];st.history.set(symbol,h);}
+   h.push({t:now,p:price});
+   while(h.length>1&&h[0].t<now-185000)h.shift();
   }
  }
 }
+
 function reconnect(kind,fn){const st=state[kind];st.connected=false;if(running&&!st.retry)st.retry=setTimeout(()=>{st.retry=null;fn();},5000);}
 let binancePolling=null;
 async function pollBinance(){
@@ -274,8 +290,7 @@ function binance(){
  ws.onerror=()=>{st.error="Binance WebSocket erişimi başarısız; REST yedeği deneniyor.";};
  ws.onclose=()=>{st.connected=false;reconnect("binance",binance);};
  }catch(e){st.error=e.message;reconnect("binance",binance);}
- void pollBinance();
- clearInterval(binancePolling);binancePolling=setInterval(()=>{if(running&&Date.now()-st.last>6000)void pollBinance();},5000);
+
 }
 let kucoinPolling=null,kucoinBusy=false;
 async function pollKucoin(){
@@ -368,7 +383,7 @@ async function okx(){
  const data=await response.json();if(String(data.code)!=="0")throw Error("OKX parite listesi alınamadı");
  const symbols=(data.data||[]).filter(x=>x.quoteCcy==="USDT"&&x.state==="live").map(x=>x.instId);
  st.tracked=symbols.length;
- void pollOkx();clearInterval(okxPolling);okxPolling=setInterval(()=>{if(running&&Date.now()-st.last>7000)void pollOkx();},5000);
+
  if(!symbols.length)throw Error("Aktif USDT paritesi bulunamadı");
  const chunks=[];for(let i=0;i<symbols.length;i+=80)chunks.push(symbols.slice(i,i+80));
  let index=0;
@@ -391,17 +406,17 @@ function render(){
  const now=Date.now();for(const [key,v] of st.alerts)if(now-v.at>300000)st.alerts.delete(key);
  cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,100);
  const connected=st.connected&&now-st.last<15000;
- status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"||kind==="kucoin"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
- cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(entryRisk(st,x,now))+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+esc(twoHourFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'Son 20 saniyede en az %2 yükseliş ölçüldü; günlük değişim dikkate alınmadı. Bu bir alım önerisi değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
+ status.textContent=(connected?"CANLI · BELLEKTE İZLENİYOR":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+latestPrices[kind].size+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
+ cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 20sn referans: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(entryRisk(st,x,now))+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+esc(twoHourFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'Son 20 saniyede en az %2 yükseliş ölçüldü; günlük değişim dikkate alınmadı. Bu bir alım önerisi değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
  if(running)return;clearTrades();twoHourFlows.clear();backfillGeneration++;running=true;start.disabled=true;stop.disabled=false;
- for(const k of names){const st=state[k];st.history.clear();st.alerts.clear();st.baseline.clear();st.error="";st.backfillStatus="";st.last=0;st.connected=false;}
- binance();okx();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);render();renderTimer=setInterval(render,1000);
+ for(const k of names){const st=state[k];st.history.clear();latestPrices[k].clear();st.alerts.clear();st.baseline.clear();st.error="";st.backfillStatus="";st.last=0;st.connected=false;}
+ binance();okx();snapshotPrices();priceMemoryTimer=setInterval(snapshotPrices,1000);render();renderTimer=setInterval(render,1000);
 }
 function end(){
- running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;clearInterval(okxPolling);okxPolling=null;clearInterval(kucoinPolling);kucoinPolling=null;clearInterval(kucoinPing);clearTimeout(kucoinReconnect);kucoinReconnect=null;kucoinSocket=null;
+ running=false;backfillGeneration++;clearInterval(priceMemoryTimer);priceMemoryTimer=null;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;clearInterval(okxPolling);okxPolling=null;clearInterval(kucoinPolling);kucoinPolling=null;clearInterval(kucoinPing);clearTimeout(kucoinReconnect);kucoinReconnect=null;kucoinSocket=null;
  for(const k of names){const st=state[k];clearTimeout(st.retry);st.retry=null;for(const ws of st.connections){ws.onclose=null;ws.close();}st.connections=[];st.socket=null;st.connected=false;document.getElementById(k+"TwentyStatus").textContent="Durduruldu";}
 }
 start?.addEventListener("click",begin);stop?.addEventListener("click",end);
