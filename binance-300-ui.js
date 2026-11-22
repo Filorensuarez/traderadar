@@ -10,8 +10,8 @@ async function update(){
   cards.replaceChildren();
   for(const item of data.rows){
    const article=document.createElement("article");article.className="coin-card";
-   const title=document.createElement("h3");title.textContent=item.symbol+" · +%"+item.changePct;
-   const detail=document.createElement("p");detail.textContent="Fiyat: "+item.price+" USDT | Son kapanmış 1 saatlik mum: "+item.referenceClose+" USDT";
+   const title=document.createElement("h3");title.textContent=item.symbol+" · +%"+item.changePct+" · "+item.status;
+   const detail=document.createElement("p");detail.textContent="Fiyat: "+item.price+" USDT | "+(item.referenceType==="rolling-300-low"?"Son 300 sn gözlenen en düşük fiyat: ":"Son kapanmış 1 saatlik mum: ")+item.referenceClose+" USDT";
    const time=document.createElement("p");time.textContent="Tespit: "+new Date(item.at).toLocaleTimeString("tr-TR")+" | 300 saniyelik izleme";
    article.append(title,detail,time);cards.append(article);
   }
