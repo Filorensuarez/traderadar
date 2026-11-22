@@ -4,18 +4,23 @@ import WebSocket from "ws";
 const state={connected:false,error:null,updatedAt:0,total:0,referencesReady:0,referenceHour:0,loading:false};
 const symbols=new Set(),reference=new Map(),candles=new Map(),previous=new Map(),alerts=[],lastAlert=new Map();
 let started=false,socket=null,refreshTimer=null;
-const API="https://api.binance.com/api/v3";
+const API_HOSTS=["https://api.binance.com/api/v3","https://api1.binance.com/api/v3","https://data-api.binance.vision/api/v3"];
+const WS_HOSTS=["wss://stream.binance.com:9443/ws/!miniTicker@arr","wss://stream.binance.com:443/ws/!miniTicker@arr","wss://data-stream.binance.vision/ws/!miniTicker@arr"];
+let wsHostIndex=0;
 const round=n=>Number(n.toFixed(4));
-async function json(url){
- const response=await fetch(url,{signal:AbortSignal.timeout(12000)});
- if(!response.ok)throw Error("Binance HTTP "+response.status);
- return response.json();
+async function json(path){
+ let error;
+ for(const host of API_HOSTS){
+  try{const response=await fetch(host+path,{signal:AbortSignal.timeout(9000)});if(!response.ok)throw Error(host+" HTTP "+response.status);return await response.json();}
+  catch(e){error=e;}
+ }
+ throw error||Error("Binance REST bağlantısı kurulamadı");
 }
 async function refreshReferences(){
  if(state.loading)return;
  state.loading=true;
  try{
-  const info=await json(API+"/exchangeInfo");
+  const info=await json("/exchangeInfo");
   const active=info.symbols.filter(s=>s.status==="TRADING"&&s.quoteAsset==="USDT"&&s.isSpotTradingAllowed!==false).map(s=>s.symbol);
   symbols.clear();for(const symbol of active)symbols.add(symbol);
   state.total=symbols.size;
@@ -28,7 +33,7 @@ async function refreshReferences(){
    while(cursor<pending.length){
     const symbol=pending[cursor++];
     try{
-     const klines=await json(API+"/klines?symbol="+encodeURIComponent(symbol)+"&interval=1h&limit=3");
+     const klines=await json("/klines?symbol="+encodeURIComponent(symbol)+"&interval=1h&limit=3");
      const completed=klines.filter(k=>Number(k[6])<Date.now()-1000).at(-1);
      if(completed&&Number(completed[4])>0)reference.set(symbol,{close:Number(completed[4]),closeTime:Number(completed[6]),hour});
     }catch(e){state.error="Saatlik referans: "+String(e.message||e);}
@@ -65,7 +70,7 @@ function observe(symbol,raw,at=Date.now()){
  while(alerts.length&&at-alerts.at(-1).at>300000)alerts.pop();
 }
 function connect(){
- const ws=new WebSocket("wss://stream.binance.com:9443/ws/!miniTicker@arr");
+ const ws=new WebSocket(WS_HOSTS[wsHostIndex]);
  socket=ws;
  ws.on("open",()=>{state.connected=true;state.error=null;});
  ws.on("message",raw=>{
@@ -75,7 +80,7 @@ function connect(){
   }catch(e){state.error=String(e.message||e);}
  });
  ws.on("error",e=>{state.error=e.message;});
- ws.on("close",()=>{state.connected=false;if(socket===ws)setTimeout(connect,5000);});
+ ws.on("close",(code)=>{state.connected=false;if(socket===ws){state.error=state.error||("WebSocket kapandı: "+code);wsHostIndex=(wsHostIndex+1)%WS_HOSTS.length;setTimeout(connect,4000);}});
  const ping=setInterval(()=>{if(ws.readyState===WebSocket.OPEN)ws.ping();},25000);
  ws.on("close",()=>clearInterval(ping));
 }
