@@ -229,15 +229,21 @@ function observe(kind,symbol,price){
  if(!running||!(price>0)||!/USDT$/.test(symbol))return;
  const st=state[kind],now=Date.now();st.last=now;
  let h=st.history.get(symbol);if(!h){h=[];st.history.set(symbol,h);}
- if(h.length&&now-h.at(-1).t<300)return;
- h.push({t:now,p:price});while(h.length>1&&h[0].t<now-185000)h.shift();
+ // Detect a 2% move at the first qualifying live tick, not after waiting 18 seconds.
+ // Only earlier observed prices within the preceding 20 seconds are eligible.
  const window=h.filter(x=>now-x.t<=20000);
- const prior=window.find(x=>x.t<=now-18000);if(!prior)return;
- const change=100*(price/prior.p-1);
+ const low=window.length?window.reduce((a,b)=>b.p<a.p?b:a):null;
+ const change=low?100*(price/low.p-1):0;
+ h.push({t:now,p:price});while(h.length>1&&h[0].t<now-185000)h.shift();
  if(change>=2){
-  const old=st.alerts.get(symbol),peak=Math.max(...window.map(x=>x.p));
-  st.alerts.set(symbol,{rawSymbol:symbol,symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close:prior.p,change:+change.toFixed(2),at:now,first:old?.first||now,historical:false});
-  trackTrades(kind,symbol);
+  const old=st.alerts.get(symbol),peak=Math.max(price,...window.map(x=>x.p));
+  // Do not keep refreshing an existing alert's expiry on every subsequent tick.
+  if(!old||now-old.at>=300000){
+   st.alerts.set(symbol,{rawSymbol:symbol,symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close:low.p,change:+change.toFixed(2),at:now,first:now,historical:false});
+   trackTrades(kind,symbol);
+  }else if(!old.historical&&change>old.change){
+   st.alerts.set(symbol,{...old,price,peak,change:+change.toFixed(2)});
+  }
  }
 }
 function reconnect(kind,fn){const st=state[kind];st.connected=false;if(running&&!st.retry)st.retry=setTimeout(()=>{st.retry=null;fn();},5000);}
