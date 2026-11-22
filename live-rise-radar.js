@@ -1,3 +1,4 @@
+import {assessEntryRisk} from "./entry-risk.js";
 import WebSocket from "ws";
 
 const feeds = {
@@ -16,7 +17,7 @@ function observe(source, symbol, value, at=Date.now()) {
   const key=source+":"+symbol;
   const points=history.get(key)||[];
   points.push({t:at,p:price});
-  while(points.length>1&&points[0].t<at-65000)points.shift();
+  while(points.length>1&&points[0].t<at-185000)points.shift();
   history.set(key,points);
   feeds[source].updatedAt=at;
   const base10=points.find(x=>x.t<=at-10000);
@@ -27,7 +28,8 @@ function observe(source, symbol, value, at=Date.now()) {
   const qualifies=(p10!==null&&p10>=0.5)||(p60!==null&&p60>=1);
   if(!qualifies||at-(cooldown.get(key)||0)<120000)return;
   cooldown.set(key,at);
-  alerts.unshift({source:feeds[source].name,symbol:symbol.replace(/USDT$/,"/USDT"),price,currency:"USDT",change10s:p10===null?null:+p10.toFixed(2),change60s:p60===null?null:+p60.toFixed(2),detectedAt:at,status:"ERKEN HAREKET"});
+  const entryRisk=assessEntryRisk(points,at);
+  alerts.unshift({entryRisk,source:feeds[source].name,symbol:symbol.replace(/USDT$/,"/USDT"),price,currency:"USDT",change10s:p10===null?null:+p10.toFixed(2),change60s:p60===null?null:+p60.toFixed(2),detectedAt:at,status:"ERKEN HAREKET"});
   if(alerts.length>100)alerts.length=100;
 }
 function attach(ws,source,onMessage,onClose){
