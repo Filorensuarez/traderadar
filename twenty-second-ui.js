@@ -327,6 +327,28 @@ async function kucoin(){
  void pollKucoin();clearInterval(kucoinPolling);
  kucoinPolling=setInterval(()=>{if(running&&Date.now()-st.last>7000)void pollKucoin();},3000);
 }
+let okxPolling=null,okxBusy=false;
+async function pollOkx(){
+ if(!running||okxBusy)return;okxBusy=true;
+ const st=state.okx;
+ try{
+  let data=null,lastError="";
+  for(const host of ["https://www.okx.com","https://eea.okx.com"]){
+   try{
+    const response=await fetch(host+"/api/v5/market/tickers?instType=SPOT",{signal:AbortSignal.timeout(8000),cache:"no-store"});
+    if(!response.ok)throw Error("HTTP "+response.status);
+    const json=await response.json();
+    if(String(json.code)!=="0"||!Array.isArray(json.data))throw Error("Geçersiz OKX fiyat yanıtı");
+    data=json.data;break;
+   }catch(e){lastError=e.message;}
+  }
+  if(!data)throw Error(lastError||"OKX fiyatları alınamadı");
+  let count=0;
+  for(const x of data){if(String(x.instId||"").endsWith("-USDT")){observe("okx",x.instId.replace("-",""),Number(x.last));count++;}}
+  if(count){st.connected=true;st.error="";st.tracked=count;}
+ }catch(e){st.error="OKX REST yedeği: "+e.message;}
+ finally{okxBusy=false;}
+}
 async function okx(){
  if(!running)return;const st=state.okx;
  try{
@@ -335,6 +357,7 @@ async function okx(){
  const data=await response.json();if(String(data.code)!=="0")throw Error("OKX parite listesi alınamadı");
  const symbols=(data.data||[]).filter(x=>x.quoteCcy==="USDT"&&x.state==="live").map(x=>x.instId);
  st.tracked=symbols.length;
+ void pollOkx();clearInterval(okxPolling);okxPolling=setInterval(()=>{if(running&&Date.now()-st.last>7000)void pollOkx();},5000);
  if(!symbols.length)throw Error("Aktif USDT paritesi bulunamadı");
  const chunks=[];for(let i=0;i<symbols.length;i+=80)chunks.push(symbols.slice(i,i+80));
  let index=0;
@@ -367,7 +390,7 @@ function begin(){
  binance();okx();void backfill("binance",backfillGeneration);void backfill("okx",backfillGeneration);render();renderTimer=setInterval(render,1000);
 }
 function end(){
- running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;clearInterval(kucoinPolling);kucoinPolling=null;clearInterval(kucoinPing);clearTimeout(kucoinReconnect);kucoinReconnect=null;kucoinSocket=null;
+ running=false;backfillGeneration++;clearTrades();start.disabled=false;stop.disabled=true;clearInterval(renderTimer);clearInterval(binancePolling);binancePolling=null;clearInterval(okxPolling);okxPolling=null;clearInterval(kucoinPolling);kucoinPolling=null;clearInterval(kucoinPing);clearTimeout(kucoinReconnect);kucoinReconnect=null;kucoinSocket=null;
  for(const k of names){const st=state[k];clearTimeout(st.retry);st.retry=null;for(const ws of st.connections){ws.onclose=null;ws.close();}st.connections=[];st.socket=null;st.connected=false;document.getElementById(k+"TwentyStatus").textContent="Durduruldu";}
 }
 start?.addEventListener("click",begin);stop?.addEventListener("click",end);
