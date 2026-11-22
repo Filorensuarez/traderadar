@@ -2,7 +2,7 @@ import WebSocket from "ws";
 
 // Binance Global spot USDT: 1-second observed candles vs last COMPLETED 1h candle close.
 const state={connected:false,error:null,updatedAt:0,total:0,referencesReady:0,referenceHour:0,loading:false};
-const symbols=new Set(),reference=new Map(),candles=new Map(),previous=new Map(),alerts=[],lastAlert=new Map(),hourLast=new Map(),lastPrices=new Map();
+const symbols=new Set(),reference=new Map(),candles=new Map(),previous=new Map(),alerts=[],lastAlert=new Map(),hourLast=new Map(),lastPrices=new Map(),rollingAbove=new Map();
 let started=false,socket=null,refreshTimer=null;
 const API_HOSTS=["https://api.binance.com/api/v3","https://api1.binance.com/api/v3","https://data-api.binance.vision/api/v3"];
 const WS_HOSTS=["wss://stream.binance.com:9443/ws/!miniTicker@arr","wss://stream.binance.com:443/ws/!miniTicker@arr","wss://data-stream.binance.vision/ws/!miniTicker@arr"];
@@ -68,6 +68,18 @@ function observe(symbol,raw,at=Date.now()){
  if(last?.second===second){last.high=Math.max(last.high,price);last.low=Math.min(last.low,price);last.close=price;last.observed=true;}
  else bars.push({second,open:price,high:price,low:price,close:price,observed:true});
  while(bars.length&&bars[0].second<second-299)bars.shift();
+ // Catch rises observed within the last five minutes, without waiting for REST hourly candles.
+ const baseline=bars.length>1?Math.min(...bars.slice(0,-1).map(x=>x.low)):null;
+ if(baseline!==null&&baseline>0){
+  const rollingChange=100*(price/baseline-1);
+  const isAbove=rollingChange>=2;
+  const previouslyAbove=rollingAbove.get(symbol);
+  rollingAbove.set(symbol,isAbove);
+  if(isAbove&&previouslyAbove!==true&&at-(lastAlert.get(symbol)||0)>=30000){
+   lastAlert.set(symbol,at);
+   alerts.unshift({symbol:symbol.replace(/USDT$/,"/USDT"),price,referenceClose:baseline,changePct:round(rollingChange),at,second,referenceCloseTime:null,observedSeconds:bars.length,status:"SON 300 SN +%2",referenceType:"rolling-300-low"});
+  }
+ }
  if(!ref||ref.hour!==state.referenceHour)return;
  const change=100*(price/ref.close-1);
  const wasAbove=previous.get(symbol);
@@ -121,7 +133,7 @@ export function startBinance300Radar(){
 export function binance300Snapshot(){
  const now=Date.now();
  const ready=[...symbols].filter(x=>reference.get(x)?.hour===state.referenceHour).length;
- return {ok:true,updatedAt:now,state:{...state,connected:state.connected&&now-state.updatedAt<15000,referencesReady:ready,tracked:candles.size,lastPriceUpdates:lastPrices.size,memoryUpdatedAt:now,ready:state.connected&&now-state.updatedAt<15000&&ready>0},
+ return {ok:true,updatedAt:now,state:{...state,connected:state.connected&&now-state.updatedAt<15000,referencesReady:ready,tracked:candles.size,lastPriceUpdates:lastPrices.size,memoryUpdatedAt:now,ready:state.connected&&now-state.updatedAt<15000&&candles.size>0},
  thresholdPct:2,windowSeconds:300,reference:"Son tamamlanmış 1 saatlik mum kapanışı",
  rows:alerts.filter(x=>now-x.at<=300000),
  note:"Her saniye 300 saniyelik fiyat hafızası ilerletilir. Yeni borsa fiyatı gelmediyse son bilinen fiyat taşınır ve gözlenmedi olarak işaretlenir; yeni fiyat uydurulmaz. REST 418 durumunda saatlik referans için saat sınırı beklenebilir."};
