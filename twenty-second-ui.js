@@ -185,7 +185,7 @@ async function backfill(kind,generation){
    const open=Number(kind==="binance"?x.openPrice:kind==="okx"?x.open24h:x.last/(1+Number(x.changeRate||0)));
    const volume=kind==="binance"?Number(x.quoteVolume):kind==="okx"?Number(x.volCcy24h)*last:Number(x.volValue);
    return {symbol,score:open>0?100*(last/open-1):0,volume};
-  }).filter(x=>x.symbol.endsWith("USDT")&&x.volume>0).sort((a,b)=>b.score-a.score);
+  }).filter(x=>x.symbol.endsWith("USDT")&&x.volume>0).sort((a,b)=>a.symbol.localeCompare(b.symbol));
   let checked=0;
   for(let i=0;i<candidates.length;i+=5){
    if(!running||generation!==backfillGeneration)return;
@@ -194,7 +194,7 @@ async function backfill(kind,generation){
    if(i+5<candidates.length)await new Promise(resolve=>setTimeout(resolve,1100));
    st.backfillStatus="Geçmiş: "+checked+"/"+candidates.length+" aday tarandı";
   }
-  st.backfillStatus="Geçmiş tarama tamamlandı ("+candidates.length+" aday, 1 dk mum)";
+  st.backfillStatus="Geçmiş tarama tamamlandı ("+candidates.length+" aday, 1 dk mum; 20 sn teyidi yok)";
  }catch(e){st.backfillStatus="Geçmiş tarama erişilemedi: "+e.message;}
 }
 
@@ -231,9 +231,14 @@ function observe(kind,symbol,price){
  let h=st.history.get(symbol);if(!h){h=[];st.history.set(symbol,h);}
  if(h.length&&now-h.at(-1).t<300)return;
  h.push({t:now,p:price});while(h.length>1&&h[0].t<now-185000)h.shift();
- const prior=h.find(x=>x.t<=now-18000);if(!prior)return;
+ const window=h.filter(x=>now-x.t<=20000);
+ const prior=window.find(x=>x.t<=now-18000);if(!prior)return;
  const change=100*(price/prior.p-1);
- if(change>=0.5){const peak=Math.max(...h.map(x=>x.p));void confirm(kind,symbol,price,peak);}
+ if(change>=2){
+  const old=st.alerts.get(symbol),peak=Math.max(...window.map(x=>x.p));
+  st.alerts.set(symbol,{rawSymbol:symbol,symbol:symbol.replace(/USDT$/,"/USDT"),price,peak,close:prior.p,change:+change.toFixed(2),at:now,first:old?.first||now,historical:false});
+  trackTrades(kind,symbol);
+ }
 }
 function reconnect(kind,fn){const st=state[kind];st.connected=false;if(running&&!st.retry)st.retry=setTimeout(()=>{st.retry=null;fn();},5000);}
 let binancePolling=null;
@@ -381,7 +386,7 @@ function render(){
  cleanupTrades();const rows=[...st.alerts.values()].sort((a,b)=>b.change-a.change).slice(0,100);
  const connected=st.connected&&now-st.last<15000;
  status.textContent=(connected?"CANLI":"BAĞLANTI BEKLENİYOR")+" · İzlenen: "+(kind==="okx"||kind==="kucoin"?st.tracked:st.history.size)+" · Sinyal: "+rows.length+(st.backfillStatus?" · "+st.backfillStatus:"")+(st.error?" · Hata: "+st.error:"");
- cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(entryRisk(st,x,now))+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+esc(twoHourFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'20 saniyelik fiyat penceresinin tepe değeri, kapanmış 5 dakikalık mumla karşılaştırıldı. 1 saniyelik OHLC mum doğrulaması değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
+ cards.innerHTML=rows.length?rows.map(x=>'<article class="info-box"><h3>'+esc(x.symbol)+' · %'+esc(x.change)+(x.historical?' · GEÇMİŞ (1 dk mum)':' · CANLI')+'</h3><p>Son fiyat: '+esc(x.price)+' USDT · 5dk kapanış: '+esc(x.close)+' · 20sn tepe: '+esc(x.peak)+' · Tespit: '+new Date(x.first).toLocaleTimeString("tr-TR")+'</p><p>'+esc(entryRisk(st,x,now))+'</p><p>'+esc(pressure(kind,x.rawSymbol))+'</p><p>'+esc(moneyFlow(kind,x.rawSymbol))+'</p><p>'+esc(twoHourFlow(kind,x.rawSymbol))+'</p><p>'+(x.historical?'Geçmiş tarama yaklaşık sonuçtur: 1 dakikalık mumun en yüksek fiyatı önceki dakikaların kapanışıyla karşılaştırılmıştır; 20 saniyelik artış ve gerçek 5 dk mum kapanışı doğrulanmamıştır.':'Son 20 saniyede en az %2 yükseliş ölçüldü; günlük değişim dikkate alınmadı. Bu bir alım önerisi değildir.')+'</p></article>').join(""):'<p>'+(!connected?"Canlı veri bekleniyor. Bu durum sıfır sinyal anlamına gelmez.":"Henüz %2 eşiğine ulaşan coin yok.")+'</p>';
  }
 }
 function begin(){
